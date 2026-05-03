@@ -11,7 +11,7 @@ pub enum Slot {
     /// Match a keyword class (COP, ALL, IF, etc.).
     Keyword(String),
     /// Match a token that resolves to a typed predicate or entity.
-    /// type_constraint is e.g. "e" or "{theme:e}" or None for "any".
+    /// type_constraint is e.g. "e" or "{theme:e,reference:e}" (always canonicalized) or None for "any".
     Var { name: String, type_constraint: Option<String> },
 }
 
@@ -50,7 +50,7 @@ fn parse_slot(spec: &str) -> Result<Slot> {
         if let Some((name, typ)) = rest.split_once(':') {
             return Ok(Slot::Var {
                 name: format!("${}", name),
-                type_constraint: Some(typ.to_string()),
+                type_constraint: Some(canonicalize_type(typ)),
             });
         }
         return Ok(Slot::Var {
@@ -63,6 +63,23 @@ fn parse_slot(spec: &str) -> Result<Slot> {
         return Err(anyhow!("invalid slot: {}", spec));
     }
     Ok(Slot::Keyword(spec.to_string()))
+}
+
+/// Canonicalize a type string so role-typed signatures compare equal regardless
+/// of role order. "e" stays "e". "{theme:e,reference:e}" and
+/// "{reference:e,theme:e}" both become "{reference:e,theme:e}" (alphabetical).
+pub fn canonicalize_type(typ: &str) -> String {
+    let trimmed = typ.trim();
+    if !trimmed.starts_with('{') || !trimmed.ends_with('}') {
+        return trimmed.to_string();
+    }
+    let inner = &trimmed[1..trimmed.len() - 1];
+    if inner.is_empty() {
+        return "{}".to_string();
+    }
+    let mut parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+    parts.sort();
+    format!("{{{}}}", parts.join(","))
 }
 
 /// Map of keyword class -> set of surface forms.
