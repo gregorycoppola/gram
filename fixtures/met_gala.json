@@ -1,0 +1,37 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "run",
+        "roles": {"agent": "e", "patient": "e"},
+        "forms": ["runs", "run", "ran"],
+        "gloss": "to direct or manage the operation of"
+      }
+    ],
+    "entities": [
+      {
+        "name": "anna_wintour",
+        "type": "e",
+        "forms": ["Anna Wintour"],
+        "gloss": "editor-in-chief of Vogue, chair of the Met Gala"
+      },
+      {
+        "name": "met_gala",
+        "type": "e",
+        "forms": ["the Met Gala", "Met Gala"],
+        "gloss": "annual fundraising gala for the Metropolitan Museum of Art Costume Institute"
+      }
+    ]
+  },
+  "grammar": [
+    {
+      "name": "transitive_fact",
+      "pattern": "$x:e $V:{agent:e,patient:e} $y:e",
+      "template": "$V(agent: $x, patient: $y)",
+      "kind": "fact"
+    }
+  ],
+  "sentences": [
+    "Anna Wintour runs the Met Gala."
+  ]
+}
