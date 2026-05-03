@@ -1,0 +1,37 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "chairwoman",
+        "roles": {"theme": "e", "reference": "e"},
+        "forms": ["chairwoman"],
+        "gloss": "a woman serving as the presiding officer of a meeting, organization, or event"
+      }
+    ],
+    "entities": [
+      {
+        "name": "anna_wintour",
+        "type": "e",
+        "forms": ["Anna Wintour"],
+        "gloss": "editor-in-chief of Vogue, chair of the Met Gala"
+      },
+      {
+        "name": "met_gala",
+        "type": "e",
+        "forms": ["the Met Gala", "Met Gala"],
+        "gloss": "annual fundraising gala for the Metropolitan Museum of Art Costume Institute"
+      }
+    ]
+  },
+  "grammar": [
+    {
+      "name": "prepositional_copular_fact",
+      "pattern": "$x:e COP $V:{theme:e,reference:e} $y:e",
+      "template": "$V(theme: $x, reference: $y)",
+      "kind": "fact"
+    }
+  ],
+  "sentences": [
+    "Anna Wintour is the chairwoman of the Met Gala."
+  ]
+}
