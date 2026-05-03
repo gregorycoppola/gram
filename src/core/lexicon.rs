@@ -109,6 +109,12 @@ impl Lexicon {
         }
         None
     }
+
+    pub fn form_index_len(&self) -> usize { self.form_index.len() }
+    pub fn max_form_len(&self) -> usize { self.max_form_len }
+    pub fn form_index_entries(&self) -> impl Iterator<Item = (&String, &(String, Category))> {
+        self.form_index.iter()
+    }
 }
 
 pub fn clean_token(token: &str) -> String {
