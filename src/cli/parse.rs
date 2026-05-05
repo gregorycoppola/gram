@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use crate::core::fixture::Fixture;
 use crate::core::lexicon::Lexicon;
 use crate::core::grammar::compile_rules;
-use crate::core::matcher::parse_sentence;
+use crate::core::matcher::{parse_sentence, Match};
 use crate::core::tokenize::{split_sentences, tokenize};
 
 #[derive(Args)]
@@ -33,13 +33,19 @@ pub struct ParseOneArgs {
     pub json: bool,
 }
 
+#[derive(serde::Serialize)]
+struct ParsedSentence {
+    sentence: String,
+    tokens: Vec<String>,
+    matches: Vec<Match>,
+}
+
 pub fn run_parse(args: ParseArgs) -> Result<()> {
     let fixture = Fixture::from_path(&args.fixture)
         .with_context(|| format!("loading fixture {}", args.fixture.display()))?;
     let lexicon = Lexicon::from_fixture(&fixture);
     let rules = compile_rules(&fixture.grammar)?;
 
-    // Collect every sentence — fixture.sentences may contain multi-sentence strings.
     let mut all_sentences: Vec<String> = Vec::new();
     for s in &fixture.sentences {
         for split in split_sentences(s) {
@@ -51,7 +57,11 @@ pub fn run_parse(args: ParseArgs) -> Result<()> {
     for sent in &all_sentences {
         let tokens = tokenize(sent);
         let matches = parse_sentence(&tokens, &lexicon, &rules);
-        results.push((sent.clone(), tokens, matches));
+        results.push(ParsedSentence {
+            sentence: sent.clone(),
+            tokens,
+            matches,
+        });
     }
 
     if args.json {
@@ -72,7 +82,11 @@ pub fn run_parse_one(args: ParseOneArgs) -> Result<()> {
     for sent in &sentences {
         let tokens = tokenize(sent);
         let matches = parse_sentence(&tokens, &lexicon, &rules);
-        results.push((sent.clone(), tokens, matches));
+        results.push(ParsedSentence {
+            sentence: sent.clone(),
+            tokens,
+            matches,
+        });
     }
 
     if args.json {
@@ -83,26 +97,26 @@ pub fn run_parse_one(args: ParseOneArgs) -> Result<()> {
     Ok(())
 }
 
-fn emit_pretty(results: &[(String, Vec<String>, Vec<crate::core::matcher::Match>)]) {
+fn emit_pretty(results: &[ParsedSentence]) {
     println!("📄 {} sentences\n", results.len());
     let mut parsed = 0;
     let mut ambiguous = 0;
     let mut failed = 0;
 
-    for (sent, _tokens, matches) in results {
-        if matches.is_empty() {
+    for r in results {
+        if r.matches.is_empty() {
             failed += 1;
-            println!("  ❌ \"{}\"", sent);
+            println!("  ❌ \"{}\"", r.sentence);
             println!("     no matching rule\n");
-        } else if matches.len() == 1 {
+        } else if r.matches.len() == 1 {
             parsed += 1;
-            let m = &matches[0];
-            println!("  ✅ \"{}\"", sent);
+            let m = &r.matches[0];
+            println!("  ✅ \"{}\"", r.sentence);
             println!("     → {}  [{}]\n", m.output, m.rule_name);
         } else {
             ambiguous += 1;
-            println!("  ⚠️  \"{}\"  ({} parses)", sent, matches.len());
-            for m in matches {
+            println!("  ⚠️  \"{}\"  ({} parses)", r.sentence, r.matches.len());
+            for m in &r.matches {
                 println!("     → {}  [{}]", m.output, m.rule_name);
             }
             println!();
@@ -113,19 +127,7 @@ fn emit_pretty(results: &[(String, Vec<String>, Vec<crate::core::matcher::Match>
         parsed, results.len(), ambiguous, failed);
 }
 
-fn emit_json(results: &[(String, Vec<String>, Vec<crate::core::matcher::Match>)]) -> Result<()> {
-    let payload: Vec<_> = results.iter().map(|(sent, tokens, matches)| {
-        serde_json::json!({
-            "sentence": sent,
-            "tokens": tokens,
-            "matches": matches.iter().map(|m| serde_json::json!({
-                "rule": m.rule_name,
-                "output": m.output,
-                "kind": m.kind,
-                "bindings": m.bindings,
-            })).collect::<Vec<_>>(),
-        })
-    }).collect();
-    println!("{}", serde_json::to_string_pretty(&payload)?);
+fn emit_json(results: &[ParsedSentence]) -> Result<()> {
+    println!("{}", serde_json::to_string_pretty(results)?);
     Ok(())
 }
