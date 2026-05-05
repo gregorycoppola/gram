@@ -1,5 +1,6 @@
 pub mod inspect;
 pub mod parse;
+pub mod serve;
 
 use anyhow::Result;
 use clap::Subcommand;
@@ -12,6 +13,8 @@ pub enum Command {
     ParseOne(parse::ParseOneArgs),
     /// Dump fixture internals — lexicon form index, tokenization, compiled rules.
     Inspect(inspect::InspectArgs),
+    /// Run an HTTP server exposing fixtures and parse results.
+    Serve(serve::ServeArgs),
 }
 
 pub fn run(command: Command) -> Result<()> {
@@ -19,5 +22,6 @@ pub fn run(command: Command) -> Result<()> {
         Command::Parse(args) => parse::run_parse(args),
         Command::ParseOne(args) => parse::run_parse_one(args),
         Command::Inspect(args) => inspect::run_inspect(args),
+        Command::Serve(args) => serve::run_serve(args),
     }
 }
