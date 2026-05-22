@@ -1,3 +1,4 @@
+pub mod db;
 pub mod inspect;
 pub mod parse;
 pub mod serve;
@@ -17,6 +18,18 @@ pub enum Command {
     Serve(serve::ServeArgs),
     /// Run the SQLite-backed HTTP server (global grammar/lexicon/sentences).
     DbServe(serve::DbServeArgs),
+    /// Manage sentences in the DB.
+    #[command(subcommand)]
+    Sentence(db::SentenceCmd),
+    /// Manage predicates (lexicon) in the DB.
+    #[command(subcommand)]
+    Predicate(db::PredicateCmd),
+    /// Manage entities (lexicon) in the DB.
+    #[command(subcommand)]
+    Entity(db::EntityCmd),
+    /// Manage grammar rules in the DB.
+    #[command(subcommand)]
+    Rule(db::RuleCmd),
 }
 
 pub fn run(command: Command) -> Result<()> {
@@ -26,5 +39,9 @@ pub fn run(command: Command) -> Result<()> {
         Command::Inspect(args) => inspect::run_inspect(args),
         Command::Serve(args) => serve::run_serve(args),
         Command::DbServe(args) => serve::run_db_serve(args),
+        Command::Sentence(c) => db::run_db(db::DbCommand::Sentence(c)),
+        Command::Predicate(c) => db::run_db(db::DbCommand::Predicate(c)),
+        Command::Entity(c) => db::run_db(db::DbCommand::Entity(c)),
+        Command::Rule(c) => db::run_db(db::DbCommand::Rule(c)),
     }
 }
