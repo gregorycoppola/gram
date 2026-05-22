@@ -64,7 +64,6 @@ pub async fn list_rules(State(s): State<DbState>) -> Res {
 }
 
 pub async fn create_rule(State(s): State<DbState>, Json(input): Json<CreateRule>) -> Res {
-    // Validate pattern compiles before saving.
     let fixture_rule = crate::core::fixture::FixtureRule {
         name: input.name.clone(),
         pattern: input.pattern.clone(),
@@ -104,7 +103,7 @@ pub async fn delete_sentence(State(s): State<DbState>, Path(id): Path<i64>) -> R
 
 // ── Parse all sentences ───────────────────────────────────────────────────────
 
-pub async fn parse_all(State(s): State<DbState>) -> Res {
+pub async fn parse_all(State(s): State<DbState>) -> Result<Json<Vec<ParseResult>>, (StatusCode, String)> {
     let fixture = store::build_fixture(&s.db).await.map_err(e500)?;
     let lexicon = Lexicon::from_fixture(&fixture);
     let rules = compile_rules(&fixture.grammar).map_err(e500)?;
@@ -118,12 +117,12 @@ pub async fn parse_all(State(s): State<DbState>) -> Res {
             results.push(ParseResult { sentence: sent, tokens, matches, status });
         }
     }
-    Ok(Json(serde_json::to_value(results)?))
+    Ok(Json(results))
 }
 
 // ── Parse single sentence ─────────────────────────────────────────────────────
 
-pub async fn parse_one(State(s): State<DbState>, Json(body): Json<serde_json::Value>) -> Res {
+pub async fn parse_one(State(s): State<DbState>, Json(body): Json<Value>) -> Result<Json<Vec<ParseResult>>, (StatusCode, String)> {
     let text = body.get("sentence")
         .and_then(|v| v.as_str())
         .ok_or_else(|| (StatusCode::BAD_REQUEST, "missing sentence".into()))?
@@ -140,5 +139,5 @@ pub async fn parse_one(State(s): State<DbState>, Json(body): Json<serde_json::Va
         let status = ParseStatus::from_matches(&matches);
         results.push(ParseResult { sentence: sent, tokens, matches, status });
     }
-    Ok(Json(serde_json::to_value(results)?))
+    Ok(Json(results))
 }
