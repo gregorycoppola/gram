@@ -15,6 +15,8 @@ pub enum Command {
     Inspect(inspect::InspectArgs),
     /// Run an HTTP server exposing fixtures and parse results.
     Serve(serve::ServeArgs),
+    /// Run the SQLite-backed HTTP server (global grammar/lexicon/sentences).
+    DbServe(serve::DbServeArgs),
 }
 
 pub fn run(command: Command) -> Result<()> {
@@ -23,5 +25,6 @@ pub fn run(command: Command) -> Result<()> {
         Command::ParseOne(args) => parse::run_parse_one(args),
         Command::Inspect(args) => inspect::run_inspect(args),
         Command::Serve(args) => serve::run_serve(args),
+        Command::DbServe(args) => serve::run_db_serve(args),
     }
 }
