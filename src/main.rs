@@ -1,5 +1,6 @@
 mod cli;
 mod core;
+mod db;
 mod server;
 
 use anyhow::Result;
