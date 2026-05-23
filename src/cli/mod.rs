@@ -14,10 +14,8 @@ pub enum Command {
     ParseOne(parse::ParseOneArgs),
     /// Dump fixture internals — lexicon form index, tokenization, compiled rules.
     Inspect(inspect::InspectArgs),
-    /// Run an HTTP server exposing fixtures and parse results.
+    /// Run the HTTP server (fixtures + DB) on localhost.
     Serve(serve::ServeArgs),
-    /// Run the SQLite-backed HTTP server (global grammar/lexicon/sentences).
-    DbServe(serve::DbServeArgs),
     /// Manage sentences in the DB.
     #[command(subcommand)]
     Sentence(db::SentenceCmd),
@@ -38,7 +36,6 @@ pub fn run(command: Command) -> Result<()> {
         Command::ParseOne(args) => parse::run_parse_one(args),
         Command::Inspect(args) => inspect::run_inspect(args),
         Command::Serve(args) => serve::run_serve(args),
-        Command::DbServe(args) => serve::run_db_serve(args),
         Command::Sentence(c) => db::run_db(db::DbCommand::Sentence(c)),
         Command::Predicate(c) => db::run_db(db::DbCommand::Predicate(c)),
         Command::Entity(c) => db::run_db(db::DbCommand::Entity(c)),
