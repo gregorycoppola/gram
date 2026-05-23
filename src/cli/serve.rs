@@ -2,23 +2,16 @@ use anyhow::Result;
 use clap::Args;
 use std::path::PathBuf;
 
-use crate::server::{run_db_server, run_server};
+use crate::server::run_server;
 
 #[derive(Args)]
 pub struct ServeArgs {
     /// Port to bind on.
-    #[arg(long, default_value_t = 9100)]
+    #[arg(long, default_value_t = 9101)]
     pub port: u16,
     /// Fixtures directory (relative or absolute).
     #[arg(long, default_value = "fixtures")]
     pub fixtures_dir: PathBuf,
-}
-
-#[derive(Args)]
-pub struct DbServeArgs {
-    /// Port to bind on.
-    #[arg(long, default_value_t = 9101)]
-    pub port: u16,
 }
 
 pub fn run_serve(args: ServeArgs) -> Result<()> {
@@ -26,11 +19,4 @@ pub fn run_serve(args: ServeArgs) -> Result<()> {
         .enable_all()
         .build()?;
     rt.block_on(run_server(args.port, args.fixtures_dir))
-}
-
-pub fn run_db_serve(args: DbServeArgs) -> Result<()> {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    rt.block_on(run_db_server(args.port))
 }
