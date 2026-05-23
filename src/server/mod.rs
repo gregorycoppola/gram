@@ -8,6 +8,7 @@ use axum::{routing::{delete, get, post}, Router};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::trace::TraceLayer;
 
 use crate::db::client::Db;
 
@@ -33,8 +34,9 @@ pub async fn run_server(port: u16, fixtures_dir: PathBuf) -> Result<()> {
         .route("/fixtures/:name/parse", get(routes::parse_fixture))
         .route("/parse", post(routes::parse_one))
         .with_state(state)
-        .layer(cors);
-    let addr = format!("0.0.0.0:{}", port);
+        .layer(cors)
+        .layer(TraceLayer::new_for_http());
+    let addr = format!("127.0.0.1:{}", port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     println!("🌐 gram serve listening on http://{}", addr);
     axum::serve(listener, app).await?;
@@ -58,8 +60,9 @@ pub async fn run_db_server(port: u16) -> Result<()> {
         .route("/parse", get(db_routes::parse_all))
         .route("/parse/one", post(db_routes::parse_one))
         .with_state(state)
-        .layer(cors);
-    let addr = format!("0.0.0.0:{}", port);
+        .layer(cors)
+        .layer(TraceLayer::new_for_http());
+    let addr = format!("127.0.0.1:{}", port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     println!("🌐 gram db-serve listening on http://{}", addr);
     axum::serve(listener, app).await?;
