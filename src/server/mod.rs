@@ -15,28 +15,21 @@ use crate::db::client::Db;
 #[derive(Clone)]
 pub struct AppState {
     pub fixtures_dir: Arc<PathBuf>,
-}
-
-#[derive(Clone)]
-pub struct DbState {
     pub db: Db,
 }
 
 pub async fn run_server(port: u16, fixtures_dir: PathBuf) -> Result<()> {
     let db = Db::connect().await?;
-    let app_state = AppState {
+    let state = AppState {
         fixtures_dir: Arc::new(fixtures_dir),
+        db,
     };
-    let db_state = DbState { db };
     let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any);
     let app = Router::new()
-        // health
         .route("/health", get(routes::health))
-        // fixture routes (legacy)
         .route("/fixtures", get(routes::list_fixtures))
         .route("/fixtures/:name", get(routes::get_fixture))
         .route("/fixtures/:name/parse", get(routes::parse_fixture))
-        // DB routes
         .route("/predicates", get(db_routes::list_predicates).post(db_routes::create_predicate))
         .route("/predicates/:id", delete(db_routes::delete_predicate))
         .route("/entities", get(db_routes::list_entities).post(db_routes::create_entity))
@@ -47,8 +40,7 @@ pub async fn run_server(port: u16, fixtures_dir: PathBuf) -> Result<()> {
         .route("/sentences/:id", delete(db_routes::delete_sentence))
         .route("/parse", get(db_routes::parse_all).post(routes::parse_one))
         .route("/parse/one", post(db_routes::parse_one))
-        .with_state(db_state)
-        .with_state(app_state)
+        .with_state(state)
         .layer(cors)
         .layer(TraceLayer::new_for_http());
     let addr = format!("127.0.0.1:{}", port);

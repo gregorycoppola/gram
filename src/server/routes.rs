@@ -48,11 +48,7 @@ pub async fn list_fixtures(
                     sentences: fixture.sentences.len(),
                 });
             }
-            Err(_) => {
-                // Skip malformed fixtures silently in the list view.
-                // GET /fixtures/{name} will surface the error for the specific fixture.
-                continue;
-            }
+            Err(_) => continue,
         }
     }
 
