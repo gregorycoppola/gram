@@ -88,8 +88,8 @@ impl Lexicon {
         if let Some(p) = self.predicates.get(canonical) {
             return Some(p.role_signature());
         }
-        if self.entities.contains_key(canonical) {
-            return Some("e".to_string());
+        if let Some(e) = self.entities.get(canonical) {
+            return Some(e.typ.clone());
         }
         None
     }
