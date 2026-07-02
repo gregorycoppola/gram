@@ -1,0 +1,95 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "meeting",
+        "roles": {"theme": "e"},
+        "forms": ["meeting"],
+        "gloss": "a gathering of people for discussion"
+      },
+      {
+        "name": "deadline",
+        "roles": {"theme": "e"},
+        "forms": ["deadline", "due date"],
+        "gloss": "the time by which something must be completed"
+      },
+      {
+        "name": "report",
+        "roles": {"theme": "e"},
+        "forms": ["report"],
+        "gloss": "a document presenting information"
+      },
+      {
+        "name": "ready",
+        "roles": {"theme": "e"},
+        "forms": ["ready"],
+        "gloss": "fully prepared or completed"
+      },
+      {
+        "name": "submitted",
+        "roles": {"theme": "e"},
+        "forms": ["submitted", "turned in"],
+        "gloss": "handed in for review"
+      },
+      {
+        "name": "scheduled",
+        "roles": {"theme": "e"},
+        "forms": ["scheduled", "planned"],
+        "gloss": "arranged for a particular time"
+      },
+      {
+        "name": "cancelled",
+        "roles": {"theme": "e"},
+        "forms": ["cancelled", "canceled"],
+        "gloss": "called off"
+      }
+    ],
+    "entities": [
+      {
+        "name": "the_report",
+        "type": "e",
+        "forms": ["the report", "report"],
+        "gloss": "the Q3 financial report"
+      },
+      {
+        "name": "the_meeting",
+        "type": "e",
+        "forms": ["the meeting", "meeting"],
+        "gloss": "the weekly standup"
+      },
+      {
+        "name": "the_deadline",
+        "type": "e",
+        "forms": ["the deadline", "deadline", "the due date", "due date"],
+        "gloss": "the submission deadline"
+      },
+      {
+        "name": "friday",
+        "type": "e",
+        "forms": ["Friday"],
+        "gloss": "the upcoming Friday"
+      },
+      {
+        "name": "monday",
+        "type": "e",
+        "forms": ["Monday"],
+        "gloss": "the upcoming Monday"
+      }
+    ]
+  },
+  "grammar": [],
+  "sentences": [
+    "When is the meeting?",
+    "When is the deadline?",
+    "When is the report due?",
+    "When is the meeting scheduled?",
+    "When was the meeting cancelled?",
+    "When is the report submitted?",
+    "When are the reports due?",
+    "When is Friday?",
+    "Is the meeting on Monday?",
+    "Is the report ready?",
+    "Is the deadline Friday?",
+    "Was the meeting cancelled?"
+  ]
+}
