@@ -58,7 +58,7 @@ fn parse_slot(spec: &str) -> Result<Slot> {
             type_constraint: None,
         });
     }
-    // Otherwise it's a keyword (COP, ALL, IF, THEN, AND, NOT, A, SOMEONE, ...).
+    // Otherwise it's a keyword (COP, ALL, IF, THEN, AND, NOT, A, SOMEONE, WH, ...).
     if !spec.chars().all(|c| c.is_ascii_uppercase() || c == '_') {
         return Err(anyhow!("invalid slot: {}", spec));
     }
@@ -93,6 +93,7 @@ pub fn keywords() -> &'static [(&'static str, &'static [&'static str])] {
         ("NOT",     &["not", "never", "no", "n't"]),
         ("A",       &["a", "an"]),
         ("SOMEONE", &["someone", "somebody", "anyone"]),
+        ("WH",      &["who", "what", "where", "when", "why", "how"]),
     ]
 }
 

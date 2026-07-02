@@ -1,0 +1,87 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "man",
+        "roles": {"theme": "e"},
+        "forms": ["man", "men"],
+        "gloss": "a human adult male"
+      },
+      {
+        "name": "mortal",
+        "roles": {"theme": "e"},
+        "forms": ["mortal"],
+        "gloss": "subject to death"
+      }
+    ],
+    "entities": [
+      {
+        "name": "socrates",
+        "type": "e",
+        "forms": ["Socrates"],
+        "gloss": "Greek philosopher, 470-399 BC"
+      }
+    ]
+  },
+  "grammar": [
+    {
+      "name": "wh_copular_with_a",
+      "pattern": "WH COP A $P:{theme:e}",
+      "template": "? [x:e]: $P(theme: x)",
+      "kind": "question"
+    },
+    {
+      "name": "wh_copular_bare",
+      "pattern": "WH COP $P:{theme:e}",
+      "template": "? [x:e]: $P(theme: x)",
+      "kind": "question"
+    },
+    {
+      "name": "wh_copular_negated",
+      "pattern": "WH COP NOT $P:{theme:e}",
+      "template": "? [x:e]: not $P(theme: x)",
+      "kind": "question"
+    },
+    {
+      "name": "wh_copular_entity",
+      "pattern": "WH COP $x:e",
+      "template": "? P: P(theme: $x)",
+      "kind": "question"
+    },
+    {
+      "name": "yn_copular_with_a",
+      "pattern": "COP $x:e A $P:{theme:e}",
+      "template": "? $P(theme: $x)",
+      "kind": "question"
+    },
+    {
+      "name": "yn_copular_bare",
+      "pattern": "COP $x:e $P:{theme:e}",
+      "template": "? $P(theme: $x)",
+      "kind": "question"
+    },
+    {
+      "name": "yn_copular_bare_plural",
+      "pattern": "COP $P:{theme:e} $Q:{theme:e}",
+      "template": "? always [x:e]: $P(theme: x) -> $Q(theme: x)",
+      "kind": "question"
+    },
+    {
+      "name": "yn_copular_universal",
+      "pattern": "COP ALL $P:{theme:e} $Q:{theme:e}",
+      "template": "? always [x:e]: $P(theme: x) -> $Q(theme: x)",
+      "kind": "question"
+    }
+  ],
+  "sentences": [
+    "Who is a man?",
+    "Who is mortal?",
+    "What is Socrates?",
+    "What are men?",
+    "Who is not mortal?",
+    "Is Socrates a man?",
+    "Is Socrates mortal?",
+    "Are men mortal?",
+    "Are all men mortal?"
+  ]
+}
