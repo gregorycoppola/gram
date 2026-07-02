@@ -53,11 +53,18 @@
       "pattern": "ALL $P:{theme:e} COP $Q:{theme:e}",
       "template": "always [x:e]: $P(theme: x) -> $Q(theme: x)",
       "kind": "rule"
+    },
+    {
+      "name": "copular_universal_bare",
+      "pattern": "$P:{theme:e} COP $Q:{theme:e}",
+      "template": "always [x:e]: $P(theme: x) -> $Q(theme: x)",
+      "kind": "rule"
     }
   ],
   "sentences": [
     "Socrates is a man.",
     "All men are mortal.",
+    "Men are mortal.",
     "Socrates is not a man.",
     "Socrates is not mortal."
   ]
