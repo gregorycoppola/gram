@@ -61,8 +61,8 @@
       "kind": "question"
     },
     {
-      "name": "how_often_pred_pred",
-      "pattern": "LIT:how LIT:often $P:{theme:e} COP $Q:{theme:e}",
+      "name": "how_often_cop_pred_pred",
+      "pattern": "LIT:how LIT:often COP $P:{theme:e} $Q:{theme:e}",
       "template": "? frequency: always [x:e]: $P(theme: x) -> $Q(theme: x)",
       "kind": "question"
     },
