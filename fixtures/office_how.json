@@ -1,0 +1,71 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "report",
+        "roles": {"theme": "e"},
+        "forms": ["report", "reports"],
+        "gloss": "a document presenting information"
+      },
+      {
+        "name": "meeting",
+        "roles": {"theme": "e"},
+        "forms": ["meeting", "meetings"],
+        "gloss": "a gathering of people for discussion"
+      },
+      {
+        "name": "due",
+        "roles": {"theme": "e"},
+        "forms": ["due"],
+        "gloss": "expected at a given time"
+      },
+      {
+        "name": "scheduled",
+        "roles": {"theme": "e"},
+        "forms": ["scheduled"],
+        "gloss": "arranged for a particular time"
+      },
+      {
+        "name": "attendee",
+        "roles": {"theme": "e"},
+        "forms": ["attendee", "attendees"],
+        "gloss": "a person present at a meeting"
+      }
+    ],
+    "entities": [
+      {
+        "name": "the_report",
+        "type": "e",
+        "forms": ["the report", "report"],
+        "gloss": "the Q3 financial report"
+      },
+      {
+        "name": "the_meeting",
+        "type": "e",
+        "forms": ["the meeting", "meeting"],
+        "gloss": "the weekly standup"
+      }
+    ]
+  },
+  "grammar": [
+    {
+      "name": "wh_entity",
+      "pattern": "WH COP $x:e",
+      "template": "? how: $x",
+      "kind": "question"
+    },
+    {
+      "name": "wh_pred_pred",
+      "pattern": "WH COP $P:{theme:e} $Q:{theme:e}",
+      "template": "? how: always [x:e]: $P(theme: x) -> $Q(theme: x)",
+      "kind": "question"
+    }
+  ],
+  "sentences": [
+    "How many reports are due?",
+    "How much is the report?",
+    "How often are meetings scheduled?",
+    "How many attendees are in the meeting?",
+    "How long is the meeting?"
+  ]
+}
