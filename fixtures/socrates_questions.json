@@ -1,0 +1,38 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "man",
+        "roles": {"theme": "e"},
+        "forms": ["man", "men"],
+        "gloss": "a human adult male"
+      },
+      {
+        "name": "mortal",
+        "roles": {"theme": "e"},
+        "forms": ["mortal"],
+        "gloss": "subject to death"
+      }
+    ],
+    "entities": [
+      {
+        "name": "socrates",
+        "type": "e",
+        "forms": ["Socrates"],
+        "gloss": "Greek philosopher, 470-399 BC"
+      }
+    ]
+  },
+  "grammar": [],
+  "sentences": [
+    "Who is a man?",
+    "Who is mortal?",
+    "What is Socrates?",
+    "What are men?",
+    "Who is not mortal?",
+    "Is Socrates a man?",
+    "Is Socrates mortal?",
+    "Are men mortal?",
+    "Are all men mortal?"
+  ]
+}
