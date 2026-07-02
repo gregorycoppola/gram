@@ -49,8 +49,8 @@
   },
   "grammar": [
     {
-      "name": "how_many_pred_pred",
-      "pattern": "LIT:how LIT:many COP $P:{theme:e} $Q:{theme:e}",
+      "name": "how_many_pred_cop_pred",
+      "pattern": "LIT:how LIT:many $P:{theme:e} COP $Q:{theme:e}",
       "template": "? count: |x: $P(theme: x)|, such-that $Q(theme: x)",
       "kind": "question"
     },
@@ -62,7 +62,7 @@
     },
     {
       "name": "how_often_pred_pred",
-      "pattern": "LIT:how LIT:often COP $P:{theme:e} $Q:{theme:e}",
+      "pattern": "LIT:how LIT:often $P:{theme:e} COP $Q:{theme:e}",
       "template": "? frequency: always [x:e]: $P(theme: x) -> $Q(theme: x)",
       "kind": "question"
     },
