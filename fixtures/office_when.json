@@ -16,7 +16,7 @@
       {
         "name": "report",
         "roles": {"theme": "e"},
-        "forms": ["report"],
+        "forms": ["report", "reports"],
         "gloss": "a document presenting information"
       },
       {
@@ -42,6 +42,12 @@
         "roles": {"theme": "e"},
         "forms": ["cancelled", "canceled"],
         "gloss": "called off"
+      },
+      {
+        "name": "due",
+        "roles": {"theme": "e"},
+        "forms": ["due"],
+        "gloss": "expected at a given time"
       }
     ],
     "entities": [
@@ -77,7 +83,38 @@
       }
     ]
   },
-  "grammar": [],
+  "grammar": [
+    {
+      "name": "wh_entity",
+      "pattern": "WH COP $x:e",
+      "template": "? when: $x",
+      "kind": "question"
+    },
+    {
+      "name": "wh_entity_pred",
+      "pattern": "WH COP $x:e $P:{theme:e}",
+      "template": "? when: $P(theme: $x)",
+      "kind": "question"
+    },
+    {
+      "name": "wh_pred_pred",
+      "pattern": "WH COP $P:{theme:e} $Q:{theme:e}",
+      "template": "? when: always [x:e]: $P(theme: x) -> $Q(theme: x)",
+      "kind": "question"
+    },
+    {
+      "name": "yn_entity_pred",
+      "pattern": "COP $x:e $P:{theme:e}",
+      "template": "? $P(theme: $x)",
+      "kind": "question"
+    },
+    {
+      "name": "yn_entity_entity",
+      "pattern": "COP $x:e $y:e",
+      "template": "? $x = $y",
+      "kind": "question"
+    }
+  ],
   "sentences": [
     "When is the meeting?",
     "When is the deadline?",
