@@ -45,6 +45,8 @@
   ],
   "sentences": [
     "Socrates is a man.",
-    "All men are mortal."
+    "All men are mortal.",
+    "Socrates is not a man.",
+    "Socrates is not mortal."
   ]
 }
