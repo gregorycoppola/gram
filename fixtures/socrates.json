@@ -37,6 +37,18 @@
       "kind": "fact"
     },
     {
+      "name": "copular_negated",
+      "pattern": "$x:e COP NOT A $P:{theme:e}",
+      "template": "not $P(theme: $x)",
+      "kind": "fact"
+    },
+    {
+      "name": "copular_negated_bare",
+      "pattern": "$x:e COP NOT $P:{theme:e}",
+      "template": "not $P(theme: $x)",
+      "kind": "fact"
+    },
+    {
       "name": "copular_universal",
       "pattern": "ALL $P:{theme:e} COP $Q:{theme:e}",
       "template": "always [x:e]: $P(theme: x) -> $Q(theme: x)",
