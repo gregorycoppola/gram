@@ -49,15 +49,33 @@
   },
   "grammar": [
     {
-      "name": "wh_entity",
-      "pattern": "WH COP $x:e",
-      "template": "? how: $x",
+      "name": "how_many_pred_pred",
+      "pattern": "LIT:how LIT:many COP $P:{theme:e} $Q:{theme:e}",
+      "template": "? count: |x: $P(theme: x)|, such-that $Q(theme: x)",
       "kind": "question"
     },
     {
-      "name": "wh_pred_pred",
-      "pattern": "WH COP $P:{theme:e} $Q:{theme:e}",
-      "template": "? how: always [x:e]: $P(theme: x) -> $Q(theme: x)",
+      "name": "how_much_entity",
+      "pattern": "LIT:how LIT:much COP $x:e",
+      "template": "? value: $x",
+      "kind": "question"
+    },
+    {
+      "name": "how_often_pred_pred",
+      "pattern": "LIT:how LIT:often COP $P:{theme:e} $Q:{theme:e}",
+      "template": "? frequency: always [x:e]: $P(theme: x) -> $Q(theme: x)",
+      "kind": "question"
+    },
+    {
+      "name": "how_many_pred_in_entity",
+      "pattern": "LIT:how LIT:many $P:{theme:e} COP _ $y:e",
+      "template": "? count: |x: $P(theme: x)|, in $y",
+      "kind": "question"
+    },
+    {
+      "name": "how_long_entity",
+      "pattern": "LIT:how LIT:long COP $x:e",
+      "template": "? duration: $x",
       "kind": "question"
     }
   ],
