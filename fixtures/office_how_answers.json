@@ -30,6 +30,12 @@
         "roles": {"theme": "e"},
         "forms": ["attendee", "attendees"],
         "gloss": "a person present at a meeting"
+      },
+      {
+        "name": "equals",
+        "roles": {"theme": "e", "value": "e"},
+        "forms": ["is"],
+        "gloss": "identity or assignment"
       }
     ],
     "entities": [
@@ -87,7 +93,7 @@
     {
       "name": "copular_entity_equals",
       "pattern": "$x:e COP $y:e",
-      "template": "$x = $y",
+      "template": "equals(theme: $x, value: $y)",
       "kind": "fact"
     },
     {
