@@ -4,8 +4,7 @@
 ///   expr       = question | impl_expr
 ///   question   = '?' [label ':'] [binding] impl_expr
 ///   impl_expr  = and_expr ['->' and_expr]
-///   and_expr   = equals ('∧' equals)*
-///   equals     = primary ['=' primary]
+///   and_expr   = primary ('∧' primary)*
 ///   primary    = 'not' primary
 ///              | 'always' binding impl_expr
 ///              | 'exists' binding and_expr [count]
@@ -25,7 +24,6 @@ enum Tok {
     RBracket,
     Colon,
     Comma,
-    Equals,
     And,
     Implies,
     Question,
@@ -48,7 +46,6 @@ fn tokenize(input: &str) -> Result<Vec<Tok>, String> {
             ']' => { tokens.push(Tok::RBracket); i += 1; }
             ':' => { tokens.push(Tok::Colon); i += 1; }
             ',' => { tokens.push(Tok::Comma); i += 1; }
-            '=' => { tokens.push(Tok::Equals); i += 1; }
             '∧' => { tokens.push(Tok::And); i += 1; }
             '?' => { tokens.push(Tok::Question); i += 1; }
             '|' => { tokens.push(Tok::Pipe); i += 1; }
@@ -102,6 +99,10 @@ impl Parser {
 
     fn at_ident(&self) -> bool {
         matches!(self.peek(), Some(Tok::Ident(_)))
+    }
+
+    fn at_ident_val(&self, val: &str) -> bool {
+        matches!(self.peek(), Some(Tok::Ident(s)) if s == val)
     }
 
     fn expect(&mut self, t: &Tok) -> Result<(), String> {
@@ -190,27 +191,13 @@ impl Parser {
     }
 
     fn parse_and(&mut self) -> Result<Expr, String> {
-        let mut left = self.parse_equals()?;
+        let mut left = self.parse_primary()?;
         while self.at(&Tok::And) {
             self.advance();
-            let right = self.parse_equals()?;
+            let right = self.parse_primary()?;
             left = Expr::And(Box::new(left), Box::new(right));
         }
         Ok(left)
-    }
-
-    fn parse_equals(&mut self) -> Result<Expr, String> {
-        let left = self.parse_primary()?;
-        if self.at(&Tok::Equals) {
-            self.advance();
-            let right = self.parse_primary()?;
-            Ok(Expr::Equals {
-                left: Box::new(left),
-                right: Box::new(right),
-            })
-        } else {
-            Ok(left)
-        }
     }
 
     fn parse_primary(&mut self) -> Result<Expr, String> {
@@ -244,7 +231,10 @@ impl Parser {
                     self.expect(&Tok::Pipe)?;
                     let _count_var = self.expect_ident()?;
                     self.expect(&Tok::Pipe)?;
-                    self.expect(&Tok::Equals)?;
+                    // '=' is not a token anymore, so it appears as Ident("=")
+                    if self.at_ident_val("=") {
+                        self.advance();
+                    }
                     Some(self.expect_ident()?)
                 } else {
                     None
