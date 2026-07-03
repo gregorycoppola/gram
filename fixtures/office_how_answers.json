@@ -42,7 +42,7 @@
       {
         "name": "the_meeting",
         "type": "e",
-        "forms": ["the meeting", "meeting"],
+        "forms": ["the meeting", "meeting", "meetings"],
         "gloss": "the weekly standup"
       },
       {
@@ -94,6 +94,12 @@
       "name": "copular_entity_in_entity",
       "pattern": "$x:e COP _ $y:e",
       "template": "in($x, $y)",
+      "kind": "fact"
+    },
+    {
+      "name": "copular_fact_adjunct",
+      "pattern": "$x:e COP $P:{theme:e} $A:e",
+      "template": "$P(theme: $x, frequency: $A)",
       "kind": "fact"
     }
   ],

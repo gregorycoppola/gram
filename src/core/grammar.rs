@@ -98,9 +98,12 @@ pub fn keywords() -> &'static [(&'static str, &'static [&'static str])] {
     ]
 }
 
-/// Tokens that are matched-then-skipped (function words, punctuation).
+/// Tokens that are matched-then-skipped.
 pub fn ignored_tokens() -> &'static [&'static str] {
-    &[".", ",", "!", "?", "the", "it", "they", "he", "she", "them", "to", "of", "than", "on", "in"]
+    // Only punctuation. Function words (articles, pronouns, prepositions)
+    // must be explicitly matched with _ in patterns so that preposition
+    // presence/absence is structurally significant.
+    &[".", ",", "!", "?"]
 }
 
 pub fn matches_keyword(token: &str, keyword: &str) -> bool {
