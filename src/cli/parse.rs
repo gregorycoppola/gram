@@ -112,12 +112,19 @@ fn emit_pretty(results: &[ParsedSentence]) {
             parsed += 1;
             let m = &r.matches[0];
             println!("  ✅ \"{}\"", r.sentence);
-            println!("     → {}  [{}]\n", m.output, m.rule_name);
+            println!("     → {}  [{}]", m.output, m.rule_name);
+            if let Err(e) = crate::core::semantics::parse(&m.output) {
+                println!("     ⚠️  semantics: {}", e);
+            }
+            println!();
         } else {
             ambiguous += 1;
             println!("  ⚠️  \"{}\"  ({} parses)", r.sentence, r.matches.len());
             for m in &r.matches {
                 println!("     → {}  [{}]", m.output, m.rule_name);
+                if let Err(e) = crate::core::semantics::parse(&m.output) {
+                    println!("       ⚠️  semantics: {}", e);
+                }
             }
             println!();
         }
