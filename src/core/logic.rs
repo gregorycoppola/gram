@@ -8,11 +8,6 @@ pub enum Expr {
         name: String,
         roles: Vec<(String, Expr)>,
     },
-    /// Equality: left = right
-    Equals {
-        left: Box<Expr>,
-        right: Box<Expr>,
-    },
     /// Negation: not expr
     Not(Box<Expr>),
     /// Conjunction: expr ∧ expr
@@ -60,7 +55,6 @@ impl std::fmt::Display for Expr {
                 }
                 write!(f, ")")
             }
-            Expr::Equals { left, right } => write!(f, "{} = {}", left, right),
             Expr::Not(e) => write!(f, "not {}", e),
             Expr::And(l, r) => write!(f, "{} ∧ {}", l, r),
             Expr::Implies { ante, cons } => write!(f, "{} -> {}", ante, cons),
