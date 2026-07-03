@@ -42,7 +42,7 @@
       {
         "name": "the_meeting",
         "type": "e",
-        "forms": ["the meeting", "meeting"],
+        "forms": ["the meeting", "meeting", "meetings"],
         "gloss": "the weekly standup"
       },
       {
