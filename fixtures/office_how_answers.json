@@ -92,8 +92,8 @@
     },
     {
       "name": "copular_entity_in_entity",
-      "pattern": "$x:e COP _ $y:e",
-      "template": "in($x, $y)",
+      "pattern": "$x:e COP LIT:in $y:e",
+      "template": "in(theme: $x, reference: $y)",
       "kind": "fact"
     },
     {
