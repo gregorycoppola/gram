@@ -101,6 +101,10 @@ impl Parser {
         matches!(self.peek(), Some(Tok::Ident(_)))
     }
 
+    fn at_ident_val(&self, val: &str) -> bool {
+        matches!(self.peek(), Some(Tok::Ident(s)) if s == val)
+    }
+
     fn expect(&mut self, t: &Tok) -> Result<(), String> {
         if self.at(t) {
             self.advance();
@@ -227,9 +231,8 @@ impl Parser {
                     self.expect(&Tok::Pipe)?;
                     let _count_var = self.expect_ident()?;
                     self.expect(&Tok::Pipe)?;
-                    // The '=' here is part of the count syntax, not an equality operator
-                    // We just skip it and read the value
-                    if self.at(&Tok::Ident(ref s)) if s == "=" {
+                    // '=' is not a token anymore, so it appears as Ident("=")
+                    if self.at_ident_val("=") {
                         self.advance();
                     }
                     Some(self.expect_ident()?)
