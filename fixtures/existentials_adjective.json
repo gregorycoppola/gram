@@ -37,12 +37,14 @@
         "name": "three_tall_men",
         "type": "e",
         "forms": ["three tall men"],
+        "count": 3,
         "gloss": "three men who are tall"
       },
       {
         "name": "three_tall_women",
         "type": "e",
         "forms": ["three tall women"],
+        "count": 3,
         "gloss": "three women who are tall"
       }
     ]
@@ -62,8 +64,8 @@
     },
     {
       "name": "existential_counted_adjective",
-      "pattern": "THERE COP $N:e",
-      "template": "exists [x:e]: x = $N",
+      "pattern": "THERE COP $N:{e,count}",
+      "template": "exists [x:e]: $N(theme: x) ∧ cardinality(x, $count)",
       "kind": "fact"
     }
   ],
