@@ -55,7 +55,7 @@
       "kind": "fact"
     },
     {
-      "existential_plural_adjective":      "name": "existential_plural_adjective",
+      "name": "existential_plural_adjective",
       "pattern": "THERE COP $P:{theme:e} $Q:{theme:e}",
       "template": "exists [x:e]: $P(theme: x) ∧ $Q(theme: x)",
       "kind": "fact"
@@ -63,7 +63,7 @@
     {
       "name": "existential_counted_adjective",
       "pattern": "THERE COP $N:e",
-      "template": "exists [x:e]: $N(theme: x), |x| = count",
+      "template": "exists [x:e]: x = $N",
       "kind": "fact"
     }
   ],
