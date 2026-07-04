@@ -102,22 +102,22 @@ fn build_syntax(
 ) -> String {
     let mut parts: Vec<String> = Vec::new();
     let mut ci = 0;
+    let mut skip_until = 0;
 
     for i in 0..tokens.len() {
+        if i < skip_until {
+            continue;
+        }
+
         let cleaned = clean_token(&tokens[i]);
         if is_ignored(&cleaned) {
             continue;
         }
 
-        // At constituent start — emit the constituent's syntax and skip its span.
         if ci < constituents.len() && i == constituents[ci].0 {
             parts.push(constituents[ci].2.clone());
+            skip_until = constituents[ci].1;
             ci += 1;
-            continue;
-        }
-
-        // Inside a constituent — skip (already emitted above).
-        if ci < constituents.len() && i > constituents[ci - 1].0 && i < constituents[ci - 1].1 {
             continue;
         }
 
