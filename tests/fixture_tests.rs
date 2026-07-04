@@ -5,7 +5,7 @@ fn fixtures_dir() -> PathBuf {
     manifest_dir.join("fixtures")
 }
 
-fn run_fixture(path: &std::path::Path) -> (String, usize, usize, usize) {
+fn run_fixture(path: &std::path::Path) -> (String, usize, usize, usize, usize) {
     let fixture = gram::core::fixture::Fixture::from_path(path)
         .unwrap_or_else(|e| panic!("failed to load {}: {}", path.display(), e));
     let lexicon = gram::core::lexicon::Lexicon::from_fixture(&fixture);
@@ -14,6 +14,7 @@ fn run_fixture(path: &std::path::Path) -> (String, usize, usize, usize) {
     let mut parsed = 0usize;
     let mut ambiguous = 0usize;
     let mut failed = 0usize;
+    let mut semantic_failures = 0usize;
 
     for sent in &fixture.sentences {
         let sentences = gram::core::tokenize::split_sentences(sent);
@@ -27,11 +28,22 @@ fn run_fixture(path: &std::path::Path) -> (String, usize, usize, usize) {
             } else {
                 ambiguous += 1;
             }
+            // Validate the semantic output of every match. Both parse errors
+            // (templates emit syntax the semantics parser rejects) and type
+            // errors (role declared e receives a proposition, etc.) count as
+            // semantic failures. Each match is checked separately so an
+            // ambiguous parse with one good output and one bad output reports
+            // exactly one failure.
+            for m in &matches {
+                if let Err(_e) = gram::core::semantics::parse_with_types(&m.output, &lexicon) {
+                    semantic_failures += 1;
+                }
+            }
         }
     }
 
     let name = path.file_name().unwrap().to_string_lossy().to_string();
-    (name, parsed, ambiguous, failed)
+    (name, parsed, ambiguous, failed, semantic_failures)
 }
 
 #[test]
@@ -47,26 +59,28 @@ fn all_fixtures_pass() {
     let mut total_parsed = 0;
     let mut total_ambiguous = 0;
     let mut total_failed = 0;
+    let mut total_semantic_failures = 0;
     let mut failures = Vec::new();
 
     for entry in &entries {
-        let (name, parsed, ambiguous, failed) = run_fixture(&entry.path());
+        let (name, parsed, ambiguous, failed, semantic_failures) = run_fixture(&entry.path());
         total_parsed += parsed;
         total_ambiguous += ambiguous;
         total_failed += failed;
-        if failed > 0 {
+        total_semantic_failures += semantic_failures;
+        if failed > 0 || semantic_failures > 0 {
             failures.push(format!(
-                "  {} — parsed: {}, ambiguous: {}, failed: {}",
-                name, parsed, ambiguous, failed
+                "  {} — parsed: {}, ambiguous: {}, failed: {}, semantic_failures: {}",
+                name, parsed, ambiguous, failed, semantic_failures
             ));
         }
     }
 
     if !failures.is_empty() {
         panic!(
-            "\nFixture failures:\n{}\n\nTotal: parsed={}, ambiguous={}, failed={}",
+            "\nFixture failures:\n{}\n\nTotal: parsed={}, ambiguous={}, failed={}, semantic_failures={}",
             failures.join("\n"),
-            total_parsed, total_ambiguous, total_failed
+            total_parsed, total_ambiguous, total_failed, total_semantic_failures
         );
     }
 
