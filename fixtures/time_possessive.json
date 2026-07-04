@@ -2,28 +2,16 @@
   "lexicon": {
     "predicates": [
       {
-        "name": "date",
-        "roles": {"reference": "e"},
+        "name": "date_of",
+        "roles": {"theme": "e", "of": "e"},
         "forms": ["date"],
-        "gloss": "a particular day"
+        "gloss": "the calendar day associated with an event"
       },
       {
-        "name": "time",
-        "roles": {"reference": "e"},
+        "name": "time_of",
+        "roles": {"theme": "e", "of": "e"},
         "forms": ["time"],
-        "gloss": "a particular time of day"
-      },
-      {
-        "name": "meeting",
-        "roles": {"theme": "e"},
-        "forms": ["meeting"],
-        "gloss": "a gathering"
-      },
-      {
-        "name": "wedding",
-        "roles": {"theme": "e"},
-        "forms": ["wedding"],
-        "gloss": "a marriage ceremony"
+        "gloss": "the clock time associated with an event"
       }
     ],
     "entities": [
@@ -61,15 +49,15 @@
   },
   "grammar": [
     {
-      "name": "date_of_copular",
+      "name": "the_date_of_copular",
       "pattern": "THE LIT:date LIT:of $x:e COP $y:e",
-      "template": "date(reference: $x) ∧ equals(theme: date(reference: $x), value: $y)",
+      "template": "the [d:e]: date_of(theme: d, of: $x) -> equals(theme: d, value: $y)",
       "kind": "fact"
     },
     {
-      "name": "time_of_copular",
+      "name": "the_time_of_copular",
       "pattern": "THE LIT:time LIT:of $x:e COP $y:e",
-      "template": "time(reference: $x) ∧ equals(theme: time(reference: $x), value: $y)",
+      "template": "the [d:e]: time_of(theme: d, of: $x) -> equals(theme: d, value: $y)",
       "kind": "fact"
     },
     {
