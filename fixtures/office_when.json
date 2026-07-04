@@ -85,20 +85,14 @@
   },
   "grammar": [
     {
-      "name": "wh_entity",
-      "pattern": "WH COP THE $x:e",
-      "template": "? when: $x",
-      "kind": "question"
-    },
-    {
       "name": "wh_bare_entity",
       "pattern": "WH COP $x:e",
       "template": "? when: $x",
       "kind": "question"
     },
     {
-      "name": "wh_entity_pred",
-      "pattern": "WH COP THE $x:e $P:{theme:e}",
+      "name": "wh_bare_entity_pred",
+      "pattern": "WH COP $x:e $P:{theme:e}",
       "template": "? when: $P(theme: $x)",
       "kind": "question"
     },

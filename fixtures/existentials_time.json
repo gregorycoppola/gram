@@ -67,7 +67,7 @@
       "kind": "fact"
     },
     {
-      "name": "existential_time_entity_copular",
+      "name": "existential_time_the_entity_copular",
       "pattern": "THERE COP A $P:{theme:e} WH THE $x:e COP $Q:{theme:e}",
       "template": "exists [t:e]: $P(theme: t) ∧ $Q(theme: $x)",
       "kind": "fact"
