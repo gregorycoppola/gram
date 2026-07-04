@@ -34,18 +34,16 @@
     ],
     "entities": [
       {
-        "name": "three_tall_men",
-        "type": "e",
-        "forms": ["three tall men"],
-        "count": 3,
-        "gloss": "three men who are tall"
+        "name": "three",
+        "type": "n",
+        "forms": ["three"],
+        "gloss": "the number 3"
       },
       {
-        "name": "three_tall_women",
-        "type": "e",
-        "forms": ["three tall women"],
-        "count": 3,
-        "gloss": "three women who are tall"
+        "name": "many",
+        "type": "n",
+        "forms": ["many"],
+        "gloss": "an indeterminate large number"
       }
     ]
   },
@@ -64,8 +62,14 @@
     },
     {
       "name": "existential_counted_adjective",
-      "pattern": "THERE COP $N:{e,count}",
-      "template": "exists [x:e]: $N(theme: x) ∧ cardinality(x, $count)",
+      "pattern": "THERE COP $n:n $P:{theme:e} $Q:{theme:e}",
+      "template": "exists_many [x:e, $n]: $P(theme: x) ∧ $Q(theme: x)",
+      "kind": "fact"
+    },
+    {
+      "name": "existential_counted_single",
+      "pattern": "THERE COP $n:n $P:{theme:e}",
+      "template": "exists_many [x:e, $n]: $P(theme: x)",
       "kind": "fact"
     }
   ],
@@ -75,6 +79,8 @@
     "There are tall men.",
     "There are short women.",
     "There are three tall men.",
-    "There are three tall women."
+    "There are three tall women.",
+    "There are many tall men.",
+    "There are many short women."
   ]
 }
