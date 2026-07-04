@@ -1,0 +1,78 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "man",
+        "roles": {"theme": "e"},
+        "forms": ["man", "men"],
+        "gloss": "an adult male human"
+      },
+      {
+        "name": "woman",
+        "roles": {"theme": "e"},
+        "forms": ["woman", "women"],
+        "gloss": "an adult female human"
+      },
+      {
+        "name": "tall",
+        "roles": {"theme": "e"},
+        "forms": ["tall"],
+        "gloss": "of great height"
+      },
+      {
+        "name": "nice",
+        "roles": {"theme": "e"},
+        "forms": ["nice"],
+        "gloss": "pleasant or kind"
+      },
+      {
+        "name": "short",
+        "roles": {"theme": "e"},
+        "forms": ["short"],
+        "gloss": "of little height"
+      }
+    ],
+    "entities": [
+      {
+        "name": "three_tall_men",
+        "type": "e",
+        "forms": ["three tall men"],
+        "gloss": "three men who are tall"
+      },
+      {
+        "name": "three_tall_women",
+        "type": "e",
+        "forms": ["three tall women"],
+        "gloss": "three women who are tall"
+      }
+    ]
+  },
+  "grammar": [
+    {
+      "name": "existential_adjective",
+      "pattern": "THERE COP A $P:{theme:e} $Q:{theme:e}",
+      "template": "exists [x:e]: $P(theme: x) ∧ $Q(theme: x)",
+      "kind": "fact"
+    },
+    {
+      "existential_plural_adjective":      "name": "existential_plural_adjective",
+      "pattern": "THERE COP $P:{theme:e} $Q:{theme:e}",
+      "template": "exists [x:e]: $P(theme: x) ∧ $Q(theme: x)",
+      "kind": "fact"
+    },
+    {
+      "name": "existential_counted_adjective",
+      "pattern": "THERE COP $N:e",
+      "template": "exists [x:e]: $N(theme: x), |x| = count",
+      "kind": "fact"
+    }
+  ],
+  "sentences": [
+    "There is a tall man.",
+    "There is a nice woman.",
+    "There are tall men.",
+    "There are short women.",
+    "There are three tall men.",
+    "There are three tall women."
+  ]
+}
