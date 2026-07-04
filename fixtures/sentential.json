@@ -24,6 +24,12 @@
         "roles": {"agent": "e", "content": "s"},
         "forms": ["think", "thinks"],
         "gloss": "to hold a belief"
+      },
+      {
+        "name": "believe",
+        "roles": {"agent": "e", "content": "s"},
+        "forms": ["believe", "believes"],
+        "gloss": "to accept as true"
       }
     ],
     "entities": [
@@ -38,6 +44,12 @@
         "type": "e",
         "forms": ["John"],
         "gloss": "a person named John"
+      },
+      {
+        "name": "plato",
+        "type": "e",
+        "forms": ["Plato"],
+        "gloss": "Greek philosopher, 428-348 BC"
       }
     ]
   },
@@ -96,6 +108,18 @@
     "All men are mortal.",
     "Socrates is not mortal.",
     "John knows that Socrates is mortal.",
-    "All men know that they are mortal."
+    "John thinks that Socrates is a man.",
+    "John thinks that Socrates is not mortal.",
+    "John believes that Socrates is mortal.",
+    "John believes that Socrates is not a man.",
+    "Plato knows that Socrates is mortal.",
+    "Plato thinks that Socrates is not mortal.",
+    "Plato believes that Socrates is a man.",
+    "Socrates knows that Socrates is a man.",
+    "All men know that they are mortal.",
+    "All men think that they are mortal.",
+    "All men believe that they are mortal.",
+    "All men think that they are not mortal.",
+    "All men believe that they are not mortal."
   ]
 }
