@@ -4,16 +4,13 @@ use crate::core::grammar::{is_ignored, matches_keyword, Rule, Slot};
 use crate::core::lexicon::{clean_token, Lexicon};
 use crate::core::template::apply_template;
 
-/// A parsed sub-phrase: a labeled box with semantic output and free variables.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Constituent {
     pub label: String,
     pub semantics: String,
     pub free_vars: Vec<(String, String)>,
-    /// Token span (start, end exclusive) in the parent's token array.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub span: Option<(usize, usize)>,
-    /// Bracketed syntax tree for this constituent, e.g. "[DP the man]".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub syntax: Option<String>,
 }
@@ -23,14 +20,10 @@ pub struct Match {
     pub rule_name: String,
     pub kind: String,
     pub output: String,
-    /// Variable name -> (canonical, type)
     pub bindings: BTreeMap<String, (String, String)>,
-    /// Per-token annotation aligned 1:1 with the input sentence's tokens.
     pub token_annotations: Vec<TokenAnnotation>,
-    /// Constituents produced by sub-clause slots, in order.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub constituents: Vec<Constituent>,
-    /// Bracketed syntax tree, e.g. "[S [DP the man] is happy]".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub syntax: Option<String>,
 }
@@ -116,13 +109,15 @@ fn build_syntax(
             continue;
         }
 
-        if ci < constituents.len() && i >= constituents[ci].0 && i < constituents[ci].1 {
-            continue;
-        }
-
+        // At constituent start — emit the constituent's syntax and skip its span.
         if ci < constituents.len() && i == constituents[ci].0 {
             parts.push(constituents[ci].2.clone());
             ci += 1;
+            continue;
+        }
+
+        // Inside a constituent — skip (already emitted above).
+        if ci < constituents.len() && i > constituents[ci - 1].0 && i < constituents[ci - 1].1 {
             continue;
         }
 
