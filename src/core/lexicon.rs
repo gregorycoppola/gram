@@ -30,7 +30,7 @@ pub enum Category {
     Entity,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lexicon {
     pub predicates: BTreeMap<String, Predicate>,
     pub entities: BTreeMap<String, Entity>,
