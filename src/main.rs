@@ -1,8 +1,3 @@
-mod cli;
-mod core;
-mod db;
-mod server;
-
 use anyhow::Result;
 use clap::Parser;
 
@@ -10,10 +5,10 @@ use clap::Parser;
 #[command(name = "gram", about = "Typed slot grammar parser for natural language")]
 struct Cli {
     #[command(subcommand)]
-    command: cli::Command,
+    command: gram::cli::Command,
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    cli::run(cli.command)
+    gram::cli::run(cli.command)
 }
