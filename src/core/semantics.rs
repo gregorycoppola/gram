@@ -11,11 +11,14 @@
 ///              | 'this' binding impl_expr
 ///              | 'that' binding impl_expr
 ///              | 'exists' binding and_expr [count]
+///              | 'exists_many' counted_binding and_expr
 ///              | ident '(' role_list ')'       -- predicate
 ///              | ident ':' ident               -- variable ref
 ///              | ident                         -- entity
 ///   binding    = '[' ident ':' ident ']' ':'
-///   count      = ',' '|' ident '|' '=' ident
+///   counted_binding = '[' ident ':' ident ',' count ']' ':'
+///   count      = num | ident           -- "3", "many", "few", ...
+///   count (legacy, on exists) = ',' '|' ident '|' '=' ident
 
 use crate::core::logic::Expr;
 
@@ -32,6 +35,7 @@ enum Tok {
     Question,
     Pipe,
     Ident(String),
+    Num(String),
 }
 
 fn tokenize(input: &str) -> Result<Vec<Tok>, String> {
@@ -55,6 +59,14 @@ fn tokenize(input: &str) -> Result<Vec<Tok>, String> {
             '-' if i + 1 < n && chars[i + 1] == '>' => {
                 tokens.push(Tok::Implies);
                 i += 2;
+            }
+            c if c.is_ascii_digit() => {
+                let start = i;
+                while i < n && chars[i].is_ascii_digit() {
+                    i += 1;
+                }
+                let num: String = chars[start..i].iter().collect();
+                tokens.push(Tok::Num(num));
             }
             c if c.is_alphabetic() || c == '_' => {
                 let start = i;
@@ -282,6 +294,29 @@ impl Parser {
                     count,
                 })
             }
+            Some(Tok::Ident(ref s)) if s == "exists_many" => {
+                self.advance();
+                // [var:type, count]:
+                self.expect(&Tok::LBracket)?;
+                let var = self.expect_ident()?;
+                self.expect(&Tok::Colon)?;
+                let var_type = self.expect_ident()?;
+                self.expect(&Tok::Comma)?;
+                let count = match self.advance() {
+                    Some(Tok::Num(n)) => n,
+                    Some(Tok::Ident(s)) => s,  // vague: many, few, several
+                    other => return Err(format!("expected count, got {:?}", other)),
+                };
+                self.expect(&Tok::RBracket)?;
+                self.expect(&Tok::Colon)?;
+                let body = self.parse_and()?;
+                Ok(Expr::ExistsMany {
+                    var,
+                    var_type,
+                    count,
+                    body: Box::new(body),
+                })
+            }
             Some(Tok::Ident(s)) => {
                 self.advance();
                 if self.at(&Tok::LParen) {
@@ -326,5 +361,42 @@ pub fn parse(input: &str) -> Result<Expr, String> {
         ))
     } else {
         Ok(expr)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_counted_existential_bare_number() {
+        let s = "exists_many [x:e, 3]: man(theme: x) ∧ tall(theme: x)";
+        let e = parse(s).expect("parse");
+        match e {
+            Expr::ExistsMany { var, var_type, count, body } => {
+                assert_eq!(var, "x");
+                assert_eq!(var_type, "e");
+                assert_eq!(count, "3");
+                assert!(matches!(*body, Expr::And(_, _)));
+            }
+            other => panic!("expected ExistsMany, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_counted_existential_vague() {
+        let s = "exists_many [x:e, many]: man(theme: x)";
+        let e = parse(s).expect("parse");
+        match e {
+            Expr::ExistsMany { count, .. } => assert_eq!(count, "many"),
+            other => panic!("expected ExistsMany, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn display_counted_existential_round_trips() {
+        let s = "exists_many [x:e, 3]: man(theme: x) ∧ tall(theme: x)";
+        let e = parse(s).expect("parse");
+        assert_eq!(s, format!("{}", e));
     }
 }
