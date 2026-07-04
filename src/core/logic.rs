@@ -48,6 +48,15 @@ pub enum Expr {
         body: Box<Expr>,
         count: Option<String>,
     },
+    /// Counted existential: exists_many [var:type, count]: body
+    /// count is a string to allow bare numbers ("3"), vague atoms ("many"),
+    /// and (in future) inequality specs (">=3") or ranges ("3..5").
+    ExistsMany {
+        var: String,
+        var_type: String,
+        count: String,
+        body: Box<Expr>,
+    },
     /// Variable reference: name:type
     Var {
         name: String,
@@ -94,6 +103,9 @@ impl std::fmt::Display for Expr {
                     write!(f, ", |{}| = {}", var, c)?;
                 }
                 Ok(())
+            }
+            Expr::ExistsMany { var, var_type, count, body } => {
+                write!(f, "exists_many [{}:{}, {}]: {}", var, var_type, count, body)
             }
             Expr::Var { name, typ } => write!(f, "{}:{}", name, typ),
             Expr::Entity(s) => write!(f, "{}", s),
