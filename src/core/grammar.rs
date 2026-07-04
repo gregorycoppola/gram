@@ -13,12 +13,16 @@ pub enum Slot {
     /// Match a token that resolves to a typed predicate or entity.
     /// type_constraint is e.g. "e" or "{theme:e,reference:e}" (always canonicalized) or None for "any".
     Var { name: String, type_constraint: Option<String> },
-    /// Match a sub-span as a constituent. Consumes all remaining tokens.
+    /// Match a sub-span as a constituent. Consumes remaining tokens unless
+    /// a delimiter keyword is specified, in which case it consumes up to
+    /// (but not including) the delimiter.
     /// available_vars are variable bindings provided by the outer rule's template
     /// context (e.g. a quantifier variable that the sub-clause's pronouns resolve to).
     Sub {
         label: String,
         available_vars: Vec<(String, String)>,
+        /// If Some, consume only up to this keyword class (e.g. "THEN", "AND").
+        delimiter: Option<String>,
     },
 }
 
@@ -75,8 +79,56 @@ fn parse_slot(spec: &str) -> Result<Slot> {
     Ok(Slot::Keyword(spec.to_string()))
 }
 
-/// Parse the part after "SUB:" — e.g. "s" or "s[$x:e]" or "s[$x:e,$y:e]".
+/// Parse the part after "SUB:" — e.g. "s", "s[$x:e]", "s:THEN", "s:THEN[$x:e]".
 fn parse_sub_slot(rest: &str) -> Result<Slot> {
+    // Split off optional delimiter after label: "s:THEN" or "s"
+    let (label_and_vars, delimiter) = if let Some(colon_pos) = rest.find(':') {
+        // Could be "s:THEN" or "s[$x:e]:THEN" — the colon inside brackets is not a delimiter separator.
+        // Check if there's a bracket before this colon.
+        let bracket_pos = rest.find('[');
+        if let Some(bp) = bracket_pos {
+            if bp < colon_pos {
+                // Colon is inside or after brackets — not a delimiter separator.
+                // Look for next colon after the closing bracket.
+                if let Some(close_bracket) = rest.find(']') {
+                    if close_bracket + 1 < rest.len() && rest.as_bytes()[close_bracket + 1] == b':' {
+                        let lbl = &rest[..close_bracket + 1];
+                        let delim = &rest[close_bracket + 2..];
+                        return parse_sub_slot_parts(lbl, Some(delim.to_string()));
+                    }
+                }
+                // No colon after bracket — no delimiter.
+                parse_sub_slot_parts(rest, None)?
+            } else {
+                // Colon before bracket — "s:THEN[$x:e]"
+                let lbl = &rest[..colon_pos];
+                let after_colon = &rest[colon_pos + 1..];
+                // after_colon might be "THEN[$x:e]" — split delimiter from vars
+                if let Some(bracket_start) = after_colon.find('[') {
+                    let delim = &after_colon[..bracket_start];
+                    let vars_part = &after_colon[bracket_start..];
+                    let full = format!("{}{}", lbl, vars_part);
+                    parse_sub_slot_parts(&full, Some(delim.to_string()))?
+                } else {
+                    // No bracket — "s:THEN" with no vars
+                    parse_sub_slot_parts(lbl, Some(after_colon.to_string()))?
+                }
+            }
+        } else {
+            // No bracket at all — "s:THEN"
+            let lbl = &rest[..colon_pos];
+            let delim = &rest[colon_pos + 1..];
+            parse_sub_slot_parts(lbl, Some(delim.to_string()))?
+        }
+    } else {
+        parse_sub_slot_parts(rest, None)?
+    };
+
+    Ok(label_and_vars)
+}
+
+/// Parse label[vars] and combine with an optional delimiter.
+fn parse_sub_slot_parts(rest: &str, delimiter: Option<String>) -> Result<Slot> {
     let (label, vars_str) = if let Some(bracket_start) = rest.find('[') {
         if !rest.ends_with(']') {
             return Err(anyhow!("unterminated bracket in SUB slot: {}", rest));
@@ -103,6 +155,7 @@ fn parse_sub_slot(rest: &str) -> Result<Slot> {
     Ok(Slot::Sub {
         label: label.to_string(),
         available_vars,
+        delimiter,
     })
 }
 

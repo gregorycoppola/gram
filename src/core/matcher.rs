@@ -21,9 +21,9 @@ pub struct Match {
     pub bindings: BTreeMap<String, (String, String)>,
     /// Per-token annotation aligned 1:1 with the input sentence's tokens.
     pub token_annotations: Vec<TokenAnnotation>,
-    /// If this match involved a sub-clause, the constituent produced.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub constituent: Option<Constituent>,
+    /// Constituents produced by sub-clause slots, in order.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub constituents: Vec<Constituent>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -97,10 +97,6 @@ pub fn parse_sentence_with_vars(
     available_vars: &[(String, String)],
 ) -> Vec<Match> {
     let effective_lexicon = if available_vars.is_empty() {
-        // No clone needed if no extra bindings.
-        // SAFETY: we're not mutating, just holding a reference.
-        // But the signature expects owned in some paths, so use a trick:
-        // return early with the fast path.
         return parse_sentence_inner(tokens, lexicon, rules);
     } else {
         lexicon.with_pronoun_bindings(available_vars)
@@ -113,7 +109,10 @@ fn parse_sentence_inner(tokens: &[String], lexicon: &Lexicon, rules: &[Rule]) ->
     for rule in rules {
         let bindings = BTreeMap::new();
         let log: Vec<Consumption> = Vec::new();
-        if let Some((b, log, constituent)) = match_pattern(&rule.pattern, 0, tokens, 0, bindings, log, lexicon, rules) {
+        let constituents = Vec::new();
+        if let Some((b, log, constituents)) = match_pattern(
+            &rule.pattern, 0, tokens, 0, bindings, log, lexicon, rules, 0, constituents,
+        ) {
             let output = apply_template(&rule.template, &b);
             let annotations = annotate_tokens(tokens, &log);
             results.push(Match {
@@ -122,7 +121,7 @@ fn parse_sentence_inner(tokens: &[String], lexicon: &Lexicon, rules: &[Rule]) ->
                 output,
                 bindings: b,
                 token_annotations: annotations,
-                constituent,
+                constituents,
             });
         }
     }
@@ -138,7 +137,9 @@ fn match_pattern(
     log: Vec<Consumption>,
     lexicon: &Lexicon,
     rules: &[Rule],
-) -> Option<(BTreeMap<String, (String, String)>, Vec<Consumption>, Option<Constituent>)> {
+    sub_count: usize,
+    mut constituents: Vec<Constituent>,
+) -> Option<(BTreeMap<String, (String, String)>, Vec<Consumption>, Vec<Constituent>)> {
     let next_is_literal_or_ignore = pi < pattern.len()
         && matches!(pattern[pi], Slot::Literal(_) | Slot::Ignore);
 
@@ -160,7 +161,7 @@ fn match_pattern(
             ti += 1;
         }
         if ti >= tokens.len() {
-            return Some((bindings, log, None));
+            return Some((bindings, log, constituents));
         }
         return None;
     }
@@ -176,18 +177,18 @@ fn match_pattern(
         Slot::Ignore => {
             let mut log = log;
             log.push(Consumption::Ignore { position: ti });
-            match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules)
+            match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents)
         }
 
         Slot::Literal(lit) => {
             if &token == lit {
                 let mut log = log;
                 log.push(Consumption::Literal { position: ti });
-                match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules)
+                match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents)
             } else if is_ignored(&token) {
                 let mut log = log;
                 log.push(Consumption::Skipped { position: ti });
-                match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules)
+                match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents)
             } else {
                 None
             }
@@ -197,11 +198,11 @@ fn match_pattern(
             if matches_keyword(&token, kw) {
                 let mut log = log;
                 log.push(Consumption::Keyword { class: kw.clone(), position: ti });
-                match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules)
+                match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents)
             } else if is_ignored(&token) {
                 let mut log = log;
                 log.push(Consumption::Skipped { position: ti });
-                match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules)
+                match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents)
             } else {
                 None
             }
@@ -225,7 +226,7 @@ fn match_pattern(
                         start: ti,
                         end: ti + consumed,
                     });
-                    if let Some(result) = match_pattern(pattern, pi + 1, tokens, ti + consumed, new_bindings, new_log, lexicon, rules) {
+                    if let Some(result) = match_pattern(pattern, pi + 1, tokens, ti + consumed, new_bindings, new_log, lexicon, rules, sub_count, constituents) {
                         return Some(result);
                     }
                 }
@@ -233,21 +234,36 @@ fn match_pattern(
             if is_ignored(&token) {
                 let mut log = log;
                 log.push(Consumption::Skipped { position: ti });
-                return match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules);
+                return match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents);
             }
             None
         }
 
-        Slot::Sub { label, available_vars } => {
-            // Sub slot: consume remaining tokens as a sub-clause.
-            // Skip any leading ignored tokens first.
+        Slot::Sub { label, available_vars, delimiter } => {
+            // Skip any leading ignored tokens.
             let sub_start = ti;
             let mut sub_ti = ti;
             while sub_ti < tokens.len() && is_ignored(&clean_token(&tokens[sub_ti])) {
                 log.push(Consumption::Skipped { position: sub_ti });
                 sub_ti += 1;
             }
-            let sub_tokens = &tokens[sub_ti..];
+
+            // Find where the sub-span ends.
+            let sub_end = if let Some(delim_kw) = delimiter {
+                // Scan for the delimiter keyword in the remaining tokens.
+                let mut end = tokens.len();
+                for i in sub_ti..tokens.len() {
+                    if matches_keyword(&clean_token(&tokens[i]), delim_kw) {
+                        end = i;
+                        break;
+                    }
+                }
+                end
+            } else {
+                tokens.len()
+            };
+
+            let sub_tokens = &tokens[sub_ti..sub_end];
 
             if sub_tokens.is_empty() {
                 return None;
@@ -264,25 +280,30 @@ fn match_pattern(
                 // Record the sub-clause consumption.
                 new_log.push(Consumption::SubClause {
                     start: sub_start,
-                    end: tokens.len(),
+                    end: sub_end,
                 });
 
-                // Bind "SUB" to the sub-clause's semantics string.
-                // Type is the label ("s") so template substitution works uniformly.
-                new_bindings.insert("SUB".to_string(), (best.output.clone(), label.clone()));
+                // Binding key: SUB for first, SUB2 for second, etc.
+                let sub_key = if sub_count == 0 {
+                    "SUB".to_string()
+                } else {
+                    format!("SUB{}", sub_count + 1)
+                };
+                new_bindings.insert(sub_key, (best.output.clone(), label.clone()));
 
                 // Build the constituent.
-                let constituent = Constituent {
+                constituents.push(Constituent {
                     label: label.clone(),
                     semantics: best.output.clone(),
                     free_vars: available_vars.clone(),
-                };
+                });
 
-                // Continue matching any remaining pattern slots (will fail if
-                // there are any, since we consumed all tokens — that's correct,
-                // Sub should be last).
-                match_pattern(pattern, pi + 1, tokens, tokens.len(), new_bindings, new_log, lexicon, rules)
-                    .map(|(b, l, _)| (b, l, Some(constituent)))
+                // Continue matching from sub_end (the delimiter token, if any,
+                // is left for the next pattern slot to consume).
+                match_pattern(
+                    pattern, pi + 1, tokens, sub_end,
+                    new_bindings, new_log, lexicon, rules, sub_count + 1, constituents,
+                )
             } else {
                 None
             }
@@ -310,7 +331,7 @@ fn annotate_tokens(tokens: &[String], log: &[Consumption]) -> Vec<TokenAnnotatio
                 } else if typ.starts_with('{') {
                     TokenKind::Predicate
                 } else {
-                    TokenKind::Entity // fallback for any future entity-type strings
+                    TokenKind::Entity
                 };
                 for i in *start..*end {
                     if i < out.len() {
@@ -349,8 +370,6 @@ fn annotate_tokens(tokens: &[String], log: &[Consumption]) -> Vec<TokenAnnotatio
             Consumption::SubClause { start, end } => {
                 for i in *start..*end {
                     if i < out.len() {
-                        // Don't overwrite more-specific annotations (Var, Keyword)
-                        // that were set by the sub-parse's own consumption.
                         if matches!(out[i].kind, TokenKind::Unmatched | TokenKind::Ignored) {
                             out[i] = TokenAnnotation {
                                 kind: TokenKind::SubClause,
