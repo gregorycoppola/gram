@@ -226,7 +226,10 @@ fn match_pattern(
                         start: ti,
                         end: ti + consumed,
                     });
-                    if let Some(result) = match_pattern(pattern, pi + 1, tokens, ti + consumed, new_bindings, new_log, lexicon, rules, sub_count, constituents) {
+                    if let Some(result) = match_pattern(
+                        pattern, pi + 1, tokens, ti + consumed,
+                        new_bindings, new_log, lexicon, rules, sub_count, constituents.clone(),
+                    ) {
                         return Some(result);
                     }
                 }
