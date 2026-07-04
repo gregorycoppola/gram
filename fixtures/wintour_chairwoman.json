@@ -26,7 +26,7 @@
   "grammar": [
     {
       "name": "prepositional_copular_fact",
-      "pattern": "$x:e COP $V:{theme:e,reference:e} $y:e",
+      "pattern": "$x:e COP THE $V:{theme:e,reference:e} LIT:of $y:e",
       "template": "$V(theme: $x, reference: $y)",
       "kind": "fact"
     }
