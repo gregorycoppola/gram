@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use crate::core::grammar::{is_ignored, matches_keyword, Rule, Slot};
-use crate::core::lexicon::{clean_token, Lexicon};
+use crate::core::grammar::{is_ignored, clean_token, matches_keyword, Rule, Slot};
+use crate::core::lexicon::Lexicon;
 use crate::core::template::apply_template;
 
 /// A parsed sub-phrase: a labeled box with semantic output and free variables.
@@ -10,6 +10,12 @@ pub struct Constituent {
     pub label: String,
     pub semantics: String,
     pub free_vars: Vec<(String, String)>,
+    /// Token span (start, end exclusive) in the parent's token array.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub span: Option<(usize, usize)>,
+    /// Bracketed syntax tree for this constituent, e.g. "[DP the man]".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub syntax: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -24,6 +30,9 @@ pub struct Match {
     /// Constituents produced by sub-clause slots, in order.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub constituents: Vec<Constituent>,
+    /// Bracketed syntax tree, e.g. "[S [DP the man] is happy]".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub syntax: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -54,11 +63,8 @@ pub enum TokenKind {
 /// Filter for which rule kinds a sub-parse should consider.
 #[derive(Debug, Clone)]
 enum KindFilter {
-    /// Accept any rule kind.
     Any,
-    /// Accept only rules with this exact kind.
     Only(String),
-    /// Accept any rule kind except this one.
     Exclude(String),
 }
 
@@ -71,7 +77,7 @@ enum Consumption {
         canonical: String,
         typ: String,
         start: usize,
-        end: usize, // exclusive
+        end: usize,
     },
     Keyword {
         class: String,
@@ -83,24 +89,68 @@ enum Consumption {
     Ignore {
         position: usize,
     },
-    /// A function-word skip the matcher took (an IGNORED token consumed
-    /// without advancing the pattern). Recorded so we can annotate it.
     Skipped {
         position: usize,
     },
-    /// A sub-clause consumed by a Sub slot.
     SubClause {
         start: usize,
-        end: usize, // exclusive
+        end: usize,
     },
+}
+
+/// Map a rule kind to a syntax tree label.
+fn kind_to_syntax_label(kind: &str) -> &'static str {
+    match kind {
+        "dp" => "DP",
+        _ => "S",
+    }
+}
+
+/// Build a bracketed syntax tree string from tokens and constituents.
+///
+/// `constituents` is a slice of (start, end, syntax_string) sorted by start.
+/// Tokens at positions within a constituent's span are replaced by the
+/// constituent's syntax string. Ignored tokens (punctuation) are skipped.
+fn build_syntax(
+    tokens: &[String],
+    constituents: &[(usize, usize, String)],
+    top_label: &str,
+) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    let mut ci = 0;
+
+    for i in 0..tokens.len() {
+        let cleaned = clean_token(&tokens[i]);
+        if is_ignored(&cleaned) {
+            continue;
+        }
+
+        // If inside a constituent, skip — the constituent's syntax replaces it.
+        if ci < constituents.len() && i >= constituents[ci].0 && i < constituents[ci].1 {
+            continue;
+        }
+
+        // If at constituent start, emit the constituent's syntax.
+        if ci < constituents.len() && i == constituents[ci].0 {
+            parts.push(constituents[ci].2.clone());
+            ci += 1;
+            continue;
+        }
+
+        parts.push(cleaned);
+    }
+
+    if parts.is_empty() {
+        format!("[{}]", top_label)
+    } else {
+        format!("[{} {}]", top_label, parts.join(" "))
+    }
 }
 
 pub fn parse_sentence(tokens: &[String], lexicon: &Lexicon, rules: &[Rule]) -> Vec<Match> {
     parse_sentence_with_vars(tokens, lexicon, rules, &[])
 }
 
-/// Parse a sentence, optionally with variables available for pronoun resolution.
-/// Used recursively for sub-clauses.
 pub fn parse_sentence_with_vars(
     tokens: &[String],
     lexicon: &Lexicon,
@@ -123,7 +173,6 @@ fn parse_sentence_inner(
 ) -> Vec<Match> {
     let mut results = Vec::new();
     for rule in rules {
-        // Apply kind filter.
         match kind_filter {
             KindFilter::Any => {}
             KindFilter::Only(k) if rule.kind != *k => continue,
@@ -139,6 +188,15 @@ fn parse_sentence_inner(
         ) {
             let output = apply_template(&rule.template, &b);
             let annotations = annotate_tokens(tokens, &log);
+
+            // Build syntax tree.
+            let constituent_spans: Vec<(usize, usize, String)> = constituents.iter()
+                .filter_map(|c| {
+                    c.span.map(|(s, e)| (s, e, c.syntax.clone().unwrap_or_default()))
+                })
+                .collect();
+            let syntax = build_syntax(tokens, &constituent_spans, kind_to_syntax_label(&rule.kind));
+
             results.push(Match {
                 rule_name: rule.name.clone(),
                 kind: rule.kind.clone(),
@@ -146,6 +204,7 @@ fn parse_sentence_inner(
                 bindings: b,
                 token_annotations: annotations,
                 constituents,
+                syntax: Some(syntax),
             });
         }
     }
@@ -178,7 +237,6 @@ fn match_pattern(
     }
 
     if pi >= pattern.len() {
-        // Pattern exhausted — accept if remaining tokens are all ignored.
         let mut ti = ti;
         let mut log = log;
         while ti < tokens.len() && is_ignored(&clean_token(&tokens[ti])) {
@@ -268,7 +326,6 @@ fn match_pattern(
         }
 
         Slot::Sub { label, available_vars, delimiter } => {
-            // Skip any leading ignored tokens.
             let sub_start = ti;
             let mut sub_ti = ti;
             while sub_ti < tokens.len() && is_ignored(&clean_token(&tokens[sub_ti])) {
@@ -276,9 +333,7 @@ fn match_pattern(
                 sub_ti += 1;
             }
 
-            // Find where the sub-span ends.
             let sub_end = if let Some(delim_kw) = delimiter {
-                // Scan for the delimiter keyword in the remaining tokens.
                 let mut end = tokens.len();
                 for i in sub_ti..tokens.len() {
                     if matches_keyword(&clean_token(&tokens[i]), delim_kw) {
@@ -297,14 +352,12 @@ fn match_pattern(
                 return None;
             }
 
-            // Build the kind filter for this sub-parse.
             let sub_filter = match label.as_str() {
                 "dp" => KindFilter::Only("dp".to_string()),
                 "s" => KindFilter::Exclude("dp".to_string()),
                 _ => KindFilter::Any,
             };
 
-            // Recursively parse the sub-span.
             let effective_lexicon = if available_vars.is_empty() {
                 None
             } else {
@@ -313,18 +366,15 @@ fn match_pattern(
             let sub_lexicon = effective_lexicon.as_ref().unwrap_or(lexicon);
             let sub_matches = parse_sentence_inner(sub_tokens, sub_lexicon, rules, &sub_filter);
 
-            // Take the best (first) match.
             if let Some(best) = sub_matches.first() {
                 let mut new_bindings = bindings.clone();
                 let mut new_log = log.clone();
 
-                // Record the sub-clause consumption.
                 new_log.push(Consumption::SubClause {
                     start: sub_start,
                     end: sub_end,
                 });
 
-                // Binding key: SUB for first, SUB2 for second, etc.
                 let sub_key = if sub_count == 0 {
                     "SUB".to_string()
                 } else {
@@ -332,15 +382,19 @@ fn match_pattern(
                 };
                 new_bindings.insert(sub_key, (best.output.clone(), label.clone()));
 
-                // Build the constituent.
+                let syntax_label = match label.as_str() {
+                    "dp" => "DP",
+                    _ => "S",
+                };
+
                 constituents.push(Constituent {
                     label: label.clone(),
                     semantics: best.output.clone(),
                     free_vars: available_vars.clone(),
+                    span: Some((sub_start, sub_end)),
+                    syntax: best.syntax.clone(),
                 });
 
-                // Continue matching from sub_end (the delimiter token, if any,
-                // is left for the next pattern slot to consume).
                 match_pattern(
                     pattern, pi + 1, tokens, sub_end,
                     new_bindings, new_log, lexicon, rules, sub_count + 1, constituents, kind_filter,
@@ -352,7 +406,6 @@ fn match_pattern(
     }
 }
 
-/// Turn a successful match's consumption log into per-token annotations.
 fn annotate_tokens(tokens: &[String], log: &[Consumption]) -> Vec<TokenAnnotation> {
     let mut out: Vec<TokenAnnotation> = (0..tokens.len())
         .map(|_| TokenAnnotation {

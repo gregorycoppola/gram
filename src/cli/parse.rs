@@ -10,25 +10,18 @@ use crate::core::tokenize::{split_sentences, tokenize};
 
 #[derive(Args)]
 pub struct ParseArgs {
-    /// Path to the fixture JSON file.
     #[arg(long)]
     pub fixture: PathBuf,
-
-    /// Emit JSON instead of pretty output.
     #[arg(long)]
     pub json: bool,
 }
 
 #[derive(Args)]
 pub struct ParseOneArgs {
-    /// Path to the fixture JSON file (used only for lexicon and grammar).
     #[arg(long)]
     pub fixture: PathBuf,
-
-    /// The sentence to parse.
     #[arg(long)]
     pub sentence: String,
-
     #[arg(long)]
     pub json: bool,
 }
@@ -112,6 +105,9 @@ fn emit_pretty(results: &[ParsedSentence], lexicon: &Lexicon) {
             parsed += 1;
             let m = &r.matches[0];
             println!("  ✅ \"{}\"", r.sentence);
+            if let Some(syn) = &m.syntax {
+                println!("     {}", syn);
+            }
             println!("     → {}  [{}]", m.output, m.rule_name);
             if let Err(e) = crate::core::semantics::parse_with_types(&m.output, lexicon) {
                 println!("     ⚠️  semantics: {}", e);
@@ -121,6 +117,9 @@ fn emit_pretty(results: &[ParsedSentence], lexicon: &Lexicon) {
             ambiguous += 1;
             println!("  ⚠️  \"{}\"  ({} parses)", r.sentence, r.matches.len());
             for m in &r.matches {
+                if let Some(syn) = &m.syntax {
+                    println!("     {}", syn);
+                }
                 println!("     → {}  [{}]", m.output, m.rule_name);
                 if let Err(e) = crate::core::semantics::parse_with_types(&m.output, lexicon) {
                     println!("       ⚠️  semantics: {}", e);
