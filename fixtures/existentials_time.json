@@ -77,18 +77,11 @@
       "pattern": "THERE COP A $P:{theme:e} WH $x:e COP A $Q:{theme:e}",
       "template": "exists [t:e]: $P(theme: t) ∧ $Q(theme: $x)",
       "kind": "fact"
-    },
-    {
-      "name": "existential_time_bare_copular",
-      "pattern": "THERE COP A $P:{theme:e} WH $x:e COP $Q:{theme:e}",
-      "template": "exists [t:e]: $P(theme: t) ∧ $Q(theme: $x)",
-      "kind": "fact"
     }
   ],
   "sentences": [
     "There was a time when men were mortal.",
     "There was a day when the report was due.",
-    "There was a moment when Socrates was a man.",
-    "There was a time when Socrates was mortal."
+    "There was a moment when Socrates was a man."
   ]
 }
