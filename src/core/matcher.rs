@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use crate::core::grammar::{is_ignored, clean_token, matches_keyword, Rule, Slot};
-use crate::core::lexicon::Lexicon;
+use crate::core::grammar::{is_ignored, matches_keyword, Rule, Slot};
+use crate::core::lexicon::{clean_token, Lexicon};
 use crate::core::template::apply_template;
 
 /// A parsed sub-phrase: a labeled box with semantic output and free variables.
@@ -60,7 +60,6 @@ pub enum TokenKind {
     SubClause,
 }
 
-/// Filter for which rule kinds a sub-parse should consider.
 #[derive(Debug, Clone)]
 enum KindFilter {
     Any,
@@ -68,8 +67,6 @@ enum KindFilter {
     Exclude(String),
 }
 
-/// One pattern slot's consumption — where it landed in the token stream and
-/// what it bound to. Recorded by the matcher and consumed by the annotator.
 #[derive(Debug, Clone)]
 enum Consumption {
     Var {
@@ -98,7 +95,6 @@ enum Consumption {
     },
 }
 
-/// Map a rule kind to a syntax tree label.
 fn kind_to_syntax_label(kind: &str) -> &'static str {
     match kind {
         "dp" => "DP",
@@ -106,11 +102,6 @@ fn kind_to_syntax_label(kind: &str) -> &'static str {
     }
 }
 
-/// Build a bracketed syntax tree string from tokens and constituents.
-///
-/// `constituents` is a slice of (start, end, syntax_string) sorted by start.
-/// Tokens at positions within a constituent's span are replaced by the
-/// constituent's syntax string. Ignored tokens (punctuation) are skipped.
 fn build_syntax(
     tokens: &[String],
     constituents: &[(usize, usize, String)],
@@ -125,12 +116,10 @@ fn build_syntax(
             continue;
         }
 
-        // If inside a constituent, skip — the constituent's syntax replaces it.
         if ci < constituents.len() && i >= constituents[ci].0 && i < constituents[ci].1 {
             continue;
         }
 
-        // If at constituent start, emit the constituent's syntax.
         if ci < constituents.len() && i == constituents[ci].0 {
             parts.push(constituents[ci].2.clone());
             ci += 1;
@@ -189,7 +178,6 @@ fn parse_sentence_inner(
             let output = apply_template(&rule.template, &b);
             let annotations = annotate_tokens(tokens, &log);
 
-            // Build syntax tree.
             let constituent_spans: Vec<(usize, usize, String)> = constituents.iter()
                 .filter_map(|c| {
                     c.span.map(|(s, e)| (s, e, c.syntax.clone().unwrap_or_default()))
@@ -381,11 +369,6 @@ fn match_pattern(
                     format!("SUB{}", sub_count + 1)
                 };
                 new_bindings.insert(sub_key, (best.output.clone(), label.clone()));
-
-                let syntax_label = match label.as_str() {
-                    "dp" => "DP",
-                    _ => "S",
-                };
 
                 constituents.push(Constituent {
                     label: label.clone(),
