@@ -57,7 +57,7 @@ pub enum TokenKind {
 enum KindFilter {
     Any,
     Only(String),
-    Exclude(String),
+    Exclude(Vec<String>),
 }
 
 #[derive(Debug, Clone)]
@@ -91,6 +91,7 @@ enum Consumption {
 fn kind_to_syntax_label(kind: &str) -> &'static str {
     match kind {
         "dp" => "DP",
+        "s_gapped" => "S",
         _ => "S",
     }
 }
@@ -131,6 +132,19 @@ fn build_syntax(
     }
 }
 
+/// Kinds that are not top-level sentences — they are sub-constituents
+/// and should be excluded by SUB:s.
+const CONSTITUENT_KINDS: &[&str] = &["dp", "s_gapped"];
+
+fn sub_filter_for_label(label: &str) -> KindFilter {
+    match label {
+        "dp" => KindFilter::Only("dp".to_string()),
+        "s_gapped" => KindFilter::Only("s_gapped".to_string()),
+        "s" => KindFilter::Exclude(CONSTITUENT_KINDS.iter().map(|s| s.to_string()).collect()),
+        _ => KindFilter::Any,
+    }
+}
+
 pub fn parse_sentence(tokens: &[String], lexicon: &Lexicon, rules: &[Rule]) -> Vec<Match> {
     parse_sentence_with_vars(tokens, lexicon, rules, &[])
 }
@@ -160,7 +174,7 @@ fn parse_sentence_inner(
         match kind_filter {
             KindFilter::Any => {}
             KindFilter::Only(k) if rule.kind != *k => continue,
-            KindFilter::Exclude(k) if rule.kind == *k => continue,
+            KindFilter::Exclude(ks) if ks.contains(&rule.kind) => continue,
             _ => {}
         }
 
@@ -335,11 +349,7 @@ fn match_pattern(
                 return None;
             }
 
-            let sub_filter = match label.as_str() {
-                "dp" => KindFilter::Only("dp".to_string()),
-                "s" => KindFilter::Exclude("dp".to_string()),
-                _ => KindFilter::Any,
-            };
+            let sub_filter = sub_filter_for_label(label);
 
             let effective_lexicon = if available_vars.is_empty() {
                 None
