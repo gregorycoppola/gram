@@ -1,0 +1,101 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "man",
+        "roles": {"theme": "e"},
+        "forms": ["man", "men"],
+        "gloss": "a human adult male"
+      },
+      {
+        "name": "mortal",
+        "roles": {"theme": "e"},
+        "forms": ["mortal"],
+        "gloss": "subject to death"
+      },
+      {
+        "name": "know",
+        "roles": {"agent": "e", "content": "s"},
+        "forms": ["know", "knows"],
+        "gloss": "to be aware of a fact"
+      },
+      {
+        "name": "think",
+        "roles": {"agent": "e", "content": "s"},
+        "forms": ["think", "thinks"],
+        "gloss": "to hold a belief"
+      }
+    ],
+    "entities": [
+      {
+        "name": "socrates",
+        "type": "e",
+        "forms": ["Socrates"],
+        "gloss": "Greek philosopher, 470-399 BC"
+      },
+      {
+        "name": "john",
+        "type": "e",
+        "forms": ["John"],
+        "gloss": "a person named John"
+      }
+    ]
+  },
+  "grammar": [
+    {
+      "name": "copular_fact",
+      "pattern": "$x:e COP A $P:{theme:e}",
+      "template": "$P(theme: $x)",
+      "kind": "fact"
+    },
+    {
+      "name": "copular_fact_bare",
+      "pattern": "$x:e COP $P:{theme:e}",
+      "template": "$P(theme: $x)",
+      "kind": "fact"
+    },
+    {
+      "name": "copular_negated",
+      "pattern": "$x:e COP NOT A $P:{theme:e}",
+      "template": "not $P(theme: $x)",
+      "kind": "fact"
+    },
+    {
+      "name": "copular_negated_bare",
+      "pattern": "$x:e COP NOT $P:{theme:e}",
+      "template": "not $P(theme: $x)",
+      "kind": "fact"
+    },
+    {
+      "name": "copular_universal",
+      "pattern": "ALL $P:{theme:e} COP $Q:{theme:e}",
+      "template": "always [x:e]: $P(theme: x) -> $Q(theme: x)",
+      "kind": "rule"
+    },
+    {
+      "name": "copular_universal_bare",
+      "pattern": "$P:{theme:e} COP $Q:{theme:e}",
+      "template": "always [x:e]: $P(theme: x) -> $Q(theme: x)",
+      "kind": "rule"
+    },
+    {
+      "name": "attitude_subclause",
+      "pattern": "$x:e $V:{agent:e,content:s} _ SUB:s",
+      "template": "$V(agent: $x, content: SUB)",
+      "kind": "fact"
+    },
+    {
+      "name": "universal_attitude",
+      "pattern": "ALL $P:{theme:e} $V:{agent:e,content:s} _ SUB:s[$x:e]",
+      "template": "always [x:e]: $P(theme: x) -> $V(agent: x, content: SUB)",
+      "kind": "rule"
+    }
+  ],
+  "sentences": [
+    "Socrates is a man.",
+    "All men are mortal.",
+    "Socrates is not mortal.",
+    "John knows that Socrates is mortal.",
+    "All men know that they are mortal."
+  ]
+}

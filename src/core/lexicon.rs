@@ -30,7 +30,7 @@ pub enum Category {
     Entity,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lexicon {
     pub predicates: BTreeMap<String, Predicate>,
     pub entities: BTreeMap<String, Entity>,
@@ -82,6 +82,29 @@ impl Lexicon {
         }
 
         Lexicon { predicates, entities, form_index, max_form_len }
+    }
+
+    /// Return a cloned lexicon with pronoun surface forms mapped to the given
+    /// variables (treated as entities). Used when parsing sub-clauses where
+    /// pronouns should resolve to an outer quantifier's variable.
+    pub fn with_pronoun_bindings(&self, vars: &[(String, String)]) -> Self {
+        let mut clone = self.clone();
+        for (var_name, var_type) in vars {
+            let bare_name = var_name.strip_prefix('$').unwrap_or(var_name);
+            // Register each pronoun as a surface form for this variable.
+            for pronoun in crate::core::grammar::pronouns() {
+                clone.form_index.insert(
+                    pronoun.to_string(),
+                    (bare_name.to_string(), Category::Entity),
+                );
+            }
+            // Register the variable itself as an entity so type lookups work.
+            clone.entities.insert(
+                bare_name.to_string(),
+                Entity { name: bare_name.to_string(), typ: var_type.clone() },
+            );
+        }
+        clone
     }
 
     pub fn get_type(&self, canonical: &str) -> Option<String> {

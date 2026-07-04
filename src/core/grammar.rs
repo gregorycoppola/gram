@@ -13,6 +13,13 @@ pub enum Slot {
     /// Match a token that resolves to a typed predicate or entity.
     /// type_constraint is e.g. "e" or "{theme:e,reference:e}" (always canonicalized) or None for "any".
     Var { name: String, type_constraint: Option<String> },
+    /// Match a sub-span as a constituent. Consumes all remaining tokens.
+    /// available_vars are variable bindings provided by the outer rule's template
+    /// context (e.g. a quantifier variable that the sub-clause's pronouns resolve to).
+    Sub {
+        label: String,
+        available_vars: Vec<(String, String)>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +53,9 @@ fn parse_slot(spec: &str) -> Result<Slot> {
     if let Some(rest) = spec.strip_prefix("LIT:") {
         return Ok(Slot::Literal(rest.to_lowercase()));
     }
+    if let Some(rest) = spec.strip_prefix("SUB:") {
+        return parse_sub_slot(rest);
+    }
     if let Some(rest) = spec.strip_prefix('$') {
         if let Some((name, typ)) = rest.split_once(':') {
             return Ok(Slot::Var {
@@ -63,6 +73,37 @@ fn parse_slot(spec: &str) -> Result<Slot> {
         return Err(anyhow!("invalid slot: {}", spec));
     }
     Ok(Slot::Keyword(spec.to_string()))
+}
+
+/// Parse the part after "SUB:" — e.g. "s" or "s[$x:e]" or "s[$x:e,$y:e]".
+fn parse_sub_slot(rest: &str) -> Result<Slot> {
+    let (label, vars_str) = if let Some(bracket_start) = rest.find('[') {
+        if !rest.ends_with(']') {
+            return Err(anyhow!("unterminated bracket in SUB slot: {}", rest));
+        }
+        let label = &rest[..bracket_start];
+        let vars_str = &rest[bracket_start + 1..rest.len() - 1];
+        (label, vars_str)
+    } else {
+        (rest, "")
+    };
+
+    let mut available_vars = Vec::new();
+    if !vars_str.is_empty() {
+        for var_spec in vars_str.split(',') {
+            let var_spec = var_spec.trim();
+            let var_spec = var_spec.strip_prefix('$')
+                .ok_or_else(|| anyhow!("SUB var must start with $: {}", var_spec))?;
+            let (name, typ) = var_spec.split_once(':')
+                .ok_or_else(|| anyhow!("SUB var must have :type: {}", var_spec))?;
+            available_vars.push((format!("${}", name), typ.to_string()));
+        }
+    }
+
+    Ok(Slot::Sub {
+        label: label.to_string(),
+        available_vars,
+    })
 }
 
 /// Canonicalize a type string so role-typed signatures compare equal regardless
@@ -120,4 +161,13 @@ pub fn matches_keyword(token: &str, keyword: &str) -> bool {
 
 pub fn is_ignored(token: &str) -> bool {
     ignored_tokens().iter().any(|i| i.eq_ignore_ascii_case(token))
+}
+
+/// Pronouns that can resolve to an available variable in a sub-clause.
+pub fn pronouns() -> &'static [&'static str] {
+    &["they", "he", "she", "them", "everyone", "everybody", "anyone", "anybody"]
+}
+
+pub fn is_pronoun(token: &str) -> bool {
+    pronouns().iter().any(|p| p.eq_ignore_ascii_case(token))
 }
