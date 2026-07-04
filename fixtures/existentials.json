@@ -63,7 +63,7 @@
     {
       "name": "existential_counted",
       "pattern": "THERE COP $n:n $P:{theme:e}",
-      "template": "exists [x:e]: $P(theme: x), |x| = $n",
+      "template": "exists_many [x:e, $n]: $P(theme: x)",
       "kind": "fact"
     },
     {
