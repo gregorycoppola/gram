@@ -73,12 +73,6 @@
       "kind": "fact"
     },
     {
-      "name": "existential_time_copular",
-      "pattern": "THERE COP A $P:{theme:e} WH $x:e COP $Q:{theme:e}",
-      "template": "exists [t:e]: $P(theme: t) ∧ $Q(theme: $x)",
-      "kind": "fact"
-    },
-    {
       "name": "existential_time_copular_with_a",
       "pattern": "THERE COP A $P:{theme:e} WH $x:e COP A $Q:{theme:e}",
       "template": "exists [t:e]: $P(theme: t) ∧ $Q(theme: $x)",
