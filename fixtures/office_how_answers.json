@@ -98,7 +98,7 @@
     },
     {
       "name": "the_costs_copular",
-      "pattern": "THE $N:{theme:e} COP $Q:e",
+      "pattern": "THE $N:e COP $Q:e",
       "template": "the [n:e]: $N(theme: n) -> costs(theme: n, amount: $Q)",
       "kind": "fact"
     },
@@ -116,7 +116,7 @@
     },
     {
       "name": "the_lasts_copular",
-      "pattern": "THE $N:{theme:e} COP $Q:e",
+      "pattern": "THE $N:e COP $Q:e",
       "template": "the [n:e]: $N(theme: n) -> lasts(theme: n, duration: $Q)",
       "kind": "fact"
     }
