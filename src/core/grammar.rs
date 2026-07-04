@@ -4,24 +4,13 @@ use crate::core::fixture::FixtureRule;
 
 #[derive(Debug, Clone)]
 pub enum Slot {
-    /// Match any token, ignore it.
     Ignore,
-    /// Match a specific literal word.
     Literal(String),
-    /// Match a keyword class (COP, ALL, IF, etc.).
     Keyword(String),
-    /// Match a token that resolves to a typed predicate or entity.
-    /// type_constraint is e.g. "e" or "{theme:e,reference:e}" (always canonicalized) or None for "any".
     Var { name: String, type_constraint: Option<String> },
-    /// Match a sub-span as a constituent. Consumes remaining tokens unless
-    /// a delimiter keyword is specified, in which case it consumes up to
-    /// (but not including) the delimiter.
-    /// available_vars are variable bindings provided by the outer rule's template
-    /// context (e.g. a quantifier variable that the sub-clause's pronouns resolve to).
     Sub {
         label: String,
         available_vars: Vec<(String, String)>,
-        /// If Some, consume only up to this keyword class (e.g. "THEN", "AND").
         delimiter: Option<String>,
     },
 }
@@ -72,22 +61,16 @@ fn parse_slot(spec: &str) -> Result<Slot> {
             type_constraint: None,
         });
     }
-    // Otherwise it's a keyword (COP, ALL, IF, THEN, AND, NOT, A, SOMEONE, WH, THERE, ...).
     if !spec.chars().all(|c| c.is_ascii_uppercase() || c == '_') {
         return Err(anyhow!("invalid slot: {}", spec));
     }
     Ok(Slot::Keyword(spec.to_string()))
 }
 
-/// Parse the part after "SUB:" — e.g. "s", "s[$x:e]", "s:THEN", "s:THEN[$x:e]", "s[$x:e]:THEN".
 fn parse_sub_slot(rest: &str) -> Result<Slot> {
-    // Find a delimiter: a colon not inside brackets where the part after it
-    // looks like a keyword (all uppercase). We scan for the LAST such colon
-    // so that "s:THEN[$x:e]" works (colon before bracket is the delimiter).
     let mut delimiter: Option<String> = None;
     let mut label_vars = rest;
 
-    // Walk colons, tracking bracket depth.
     let mut depth = 0usize;
     let bytes = rest.as_bytes();
     let mut last_keyword_colon = None;
@@ -97,7 +80,6 @@ fn parse_sub_slot(rest: &str) -> Result<Slot> {
             b']' => depth -= 1,
             b':' if depth == 0 => {
                 let after = &rest[i + 1..];
-                // Delimiter must be all uppercase (a keyword class).
                 if !after.is_empty() && after.chars().all(|c| c.is_ascii_uppercase() || c == '_') {
                     last_keyword_colon = Some(i);
                 }
@@ -114,7 +96,6 @@ fn parse_sub_slot(rest: &str) -> Result<Slot> {
     parse_sub_slot_parts(label_vars, delimiter)
 }
 
-/// Parse label[vars] and combine with an optional delimiter.
 fn parse_sub_slot_parts(rest: &str, delimiter: Option<String>) -> Result<Slot> {
     let (label, vars_str) = if let Some(bracket_start) = rest.find('[') {
         if !rest.ends_with(']') {
@@ -146,9 +127,6 @@ fn parse_sub_slot_parts(rest: &str, delimiter: Option<String>) -> Result<Slot> {
     })
 }
 
-/// Canonicalize a type string so role-typed signatures compare equal regardless
-/// of role order. "e" stays "e". "{theme:e,reference:e}" and
-/// "{reference:e,theme:e}" both become "{reference:e,theme:e}" (alphabetical).
 pub fn canonicalize_type(typ: &str) -> String {
     let trimmed = typ.trim();
     if !trimmed.starts_with('{') || !trimmed.ends_with('}') {
@@ -163,11 +141,11 @@ pub fn canonicalize_type(typ: &str) -> String {
     format!("{{{}}}", parts.join(","))
 }
 
-/// Map of keyword class -> set of surface forms.
 pub fn keywords() -> &'static [(&'static str, &'static [&'static str])] {
     &[
         ("COP",     &["is", "are", "was", "were", "am", "be"]),
         ("ALL",     &["all", "every"]),
+        ("ANY",     &["any"]),
         ("IF",      &["if", "when", "whenever"]),
         ("THEN",    &["then"]),
         ("AND",     &["and", "&"]),
@@ -179,10 +157,10 @@ pub fn keywords() -> &'static [(&'static str, &'static [&'static str])] {
         ("THE",     &["the"]),
         ("THIS",    &["this"]),
         ("THAT",    &["that"]),
+        ("WHO",     &["who"]),
     ]
 }
 
-/// Tokens that are matched-then-skipped.
 pub fn ignored_tokens() -> &'static [&'static str] {
     &[".", ",", "!", "?"]
 }
@@ -200,7 +178,6 @@ pub fn is_ignored(token: &str) -> bool {
     ignored_tokens().iter().any(|i| i.eq_ignore_ascii_case(token))
 }
 
-/// Pronouns that can resolve to an available variable in a sub-clause.
 pub fn pronouns() -> &'static [&'static str] {
     &["they", "he", "she", "them", "everyone", "everybody", "anyone", "anybody"]
 }
