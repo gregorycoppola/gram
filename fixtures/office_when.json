@@ -85,13 +85,13 @@
   },
   "grammar": [
     {
-      "name": "wh_entity",
+      "name": "wh_bare_entity",
       "pattern": "WH COP $x:e",
       "template": "? when: $x",
       "kind": "question"
     },
     {
-      "name": "wh_entity_pred",
+      "name": "wh_bare_entity_pred",
       "pattern": "WH COP $x:e $P:{theme:e}",
       "template": "? when: $P(theme: $x)",
       "kind": "question"
@@ -103,15 +103,33 @@
       "kind": "question"
     },
     {
-      "name": "yn_entity_pred",
-      "pattern": "COP $x:e $P:{theme:e}",
+      "name": "wh_the_pred_pred",
+      "pattern": "WH COP THE $P:{theme:e} $Q:{theme:e}",
+      "template": "? when: always [x:e]: $P(theme: x) -> $Q(theme: x)",
+      "kind": "question"
+    },
+    {
+      "name": "yn_the_entity_pred",
+      "pattern": "COP THE $x:e $P:{theme:e}",
       "template": "? $P(theme: $x)",
       "kind": "question"
     },
     {
-      "name": "yn_entity_entity",
-      "pattern": "COP $x:e $y:e",
-      "template": "? $x = $y",
+      "name": "yn_the_entity_on_entity",
+      "pattern": "COP THE $x:e LIT:on $y:e",
+      "template": "? on_date(theme: $x, value: $y)",
+      "kind": "question"
+    },
+    {
+      "name": "yn_the_entity_entity",
+      "pattern": "COP THE $x:e THE $y:e",
+      "template": "? equals(theme: $x, value: $y)",
+      "kind": "question"
+    },
+    {
+      "name": "yn_the_entity_bare_entity",
+      "pattern": "COP THE $x:e $y:e",
+      "template": "? equals(theme: $x, value: $y)",
       "kind": "question"
     }
   ],

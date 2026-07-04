@@ -50,6 +50,12 @@
         "type": "e",
         "forms": ["Socrates"],
         "gloss": "Greek philosopher"
+      },
+      {
+        "name": "the_report",
+        "type": "e",
+        "forms": ["the report", "report"],
+        "gloss": "the Q3 financial report"
       }
     ]
   },
@@ -61,8 +67,8 @@
       "kind": "fact"
     },
     {
-      "name": "existential_time_copular",
-      "pattern": "THERE COP A $P:{theme:e} WH $x:e COP $Q:{theme:e}",
+      "name": "existential_time_the_entity_copular",
+      "pattern": "THERE COP A $P:{theme:e} WH THE $x:e COP $Q:{theme:e}",
       "template": "exists [t:e]: $P(theme: t) ∧ $Q(theme: $x)",
       "kind": "fact"
     },
