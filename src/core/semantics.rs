@@ -7,6 +7,7 @@
 ///   and_expr   = primary ('∧' primary)*
 ///   primary    = 'not' primary
 ///              | 'always' binding impl_expr
+///              | 'the' binding impl_expr
 ///              | 'exists' binding and_expr [count]
 ///              | ident '(' role_list ')'       -- predicate
 ///              | ident ':' ident               -- variable ref
@@ -176,6 +177,18 @@ impl Parser {
         Ok((var, var_type, body))
     }
 
+    /// Parse [var:type]: impl_expr
+    fn parse_binding_impl(&mut self) -> Result<(String, String, Expr), String> {
+        self.expect(&Tok::LBracket)?;
+        let var = self.expect_ident()?;
+        self.expect(&Tok::Colon)?;
+        let var_type = self.expect_ident()?;
+        self.expect(&Tok::RBracket)?;
+        self.expect(&Tok::Colon)?;
+        let body = self.parse_impl()?;
+        Ok((var, var_type, body))
+    }
+
     fn parse_impl(&mut self) -> Result<Expr, String> {
         let left = self.parse_and()?;
         if self.at(&Tok::Implies) {
@@ -209,14 +222,17 @@ impl Parser {
             }
             Some(Tok::Ident(ref s)) if s == "always" => {
                 self.advance();
-                self.expect(&Tok::LBracket)?;
-                let var = self.expect_ident()?;
-                self.expect(&Tok::Colon)?;
-                let var_type = self.expect_ident()?;
-                self.expect(&Tok::RBracket)?;
-                self.expect(&Tok::Colon)?;
-                let body = self.parse_impl()?;
+                let (var, var_type, body) = self.parse_binding_impl()?;
                 Ok(Expr::ForAll {
+                    var,
+                    var_type,
+                    body: Box::new(body),
+                })
+            }
+            Some(Tok::Ident(ref s)) if s == "the" => {
+                self.advance();
+                let (var, var_type, body) = self.parse_binding_impl()?;
+                Ok(Expr::The {
                     var,
                     var_type,
                     body: Box::new(body),

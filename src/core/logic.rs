@@ -23,6 +23,12 @@ pub enum Expr {
         var_type: String,
         body: Box<Expr>,
     },
+    /// Definite description: the [var:type]: body
+    The {
+        var: String,
+        var_type: String,
+        body: Box<Expr>,
+    },
     /// Existential: exists [var:type]: body [, |var| = count]
     Exists {
         var: String,
@@ -60,6 +66,9 @@ impl std::fmt::Display for Expr {
             Expr::Implies { ante, cons } => write!(f, "{} -> {}", ante, cons),
             Expr::ForAll { var, var_type, body } => {
                 write!(f, "always [{}:{}]: {}", var, var_type, body)
+            }
+            Expr::The { var, var_type, body } => {
+                write!(f, "the [{}:{}]: {}", var, var_type, body)
             }
             Expr::Exists { var, var_type, body, count } => {
                 write!(f, "exists [{}:{}]: {}", var, var_type, body)?;
