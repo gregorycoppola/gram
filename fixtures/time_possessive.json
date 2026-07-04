@@ -1,0 +1,107 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "date_of",
+        "roles": {"theme": "e", "of": "e"},
+        "forms": ["date"],
+        "gloss": "the calendar day associated with an event"
+      },
+      {
+        "name": "time_of",
+        "roles": {"theme": "e", "of": "e"},
+        "forms": ["time"],
+        "gloss": "the clock time associated with an event"
+      },
+      {
+        "name": "wedding",
+        "roles": {"theme": "e"},
+        "forms": ["wedding"],
+        "gloss": "a marriage ceremony"
+      },
+      {
+        "name": "meeting",
+        "roles": {"theme": "e"},
+        "forms": ["meeting"],
+        "gloss": "a scheduled gathering"
+      },
+      {
+        "name": "on_date",
+        "roles": {"theme": "e", "value": "e"},
+        "forms": [],
+        "gloss": "falls on a particular date"
+      },
+      {
+        "name": "at_time",
+        "roles": {"theme": "e", "value": "e"},
+        "forms": [],
+        "gloss": "occurs at a particular time"
+      }
+    ],
+    "entities": [
+      {
+        "name": "the_meeting",
+        "type": "e",
+        "forms": ["the meeting"],
+        "gloss": "a scheduled gathering"
+      },
+      {
+        "name": "the_wedding",
+        "type": "e",
+        "forms": ["the wedding"],
+        "gloss": "a marriage ceremony"
+      },
+      {
+        "name": "friday",
+        "type": "e",
+        "forms": ["friday"],
+        "gloss": "the day of the week"
+      },
+      {
+        "name": "july_3",
+        "type": "e",
+        "forms": ["july 3", "july 3rd"],
+        "gloss": "a specific date"
+      },
+      {
+        "name": "three_pm",
+        "type": "e",
+        "forms": ["3 pm", "3 p.m.", "3pm"],
+        "gloss": "a time of day"
+      }
+    ]
+  },
+  "grammar": [
+    {
+      "name": "the_date_of_copular",
+      "pattern": "THE LIT:date LIT:of $x:e COP $y:e",
+      "template": "the [d:e]: date_of(theme: d, of: $x) -> equals(theme: d, value: $y)",
+      "kind": "fact"
+    },
+    {
+      "name": "the_time_of_copular",
+      "pattern": "THE LIT:time LIT:of $x:e COP $y:e",
+      "template": "the [d:e]: time_of(theme: d, of: $x) -> equals(theme: d, value: $y)",
+      "kind": "fact"
+    },
+    {
+      "name": "the_on_date_copular",
+      "pattern": "THE $N:{theme:e} COP LIT:on $y:e",
+      "template": "the [n:e]: $N(theme: n) -> on_date(theme: n, value: $y)",
+      "kind": "fact"
+    },
+    {
+      "name": "the_at_time_copular",
+      "pattern": "THE $N:{theme:e} COP LIT:at $y:e",
+      "template": "the [n:e]: $N(theme: n) -> at_time(theme: n, value: $y)",
+      "kind": "fact"
+    }
+  ],
+  "sentences": [
+    "The date of the meeting is Friday.",
+    "The date of the wedding is July 3.",
+    "The time of the meeting is 3 PM.",
+    "The wedding is on July 3.",
+    "The meeting is at 3 PM."
+  ]
+}
