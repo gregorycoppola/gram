@@ -51,6 +51,17 @@ pub enum TokenKind {
     SubClause,
 }
 
+/// Filter for which rule kinds a sub-parse should consider.
+#[derive(Debug, Clone)]
+enum KindFilter {
+    /// Accept any rule kind.
+    Any,
+    /// Accept only rules with this exact kind.
+    Only(String),
+    /// Accept any rule kind except this one.
+    Exclude(String),
+}
+
 /// One pattern slot's consumption — where it landed in the token stream and
 /// what it bound to. Recorded by the matcher and consumed by the annotator.
 #[derive(Debug, Clone)]
@@ -97,21 +108,34 @@ pub fn parse_sentence_with_vars(
     available_vars: &[(String, String)],
 ) -> Vec<Match> {
     let effective_lexicon = if available_vars.is_empty() {
-        return parse_sentence_inner(tokens, lexicon, rules);
+        return parse_sentence_inner(tokens, lexicon, rules, &KindFilter::Any);
     } else {
         lexicon.with_pronoun_bindings(available_vars)
     };
-    parse_sentence_inner(tokens, &effective_lexicon, rules)
+    parse_sentence_inner(tokens, &effective_lexicon, rules, &KindFilter::Any)
 }
 
-fn parse_sentence_inner(tokens: &[String], lexicon: &Lexicon, rules: &[Rule]) -> Vec<Match> {
+fn parse_sentence_inner(
+    tokens: &[String],
+    lexicon: &Lexicon,
+    rules: &[Rule],
+    kind_filter: &KindFilter,
+) -> Vec<Match> {
     let mut results = Vec::new();
     for rule in rules {
+        // Apply kind filter.
+        match kind_filter {
+            KindFilter::Any => {}
+            KindFilter::Only(k) if rule.kind != *k => continue,
+            KindFilter::Exclude(k) if rule.kind == *k => continue,
+            _ => {}
+        }
+
         let bindings = BTreeMap::new();
         let log: Vec<Consumption> = Vec::new();
         let constituents = Vec::new();
         if let Some((b, log, constituents)) = match_pattern(
-            &rule.pattern, 0, tokens, 0, bindings, log, lexicon, rules, 0, constituents,
+            &rule.pattern, 0, tokens, 0, bindings, log, lexicon, rules, 0, constituents, kind_filter,
         ) {
             let output = apply_template(&rule.template, &b);
             let annotations = annotate_tokens(tokens, &log);
@@ -139,6 +163,7 @@ fn match_pattern(
     rules: &[Rule],
     sub_count: usize,
     mut constituents: Vec<Constituent>,
+    kind_filter: &KindFilter,
 ) -> Option<(BTreeMap<String, (String, String)>, Vec<Consumption>, Vec<Constituent>)> {
     let next_is_literal_or_ignore = pi < pattern.len()
         && matches!(pattern[pi], Slot::Literal(_) | Slot::Ignore);
@@ -177,18 +202,18 @@ fn match_pattern(
         Slot::Ignore => {
             let mut log = log;
             log.push(Consumption::Ignore { position: ti });
-            match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents)
+            match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter)
         }
 
         Slot::Literal(lit) => {
             if &token == lit {
                 let mut log = log;
                 log.push(Consumption::Literal { position: ti });
-                match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents)
+                match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter)
             } else if is_ignored(&token) {
                 let mut log = log;
                 log.push(Consumption::Skipped { position: ti });
-                match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents)
+                match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter)
             } else {
                 None
             }
@@ -198,11 +223,11 @@ fn match_pattern(
             if matches_keyword(&token, kw) {
                 let mut log = log;
                 log.push(Consumption::Keyword { class: kw.clone(), position: ti });
-                match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents)
+                match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter)
             } else if is_ignored(&token) {
                 let mut log = log;
                 log.push(Consumption::Skipped { position: ti });
-                match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents)
+                match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter)
             } else {
                 None
             }
@@ -228,7 +253,7 @@ fn match_pattern(
                     });
                     if let Some(result) = match_pattern(
                         pattern, pi + 1, tokens, ti + consumed,
-                        new_bindings, new_log, lexicon, rules, sub_count, constituents.clone(),
+                        new_bindings, new_log, lexicon, rules, sub_count, constituents.clone(), kind_filter,
                     ) {
                         return Some(result);
                     }
@@ -237,7 +262,7 @@ fn match_pattern(
             if is_ignored(&token) {
                 let mut log = log;
                 log.push(Consumption::Skipped { position: ti });
-                return match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents);
+                return match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter);
             }
             None
         }
@@ -272,8 +297,21 @@ fn match_pattern(
                 return None;
             }
 
-            // Recursively parse the sub-span with available vars for pronoun resolution.
-            let sub_matches = parse_sentence_with_vars(sub_tokens, lexicon, rules, available_vars);
+            // Build the kind filter for this sub-parse.
+            let sub_filter = match label.as_str() {
+                "dp" => KindFilter::Only("dp".to_string()),
+                "s" => KindFilter::Exclude("dp".to_string()),
+                _ => KindFilter::Any,
+            };
+
+            // Recursively parse the sub-span.
+            let effective_lexicon = if available_vars.is_empty() {
+                None
+            } else {
+                Some(lexicon.with_pronoun_bindings(available_vars))
+            };
+            let sub_lexicon = effective_lexicon.as_ref().unwrap_or(lexicon);
+            let sub_matches = parse_sentence_inner(sub_tokens, sub_lexicon, rules, &sub_filter);
 
             // Take the best (first) match.
             if let Some(best) = sub_matches.first() {
@@ -305,7 +343,7 @@ fn match_pattern(
                 // is left for the next pattern slot to consume).
                 match_pattern(
                     pattern, pi + 1, tokens, sub_end,
-                    new_bindings, new_log, lexicon, rules, sub_count + 1, constituents,
+                    new_bindings, new_log, lexicon, rules, sub_count + 1, constituents, kind_filter,
                 )
             } else {
                 None
