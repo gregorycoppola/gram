@@ -29,6 +29,18 @@ pub enum Expr {
         var_type: String,
         body: Box<Expr>,
     },
+    /// Demonstrative: this [var:type]: body
+    This {
+        var: String,
+        var_type: String,
+        body: Box<Expr>,
+    },
+    /// Demonstrative: that [var:type]: body
+    That {
+        var: String,
+        var_type: String,
+        body: Box<Expr>,
+    },
     /// Existential: exists [var:type]: body [, |var| = count]
     Exists {
         var: String,
@@ -69,6 +81,12 @@ impl std::fmt::Display for Expr {
             }
             Expr::The { var, var_type, body } => {
                 write!(f, "the [{}:{}]: {}", var, var_type, body)
+            }
+            Expr::This { var, var_type, body } => {
+                write!(f, "this [{}:{}]: {}", var, var_type, body)
+            }
+            Expr::That { var, var_type, body } => {
+                write!(f, "that [{}:{}]: {}", var, var_type, body)
             }
             Expr::Exists { var, var_type, body, count } => {
                 write!(f, "exists [{}:{}]: {}", var, var_type, body)?;

@@ -1,0 +1,57 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "man",
+        "roles": {"theme": "e"},
+        "forms": ["man"],
+        "gloss": "an adult male human"
+      },
+      {
+        "name": "woman",
+        "roles": {"theme": "e"},
+        "forms": ["woman"],
+        "gloss": "an adult female human"
+      },
+      {
+        "name": "tall",
+        "roles": {"theme": "e"},
+        "forms": ["tall"],
+        "gloss": "of great height"
+      },
+      {
+        "name": "nice",
+        "roles": {"theme": "e"},
+        "forms": ["nice"],
+        "gloss": "pleasant or kind"
+      },
+      {
+        "name": "smart",
+        "roles": {"theme": "e"},
+        "forms": ["smart"],
+        "gloss": "intelligent"
+      }
+    ],
+    "entities": []
+  },
+  "grammar": [
+    {
+      "name": "this_copular",
+      "pattern": "THIS $P:{theme:e} COP $Q:{theme:e}",
+      "template": "this [n:e]: $P(theme: n) -> $Q(theme: n)",
+      "kind": "fact"
+    },
+    {
+      "name": "that_copular",
+      "pattern": "THAT $P:{theme:e} COP $Q:{theme:e}",
+      "template": "that [n:e]: $P(theme: n) -> $Q(theme: n)",
+      "kind": "fact"
+    }
+  ],
+  "sentences": [
+    "This man is tall.",
+    "That woman is nice.",
+    "This man is smart.",
+    "That woman is tall."
+  ]
+}

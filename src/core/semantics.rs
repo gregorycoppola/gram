@@ -8,6 +8,8 @@
 ///   primary    = 'not' primary
 ///              | 'always' binding impl_expr
 ///              | 'the' binding impl_expr
+///              | 'this' binding impl_expr
+///              | 'that' binding impl_expr
 ///              | 'exists' binding and_expr [count]
 ///              | ident '(' role_list ')'       -- predicate
 ///              | ident ':' ident               -- variable ref
@@ -233,6 +235,24 @@ impl Parser {
                 self.advance();
                 let (var, var_type, body) = self.parse_binding_impl()?;
                 Ok(Expr::The {
+                    var,
+                    var_type,
+                    body: Box::new(body),
+                })
+            }
+            Some(Tok::Ident(ref s)) if s == "this" => {
+                self.advance();
+                let (var, var_type, body) = self.parse_binding_impl()?;
+                Ok(Expr::This {
+                    var,
+                    var_type,
+                    body: Box::new(body),
+                })
+            }
+            Some(Tok::Ident(ref s)) if s == "that" => {
+                self.advance();
+                let (var, var_type, body) = self.parse_binding_impl()?;
+                Ok(Expr::That {
                     var,
                     var_type,
                     body: Box::new(body),
