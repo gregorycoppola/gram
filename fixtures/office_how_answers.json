@@ -32,10 +32,16 @@
         "gloss": "a person present at a meeting"
       },
       {
-        "name": "equals",
-        "roles": {"theme": "e", "value": "e"},
-        "forms": ["is"],
-        "gloss": "identity or assignment"
+        "name": "costs",
+        "roles": {"theme": "e", "amount": "e"},
+        "forms": [],
+        "gloss": "has a monetary value"
+      },
+      {
+        "name": "lasts",
+        "roles": {"theme": "e", "duration": "e"},
+        "forms": [],
+        "gloss": "continues for a period of time"
       }
     ],
     "entities": [
@@ -91,9 +97,9 @@
       "kind": "fact"
     },
     {
-      "name": "copular_entity_equals",
-      "pattern": "$x:e COP $y:e",
-      "template": "equals(theme: $x, value: $y)",
+      "name": "the_costs_copular",
+      "pattern": "THE $N:e COP $Q:e",
+      "template": "the [n:e]: $N(theme: n) -> costs(theme: n, amount: $Q)",
       "kind": "fact"
     },
     {
@@ -106,6 +112,12 @@
       "name": "copular_fact_adjunct",
       "pattern": "$x:e COP $P:{theme:e} $A:e",
       "template": "$P(theme: $x, frequency: $A)",
+      "kind": "fact"
+    },
+    {
+      "name": "the_lasts_copular",
+      "pattern": "THE $N:e COP $Q:e",
+      "template": "the [n:e]: $N(theme: n) -> lasts(theme: n, duration: $Q)",
       "kind": "fact"
     }
   ],
