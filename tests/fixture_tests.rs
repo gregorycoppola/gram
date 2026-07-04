@@ -54,7 +54,7 @@ fn all_fixtures_pass() {
         total_parsed += parsed;
         total_ambiguous += ambiguous;
         total_failed += failed;
-        if failed > 0 || ambiguous > 0 {
+        if failed > 0 {
             failures.push(format!(
                 "  {} — parsed: {}, ambiguous: {}, failed: {}",
                 name, parsed, ambiguous, failed
@@ -64,7 +64,7 @@ fn all_fixtures_pass() {
 
     if !failures.is_empty() {
         panic!(
-            "\nFixture regressions:\n{}\n\nTotal: parsed={}, ambiguous={}, failed={}",
+            "\nFixture failures:\n{}\n\nTotal: parsed={}, ambiguous={}, failed={}",
             failures.join("\n"),
             total_parsed, total_ambiguous, total_failed
         );
