@@ -1,0 +1,36 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "man",
+        "roles": {"theme": "e"},
+        "forms": ["man"],
+        "gloss": "an adult male human"
+      },
+      {
+        "name": "tall",
+        "roles": {"theme": "e"},
+        "forms": ["tall"],
+        "gloss": "of great height"
+      },
+      {
+        "name": "nice",
+        "roles": {"theme": "e"},
+        "forms": ["nice"],
+        "gloss": "pleasant or kind"
+      }
+    ],
+    "entities": []
+  },
+  "grammar": [
+    {
+      "name": "the_tall_man_is_nice",
+      "pattern": "THE $Q:{theme:e} $P:{theme:e} COP $R:{theme:e}",
+      "template": "the [n:e]: $Q(theme: n) ∧ $P(theme: n) -> $R(theme: n)",
+      "kind": "fact"
+    }
+  ],
+  "sentences": [
+    "The tall man is nice."
+  ]
+}
