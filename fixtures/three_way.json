@@ -21,7 +21,7 @@
       },
       {
         "name": "want",
-        "roles": {"agent": "e", "target": "e"},
+        "roles": {"agent": "e", "target": "s"},
         "forms": ["want", "wants", "wanted"],
         "gloss": "desire"
       },
@@ -63,7 +63,7 @@
     },
     {
       "name": "want_infinitive_destination",
-      "pattern": "$x:e $V:{agent:e,target:e} LIT:to $W:{agent:e,destination:e} LIT:to $y:e",
+      "pattern": "$x:e $V:{agent:e,target:s} LIT:to $W:{agent:e,destination:e} LIT:to $y:e",
       "template": "$V(agent: $x, target: $W(agent: $x, destination: $y))",
       "kind": "fact"
     }
