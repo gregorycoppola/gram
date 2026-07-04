@@ -12,6 +12,30 @@
         "roles": {"theme": "e", "of": "e"},
         "forms": ["time"],
         "gloss": "the clock time associated with an event"
+      },
+      {
+        "name": "wedding",
+        "roles": {"theme": "e"},
+        "forms": ["wedding"],
+        "gloss": "a marriage ceremony"
+      },
+      {
+        "name": "meeting",
+        "roles": {"theme": "e"},
+        "forms": ["meeting"],
+        "gloss": "a scheduled gathering"
+      },
+      {
+        "name": "on_date",
+        "roles": {"theme": "e", "value": "e"},
+        "forms": [],
+        "gloss": "falls on a particular date"
+      },
+      {
+        "name": "at_time",
+        "roles": {"theme": "e", "value": "e"},
+        "forms": [],
+        "gloss": "occurs at a particular time"
       }
     ],
     "entities": [
@@ -61,15 +85,15 @@
       "kind": "fact"
     },
     {
-      "name": "on_date_copular",
-      "pattern": "$x:e COP LIT:on $y:e",
-      "template": "equals(theme: $x, value: $y)",
+      "name": "the_on_date_copular",
+      "pattern": "THE $N:{theme:e} COP LIT:on $y:e",
+      "template": "the [n:e]: $N(theme: n) -> on_date(theme: n, value: $y)",
       "kind": "fact"
     },
     {
-      "name": "at_time_copular",
-      "pattern": "$x:e COP LIT:at $y:e",
-      "template": "equals(theme: $x, value: $y)",
+      "name": "the_at_time_copular",
+      "pattern": "THE $N:{theme:e} COP LIT:at $y:e",
+      "template": "the [n:e]: $N(theme: n) -> at_time(theme: n, value: $y)",
       "kind": "fact"
     }
   ],
