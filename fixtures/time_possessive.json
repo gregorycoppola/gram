@@ -62,13 +62,13 @@
   "grammar": [
     {
       "name": "date_of_copular",
-      "pattern": "THE date LIT:of $x:e COP $y:e",
+      "pattern": "THE LIT:date LIT:of $x:e COP $y:e",
       "template": "date(reference: $x) ∧ equals(theme: date(reference: $x), value: $y)",
       "kind": "fact"
     },
     {
       "name": "time_of_copular",
-      "pattern": "THE time LIT:of $x:e COP $y:e",
+      "pattern": "THE LIT:time LIT:of $x:e COP $y:e",
       "template": "time(reference: $x) ∧ equals(theme: time(reference: $x), value: $y)",
       "kind": "fact"
     },
