@@ -96,6 +96,8 @@ pub fn keywords() -> &'static [(&'static str, &'static [&'static str])] {
         ("WH",      &["who", "what", "where", "when", "why", "how"]),
         ("THERE",   &["there"]),
         ("THE",     &["the"]),
+        ("THIS",    &["this"]),
+        ("THAT",    &["that"]),
     ]
 }
 
