@@ -20,6 +20,7 @@
 ///   count      = num | ident           -- "3", "many", "few", ...
 ///   count (legacy, on exists) = ',' '|' ident '|' '=' ident
 
+use crate::core::lexicon::Lexicon;
 use crate::core::logic::Expr;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -364,6 +365,114 @@ pub fn parse(input: &str) -> Result<Expr, String> {
     }
 }
 
+// === Type checking ===
+//
+// Predicates declare role types in the lexicon. The proposition type `s`
+// marks roles that accept a nested predicate as their value (sentential
+// arguments). Entity-typed roles (e.g. `e`, `n`) must not receive a
+// proposition. Predicates not declared in the lexicon are passed through
+// without checking, so ad-hoc outputs don't fail.
+
+/// True iff `arg` is an AST node that counts as a proposition (a truth-valued
+/// expression rather than an entity).
+fn is_proposition_value(arg: &Expr) -> bool {
+    matches!(
+        arg,
+        Expr::Pred { .. }
+            | Expr::Not(_)
+            | Expr::And(_, _)
+            | Expr::Implies { .. }
+            | Expr::ForAll { .. }
+            | Expr::The { .. }
+            | Expr::This { .. }
+            | Expr::That { .. }
+            | Expr::Exists { .. }
+            | Expr::ExistsMany { .. }
+            | Expr::Question { .. }
+    )
+}
+
+fn check_expr_types(expr: &Expr, lexicon: &Lexicon) -> Result<(), String> {
+    match expr {
+        Expr::Pred { name, roles } => {
+            // If the predicate is declared, enforce role types. Otherwise skip.
+            if let Some(pred) = lexicon.predicates.get(name) {
+                for (role_name, role_val) in roles {
+                    let declared = pred.roles.get(role_name);
+                    let val_is_proposition = is_proposition_value(role_val);
+                    match declared {
+                        Some(t) if t == "s" => {
+                            if !val_is_proposition {
+                                return Err(format!(
+                                    "role '{}' of '{}' expects s, got a non-proposition value",
+                                    role_name, name
+                                ));
+                            }
+                        }
+                        Some(t) => {
+                            if val_is_proposition {
+                                return Err(format!(
+                                    "role '{}' of '{}' expects {}, got a proposition",
+                                    role_name, name, t
+                                ));
+                            }
+                        }
+                        None => {
+                            // Role not declared. Be lenient for now — undeclared
+                            // roles on declared predicates are a separate lint.
+                        }
+                    }
+                    // Recurse into the value (propositions get their own checks).
+                    check_expr_types(role_val, lexicon)?;
+                }
+            } else {
+                // Undeclared predicate: recurse into role values but don't
+                // enforce type discipline (we have no schema to enforce).
+                for (_, role_val) in roles {
+                    check_expr_types(role_val, lexicon)?;
+                }
+            }
+            Ok(())
+        }
+        Expr::Not(e) => check_expr_types(e, lexicon),
+        Expr::And(l, r) => {
+            check_expr_types(l, lexicon)?;
+            check_expr_types(r, lexicon)
+        }
+        Expr::Implies { ante, cons } => {
+            check_expr_types(ante, lexicon)?;
+            check_expr_types(cons, lexicon)
+        }
+        Expr::ForAll { body, .. }
+        | Expr::The { body, .. }
+        | Expr::This { body, .. }
+        | Expr::That { body, .. }
+        | Expr::Exists { body, .. }
+        | Expr::ExistsMany { body, .. } => check_expr_types(body, lexicon),
+        Expr::Question { body, .. } => check_expr_types(body, lexicon),
+        Expr::Var { .. } | Expr::Entity(_) => Ok(()),
+    }
+}
+
+/// Check that an `Expr` is well-typed against the lexicon's role declarations.
+///
+/// Returns `Ok(())` if every predicate's role values match their declared
+/// types: roles declared `s` receive propositions, roles declared with any
+/// other type do not. Predicates absent from the lexicon are passed through
+/// without checking.
+pub fn check_types(expr: &Expr, lexicon: &Lexicon) -> Result<(), String> {
+    check_expr_types(expr, lexicon)
+}
+
+/// Parse a semantic output string into the logic AST, then type-check it
+/// against the supplied lexicon. Returns the parsed `Expr` on success, or
+/// the first parse/type error encountered.
+pub fn parse_with_types(input: &str, lexicon: &Lexicon) -> Result<Expr, String> {
+    let expr = parse(input)?;
+    check_types(&expr, lexicon)?;
+    Ok(expr)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398,5 +507,91 @@ mod tests {
         let s = "exists_many [x:e, 3]: man(theme: x) ∧ tall(theme: x)";
         let e = parse(s).expect("parse");
         assert_eq!(s, format!("{}", e));
+    }
+}
+
+#[cfg(test)]
+mod type_tests {
+    use super::*;
+    use crate::core::fixture::Fixture;
+
+    fn test_lexicon() -> Lexicon {
+        let json = r#"{
+            "lexicon": {
+                "predicates": [
+                    {"name": "think", "roles": {"agent": "e", "content": "s"}, "forms": ["think"]},
+                    {"name": "know", "roles": {"agent": "e", "content": "s"}, "forms": ["know"]},
+                    {"name": "man", "roles": {"theme": "e"}, "forms": ["man"]},
+                    {"name": "mortal", "roles": {"theme": "e"}, "forms": ["mortal"]}
+                ],
+                "entities": [
+                    {"name": "socrates", "type": "e", "forms": ["Socrates"]}
+                ]
+            },
+            "grammar": [],
+            "sentences": []
+        }"#;
+        let fixture: Fixture = serde_json::from_str(json).unwrap();
+        Lexicon::from_fixture(&fixture)
+    }
+
+    #[test]
+    fn type_s_accepts_predicate() {
+        let lex = test_lexicon();
+        let e = parse("think(agent: socrates, content: mortal(theme: socrates))").unwrap();
+        assert!(check_types(&e, &lex).is_ok());
+    }
+
+    #[test]
+    fn type_e_rejects_predicate() {
+        let lex = test_lexicon();
+        let e = parse("mortal(theme: think(agent: socrates, content: mortal(theme: socrates)))").unwrap();
+        let err = check_types(&e, &lex).unwrap_err();
+        assert!(err.contains("theme"), "got: {}", err);
+        assert!(err.contains("mortal"), "got: {}", err);
+    }
+
+    #[test]
+    fn nested_propositions_checked() {
+        let lex = test_lexicon();
+        let e = parse("know(agent: socrates, content: think(agent: socrates, content: mortal(theme: socrates)))").unwrap();
+        assert!(check_types(&e, &lex).is_ok());
+    }
+
+    #[test]
+    fn nested_proposition_rejects_violation() {
+        let lex = test_lexicon();
+        // Outer is fine (content: s), but inner think has agent as a pred (agent: e).
+        let e = parse("know(agent: socrates, content: think(agent: mortal(theme: socrates), content: mortal(theme: socrates)))").unwrap();
+        assert!(check_types(&e, &lex).is_err());
+    }
+
+    #[test]
+    fn undeclared_predicate_passes() {
+        let lex = test_lexicon();
+        let e = parse("unknown_pred(theme: socrates)").unwrap();
+        assert!(check_types(&e, &lex).is_ok());
+    }
+
+    #[test]
+    fn undeclared_predicate_with_nested_passes() {
+        let lex = test_lexicon();
+        // Unknown predicate containing a nested pred — passes since we can't check.
+        let e = parse("unknown_pred(theme: mortal(theme: socrates))").unwrap();
+        assert!(check_types(&e, &lex).is_ok());
+    }
+
+    #[test]
+    fn parse_with_types_accepts() {
+        let lex = test_lexicon();
+        let s = "think(agent: socrates, content: mortal(theme: socrates))";
+        assert!(parse_with_types(s, &lex).is_ok());
+    }
+
+    #[test]
+    fn parse_with_types_rejects() {
+        let lex = test_lexicon();
+        let s = "mortal(theme: think(agent: socrates, content: mortal(theme: socrates)))";
+        assert!(parse_with_types(s, &lex).is_err());
     }
 }
