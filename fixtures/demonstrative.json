@@ -36,25 +36,13 @@
   },
   "grammar": [
     {
-      "name": "this_adj_copular",
+      "name": "this_copular",
       "pattern": "THIS $P:{theme:e} COP $Q:{theme:e}",
       "template": "this [n:e]: $P(theme: n) -> $Q(theme: n)",
       "kind": "fact"
     },
     {
-      "name": "that_adj_copular",
-      "pattern": "THAT $P:{theme:e} COP $Q:{theme:e}",
-      "template": "that [n:e]: $P(theme: n) -> $Q(theme: n)",
-      "kind": "fact"
-    },
-    {
-      "name": "this_bare_copular",
-      "pattern": "THIS $P:{theme:e} COP $Q:{theme:e}",
-      "template": "this [n:e]: $P(theme: n) -> $Q(theme: n)",
-      "kind": "fact"
-    },
-    {
-      "name": "that_bare_copular",
+      "name": "that_copular",
       "pattern": "THAT $P:{theme:e} COP $Q:{theme:e}",
       "template": "that [n:e]: $P(theme: n) -> $Q(theme: n)",
       "kind": "fact"
