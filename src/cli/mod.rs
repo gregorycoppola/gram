@@ -1,3 +1,4 @@
+pub mod api;
 pub mod inspect;
 pub mod parse;
 pub mod serve;
@@ -13,6 +14,8 @@ pub enum Command {
     ParseOne(parse::ParseOneArgs),
     /// Dump fixture internals — lexicon form index, tokenization, compiled rules.
     Inspect(inspect::InspectArgs),
+    /// HTTP client — hit server endpoints and print JSON.
+    Api(api::ApiArgs),
     /// Run the HTTP server on localhost. Serves fixtures from a directory;
     /// the gloss frontend is a separate Vite app that talks to this API.
     Serve(serve::ServeArgs),
@@ -23,6 +26,7 @@ pub fn run(command: Command) -> Result<()> {
         Command::Parse(args) => parse::run_parse(args),
         Command::ParseOne(args) => parse::run_parse_one(args),
         Command::Inspect(args) => inspect::run_inspect(args),
+        Command::Api(args) => api::run_api(args),
         Command::Serve(args) => serve::run_serve(args),
     }
 }
