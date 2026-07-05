@@ -14,6 +14,8 @@ pub struct Constituent {
     pub span: Option<(usize, usize)>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub syntax: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub syntax_tree: Option<SyntaxNode>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -27,11 +29,24 @@ pub struct Match {
     pub constituents: Vec<Constituent>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub syntax: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub syntax_tree: Option<SyntaxNode>,
     /// Result of running `semantics::parse_with_types` on `output`.
     /// `None` means the check passed (no error). `Some(String)` is the
     /// error message — same string the CLI prints after `⚠️ semantics:`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub semantics_check: Option<String>,
+}
+
+/// A node in the syntax tree. Leaves have `terminal` set; internal nodes
+/// have `children`.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SyntaxNode {
+    pub label: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<SyntaxNode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub terminal: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -138,6 +153,60 @@ fn build_syntax(
     }
 }
 
+fn build_syntax_tree(
+    tokens: &[String],
+    annotations: &[TokenAnnotation],
+    constituents: &[(usize, usize, SyntaxNode)],
+    top_label: &str,
+) -> SyntaxNode {
+    let mut children = Vec::new();
+    let mut ci = 0;
+    let mut skip_until = 0;
+
+    for i in 0..tokens.len() {
+        if i < skip_until {
+            continue;
+        }
+
+        let cleaned = clean_token(&tokens[i]);
+        if is_ignored(&cleaned) {
+            continue;
+        }
+
+        if ci < constituents.len() && i == constituents[ci].0 {
+            children.push(constituents[ci].2.clone());
+            skip_until = constituents[ci].1;
+            ci += 1;
+            continue;
+        }
+
+        let ann = &annotations[i];
+        let node = match ann.kind {
+            TokenKind::Keyword => {
+                let label = ann.keyword_class.as_deref().unwrap_or("KW");
+                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned) }
+            }
+            TokenKind::Entity => {
+                let label = ann.canonical.as_deref().unwrap_or(&cleaned);
+                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned) }
+            }
+            TokenKind::Predicate => {
+                let label = ann.canonical.as_deref().unwrap_or(&cleaned);
+                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned) }
+            }
+            TokenKind::Literal => {
+                SyntaxNode { label: "LIT".to_string(), children: vec![], terminal: Some(cleaned) }
+            }
+            _ => {
+                SyntaxNode { label: "UNK".to_string(), children: vec![], terminal: Some(cleaned) }
+            }
+        };
+        children.push(node);
+    }
+
+    SyntaxNode { label: top_label.to_string(), children, terminal: None }
+}
+
 /// Kinds that are not top-level sentences — they are sub-constituents
 /// and should be excluded by SUB:s.
 const CONSTITUENT_KINDS: &[&str] = &["dp", "s_gapped"];
@@ -200,10 +269,13 @@ fn parse_sentence_inner(
                 .collect();
             let syntax = build_syntax(tokens, &constituent_spans, kind_to_syntax_label(&rule.kind));
 
-            // Run the semantics type-checker on the output. The CLI does this
-            // in emit_pretty; doing it here means the API response carries the
-            // same diagnostic, so gloss can render it without a second call.
-            // None = passed, Some(msg) = error message.
+            let constituent_trees: Vec<(usize, usize, SyntaxNode)> = constituents.iter()
+                .filter_map(|c| {
+                    c.span.zip(c.syntax_tree.clone()).map(|(s, t)| (s.0, s.1, t))
+                })
+                .collect();
+            let syntax_tree = build_syntax_tree(tokens, &annotations, &constituent_trees, kind_to_syntax_label(&rule.kind));
+
             let semantics_check = match parse_with_types(&output, lexicon) {
                 Ok(_) => None,
                 Err(e) => Some(e),
@@ -217,6 +289,7 @@ fn parse_sentence_inner(
                 token_annotations: annotations,
                 constituents,
                 syntax: Some(syntax),
+                syntax_tree: Some(syntax_tree),
                 semantics_check,
             });
         }
@@ -397,6 +470,7 @@ fn match_pattern(
                     free_vars: available_vars.clone(),
                     span: Some((sub_start, sub_end)),
                     syntax: best.syntax.clone(),
+                    syntax_tree: best.syntax_tree.clone(),
                 });
 
                 match_pattern(
