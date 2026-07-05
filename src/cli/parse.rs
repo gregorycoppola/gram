@@ -60,7 +60,7 @@ pub fn run_parse(args: ParseArgs) -> Result<()> {
     if args.json {
         emit_json(&results)?;
     } else {
-        emit_pretty(&results, &lexicon);
+        emit_pretty(&results);
     }
     Ok(())
 }
@@ -85,12 +85,12 @@ pub fn run_parse_one(args: ParseOneArgs) -> Result<()> {
     if args.json {
         emit_json(&results)?;
     } else {
-        emit_pretty(&results, &lexicon);
+        emit_pretty(&results);
     }
     Ok(())
 }
 
-fn emit_pretty(results: &[ParsedSentence], lexicon: &Lexicon) {
+fn emit_pretty(results: &[ParsedSentence]) {
     println!("📄 {} sentences\n", results.len());
     let mut parsed = 0;
     let mut ambiguous = 0;
@@ -109,7 +109,7 @@ fn emit_pretty(results: &[ParsedSentence], lexicon: &Lexicon) {
                 println!("     {}", syn);
             }
             println!("     → {}  [{}]", m.output, m.rule_name);
-            if let Err(e) = crate::core::semantics::parse_with_types(&m.output, lexicon) {
+            if let Some(e) = &m.semantics_check {
                 println!("     ⚠️  semantics: {}", e);
             }
             println!();
@@ -121,7 +121,7 @@ fn emit_pretty(results: &[ParsedSentence], lexicon: &Lexicon) {
                     println!("     {}", syn);
                 }
                 println!("     → {}  [{}]", m.output, m.rule_name);
-                if let Err(e) = crate::core::semantics::parse_with_types(&m.output, lexicon) {
+                if let Some(e) = &m.semantics_check {
                     println!("       ⚠️  semantics: {}", e);
                 }
             }

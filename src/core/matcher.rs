@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::core::grammar::{is_ignored, matches_keyword, Rule, Slot};
 use crate::core::lexicon::{clean_token, Lexicon};
+use crate::core::semantics::parse_with_types;
 use crate::core::template::apply_template;
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -26,6 +27,11 @@ pub struct Match {
     pub constituents: Vec<Constituent>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub syntax: Option<String>,
+    /// Result of running `semantics::parse_with_types` on `output`.
+    /// `None` means the check passed (no error). `Some(String)` is the
+    /// error message — same string the CLI prints after `⚠️ semantics:`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub semantics_check: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -194,6 +200,15 @@ fn parse_sentence_inner(
                 .collect();
             let syntax = build_syntax(tokens, &constituent_spans, kind_to_syntax_label(&rule.kind));
 
+            // Run the semantics type-checker on the output. The CLI does this
+            // in emit_pretty; doing it here means the API response carries the
+            // same diagnostic, so gloss can render it without a second call.
+            // None = passed, Some(msg) = error message.
+            let semantics_check = match parse_with_types(&output, lexicon) {
+                Ok(_) => None,
+                Err(e) => Some(e),
+            };
+
             results.push(Match {
                 rule_name: rule.name.clone(),
                 kind: rule.kind.clone(),
@@ -202,6 +217,7 @@ fn parse_sentence_inner(
                 token_annotations: annotations,
                 constituents,
                 syntax: Some(syntax),
+                semantics_check,
             });
         }
     }
