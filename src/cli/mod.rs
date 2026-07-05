@@ -1,4 +1,3 @@
-pub mod db;
 pub mod inspect;
 pub mod parse;
 pub mod serve;
@@ -14,20 +13,9 @@ pub enum Command {
     ParseOne(parse::ParseOneArgs),
     /// Dump fixture internals — lexicon form index, tokenization, compiled rules.
     Inspect(inspect::InspectArgs),
-    /// Run the HTTP server (fixtures + DB) on localhost.
+    /// Run the HTTP server on localhost. Serves fixtures from a directory;
+    /// the gloss frontend is a separate Vite app that talks to this API.
     Serve(serve::ServeArgs),
-    /// Manage sentences in the DB.
-    #[command(subcommand)]
-    Sentence(db::SentenceCmd),
-    /// Manage predicates (lexicon) in the DB.
-    #[command(subcommand)]
-    Predicate(db::PredicateCmd),
-    /// Manage entities (lexicon) in the DB.
-    #[command(subcommand)]
-    Entity(db::EntityCmd),
-    /// Manage grammar rules in the DB.
-    #[command(subcommand)]
-    Rule(db::RuleCmd),
 }
 
 pub fn run(command: Command) -> Result<()> {
@@ -36,9 +24,5 @@ pub fn run(command: Command) -> Result<()> {
         Command::ParseOne(args) => parse::run_parse_one(args),
         Command::Inspect(args) => inspect::run_inspect(args),
         Command::Serve(args) => serve::run_serve(args),
-        Command::Sentence(c) => db::run_db(db::DbCommand::Sentence(c)),
-        Command::Predicate(c) => db::run_db(db::DbCommand::Predicate(c)),
-        Command::Entity(c) => db::run_db(db::DbCommand::Entity(c)),
-        Command::Rule(c) => db::run_db(db::DbCommand::Rule(c)),
     }
 }
