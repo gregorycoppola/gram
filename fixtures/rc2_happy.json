@@ -22,6 +22,18 @@
       "kind": "dp"
     },
     {
+      "name": "a_dp",
+      "pattern": "A $N:{theme:e}",
+      "sem": "exists_dp($N, theme)",
+      "kind": "dp"
+    },
+    {
+      "name": "every_dp",
+      "pattern": "ALL $N:{theme:e}",
+      "sem": "forall_dp($N, theme)",
+      "kind": "dp"
+    },
+    {
       "name": "s_copula",
       "pattern": "SUB:dp[$x:e]:COP COP $P:{theme:e}",
       "sem": "s_copula($SUB, $P, theme)",
@@ -29,6 +41,8 @@
     }
   ],
   "sentences": [
-    "the man is happy"
+    "the man is happy",
+    "a man is happy",
+    "every man is happy"
   ]
 }
