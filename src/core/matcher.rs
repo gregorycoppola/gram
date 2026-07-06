@@ -225,10 +225,6 @@ pub fn parse_sentence_with_vars(
     parse_sentence_inner(tokens, &effective_lexicon, rules, &KindFilter::Any, &mut var_gen)
 }
 
-/// Parse a sentence using explicit span hints from the fixture.
-/// Each span is parsed independently, then the S-level constructor combines them.
-/// Gap tokens (not covered by any span) are looked up in the lexicon and injected
-/// as lexical bindings for unresolved constructor args.
 pub fn parse_hinted_sentence(
     sentence: &crate::core::fixture::InputSentence,
     lexicon: &Lexicon,
@@ -252,7 +248,6 @@ pub fn parse_hinted_sentence(
         let matches = parse_sentence_inner(sub_tokens, lexicon, rules, &filter, &mut var_gen);
         if let Some(best) = matches.first() {
             let sv = best.sem_value.clone().unwrap_or_else(|| {
-                // Fallback: parse the output string if no SemValue (old template path)
                 match crate::core::semantics::parse(&best.output) {
                     Ok(expr) => SemValue::Prop(expr),
                     Err(_) => SemValue::Prop(crate::core::logic::Expr::Entity("_error".into())),
@@ -293,8 +288,7 @@ pub fn parse_hinted_sentence(
             None => continue,
         };
 
-        // 5. Resolve constructor args: child spans first (by SUB name), then gap tokens
-        let mut sub_idx = 0;
+        // 5. Resolve constructor args: child spans by SUB name, gap tokens by position
         let mut gap_idx = 0;
         let mut args: Vec<Arg> = Vec::new();
         let mut ok = true;
@@ -303,17 +297,14 @@ pub fn parse_hinted_sentence(
             match sem_arg {
                 SemArg::Slot(name) => {
                     let key = name.strip_prefix('$').unwrap_or(name);
-                    // Check if this looks like a SUB reference
                     if key == "SUB" || key.starts_with("SUB") {
                         if let Some(idx) = parse_sub_index(key) {
                             if idx < child_results.len() {
                                 args.push(Arg::Sub(child_results[idx].1.clone()));
-                                sub_idx = idx + 1;
                                 continue;
                             }
                         }
                     }
-                    // Fall through to gap tokens
                     if gap_idx < gap_entries.len() {
                         let (canonical, typ, _) = &gap_entries[gap_idx];
                         args.push(Arg::Lexical(canonical.clone(), typ.clone()));
@@ -354,16 +345,15 @@ pub fn parse_hinted_sentence(
                     &sentence.tokens,
                     &sentence.spans,
                     &gap_entries,
-                    lexicon,
                 );
 
                 let constituent_spans: Vec<(usize, usize, String)> = constituents.iter()
-                    .filter_map(|c| c.span.map(|(s, e)| (s, e, c.syntax.clone().unwrap_or_default())))
+                    .filter_map(|c| c.span.map(|(s, e)| (s, e, c.syntax.clone().unwrap_or_default()))
                     .collect();
                 let syntax = build_syntax(&sentence.tokens, &constituent_spans, "S");
 
                 let constituent_trees: Vec<(usize, usize, SyntaxNode)> = constituents.iter()
-                    .filter_map(|c| c.span.zip(c.syntax_tree.clone()).map(|(s, t)| (s.0, s.1, t)))
+                    .filter_map(|c| c.span.zip(c.syntax_tree.clone()).map(|(s, t)| (s.0, s.1, t))
                     .collect();
                 let syntax_tree = build_syntax_tree(&sentence.tokens, &annotations, &constituent_trees, "S");
 
@@ -405,7 +395,6 @@ fn build_annotations_from_hints(
     tokens: &[String],
     spans: &[crate::core::fixture::Span],
     gap_entries: &[(String, String, usize)],
-    lexicon: &Lexicon,
 ) -> Vec<TokenAnnotation> {
     let mut out: Vec<TokenAnnotation> = tokens.iter()
         .map(|_| TokenAnnotation {
@@ -417,7 +406,6 @@ fn build_annotations_from_hints(
         })
         .collect();
 
-    // Mark span-covered tokens as SubClause
     for span in spans {
         for i in span.start..span.end {
             if i < out.len() {
@@ -432,7 +420,6 @@ fn build_annotations_from_hints(
         }
     }
 
-    // Annotate gap tokens from lexicon lookups
     for (canonical, typ, pos) in gap_entries {
         if *pos < out.len() {
             let kind = if typ == "e" {
@@ -477,12 +464,12 @@ fn parse_sentence_inner(
             let annotations = annotate_tokens(tokens, &log);
 
             let constituent_spans: Vec<(usize, usize, String)> = constituents.iter()
-                .filter_map(|c| c.span.map(|(s, e)| (s, e, c.syntax.clone().unwrap_or_default())))
+                .filter_map(|c| c.span.map(|(s, e)| (s, e, c.syntax.clone().unwrap_or_default()))
                 .collect();
             let syntax = build_syntax(tokens, &constituent_spans, kind_to_syntax_label(&rule.kind));
 
             let constituent_trees: Vec<(usize, usize, SyntaxNode)> = constituents.iter()
-                .filter_map(|c| c.span.zip(c.syntax_tree.clone()).map(|(s, t)| (s.0, s.1, t)))
+                .filter_map(|c| c.span.zip(c.syntax_tree.clone()).map(|(s, t)| (s.0, s.1, t))
                 .collect();
             let syntax_tree = build_syntax_tree(tokens, &annotations, &constituent_trees, kind_to_syntax_label(&rule.kind));
 
@@ -644,7 +631,7 @@ fn match_pattern(
                 if type_ok {
                     let mut new_bindings = bindings.clone();
                     let mut new_log = log.clone();
-                    new_bindings.insert(name.clone(), (canonical.clone(), actual_type.clone()));
+                    new_bindings.insert(name.clone(), (canonical.clone(), actual_type.clone());
                     new_log.push(Consumption::Var {
                         variable: name.clone(), canonical, typ: actual_type, start: ti, end: ti + consumed,
                     });
@@ -701,7 +688,7 @@ fn match_pattern(
                     } else {
                         format!("SUB{}", sub_count + 1)
                     };
-                    new_bindings.insert(sub_key, (best.output.clone(), label.clone()));
+                    new_bindings.insert(sub_key, (best.output.clone(), label.clone());
                     constituents.push(Constituent {
                         label: label.clone(),
                         semantics: best.output.clone(),
@@ -742,7 +729,7 @@ fn match_pattern(
                         } else {
                             format!("SUB{}", sub_count + 1)
                         };
-                        new_bindings.insert(sub_key, (best.output.clone(), label.clone()));
+                        new_bindings.insert(sub_key, (best.output.clone(), label.clone());
                         trial_constituents.push(Constituent {
                             label: label.clone(),
                             semantics: best.output.clone(),
@@ -781,7 +768,7 @@ fn annotate_tokens(tokens: &[String], log: &[Consumption]) -> Vec<TokenAnnotatio
                 } else if typ.starts_with('{') {
                     TokenKind::Predicate
                 } else {
-                    TokenKind::Entity
+                    TokenKind::Error => TokenKind::Entity
                 };
                 for i in *start..*end {
                     if i < out.len() {
@@ -809,7 +796,7 @@ fn annotate_tokens(tokens: &[String], log: &[Consumption]) -> Vec<TokenAnnotatio
             Consumption::Literal { position } => {
                 if *position < out.len() {
                     out[*position] = TokenAnnotation {
-                        kind: TokenKind::Literal,
+                        kind: Token::Literal,
                         canonical: None,
                         typ: None,
                         variable: None,

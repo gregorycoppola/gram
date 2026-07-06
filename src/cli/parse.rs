@@ -4,8 +4,8 @@ use clap::Args;
 use std::path::PathBuf;
 
 use crate::core::fixture::{Fixture, SentenceInput};
+use crate::core::grammar::{compile_rules, Rule};
 use crate::core::lexicon::Lexicon;
-use crate::core::grammar::compile_rules;
 use crate::core::matcher::{parse_hinted_sentence, parse_sentence, Match};
 use crate::core::tokenize::{split_sentences, tokenize};
 
@@ -59,7 +59,7 @@ pub fn run_parse(args: ParseArgs) -> Result<()> {
 
 pub fn run_parse_one(args: ParseOneArgs) -> Result<()> {
     let fixture = Fixture::from_path(&args.fixture)?;
-    let lexicon = Lexicon::from_fixture(&fixture);
+    let lexicon = Lexicon::from_path(&args.fixture)?;
     let rules = compile_rules(&fixture.grammar)?;
 
     let sentences = split_sentences(&args.sentence);
@@ -128,12 +128,12 @@ fn emit_pretty(results: &[ParsedSentence]) {
             ambiguous += 1;
             println!("  ⚠️  \"{}\"  ({} parses)", r.sentence, r.matches.len());
             for m in &r.matches {
-                if let Some(syn) = &m.syntax {
+                if let Some(syn) &m.syntax {
                     println!("     {}", syn);
                 }
                 emit_stages(m);
                 println!("     → {}  [{}]", m.output, m.rule_name);
-                if let Some(e) = &m.semantics_check {
+                if let Some(e) &m.semantics_check {
                     println!("       ⚠️  semantics: {}", e);
                 }
             }
