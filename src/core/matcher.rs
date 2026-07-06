@@ -256,7 +256,6 @@ fn parse_sentence_inner(
                 .collect();
             let syntax_tree = build_syntax_tree(tokens, &annotations, &constituent_trees, kind_to_syntax_label(&rule.kind));
 
-            // Resolve semantics: new constructor path or old template path
             let (output, sem_value, semantics_check) = if let Some(ref sem_spec) = rule.sem {
                 match resolve_and_construct(sem_spec, &b, &constituents, var_gen) {
                     Ok((sv, out)) => (out, Some(sv), None),
@@ -290,14 +289,12 @@ fn parse_sentence_inner(
     results
 }
 
-/// Resolve a SemSpec's args from bindings and constituent sem_values, then call the constructor.
 fn resolve_and_construct(
     sem_spec: &crate::core::sem_dsl::SemSpec,
     bindings: &BTreeMap<String, (String, String)>,
     constituents: &[Constituent],
     var_gen: &mut VarGen,
 ) -> Result<(SemValue, String), String> {
-    // Build a map from SUB key to sem_value
     let mut sub_values: BTreeMap<String, SemValue> = BTreeMap::new();
     for (i, constituent) in constituents.iter().enumerate() {
         let key = if i == 0 {
@@ -310,7 +307,6 @@ fn resolve_and_construct(
         }
     }
 
-    // Resolve each arg
     let mut args: Vec<Arg> = Vec::new();
     for sem_arg in &sem_spec.args {
         match sem_arg {
@@ -445,7 +441,9 @@ fn match_pattern(
                 log.push(Consumption::Skipped { position: sub_ti });
                 sub_ti += 1;
             }
-            let sub_end = if let Some(delim_kw) = delimiter {
+
+            if let Some(delim_kw) = delimiter {
+                // Delimited: scan forward for the delimiter keyword
                 let mut end = tokens.len();
                 for i in sub_ti..tokens.len() {
                     if matches_keyword(&clean_token(&tokens[i]), delim_kw) {
@@ -453,47 +451,89 @@ fn match_pattern(
                         break;
                     }
                 }
-                end
-            } else {
-                tokens.len()
-            };
-            let sub_tokens = &tokens[sub_ti..sub_end];
-            if sub_tokens.is_empty() {
-                return None;
-            }
-            let sub_filter = sub_filter_for_label(label);
-            let effective_lexicon = if available_vars.is_empty() {
-                None
-            } else {
-                Some(lexicon.with_pronoun_bindings(available_vars))
-            };
-            let sub_lexicon = effective_lexicon.as_ref().unwrap_or(lexicon);
-            let sub_matches = parse_sentence_inner(sub_tokens, sub_lexicon, rules, &sub_filter, var_gen);
-            if let Some(best) = sub_matches.first() {
-                let mut new_bindings = bindings.clone();
-                let mut new_log = log.clone();
-                new_log.push(Consumption::SubClause { start: sub_start, end: sub_end });
-                let sub_key = if sub_count == 0 {
-                    "SUB".to_string()
+                let sub_tokens = &tokens[sub_ti..end];
+                if sub_tokens.is_empty() {
+                    return None;
+                }
+                let sub_filter = sub_filter_for_label(label);
+                let effective_lexicon = if available_vars.is_empty() {
+                    None
                 } else {
-                    format!("SUB{}", sub_count + 1)
+                    Some(lexicon.with_pronoun_bindings(available_vars))
                 };
-                new_bindings.insert(sub_key, (best.output.clone(), label.clone()));
-                constituents.push(Constituent {
-                    label: label.clone(),
-                    semantics: best.output.clone(),
-                    free_vars: available_vars.clone(),
-                    span: Some((sub_start, sub_end)),
-                    syntax: best.syntax.clone(),
-                    syntax_tree: best.syntax_tree.clone(),
-                    sem_value: best.sem_value.clone(),
-                });
-                match_pattern(
-                    pattern, pi + 1, tokens, sub_end,
-                    new_bindings, new_log, lexicon, rules, sub_count + 1, constituents, kind_filter,
-                    var_gen,
-                )
+                let sub_lexicon = effective_lexicon.as_ref().unwrap_or(lexicon);
+                let sub_matches = parse_sentence_inner(sub_tokens, sub_lexicon, rules, &sub_filter, var_gen);
+                if let Some(best) = sub_matches.first() {
+                    let mut new_bindings = bindings.clone();
+                    let mut new_log = log.clone();
+                    new_log.push(Consumption::SubClause { start: sub_start, end });
+                    let sub_key = if sub_count == 0 {
+                        "SUB".to_string()
+                    } else {
+                        format!("SUB{}", sub_count + 1)
+                    };
+                    new_bindings.insert(sub_key, (best.output.clone(), label.clone()));
+                    constituents.push(Constituent {
+                        label: label.clone(),
+                        semantics: best.output.clone(),
+                        free_vars: available_vars.clone(),
+                        span: Some((sub_start, end)),
+                        syntax: best.syntax.clone(),
+                        syntax_tree: best.syntax_tree.clone(),
+                        sem_value: best.sem_value.clone(),
+                    });
+                    return match_pattern(
+                        pattern, pi + 1, tokens, end,
+                        new_bindings, new_log, lexicon, rules, sub_count + 1, constituents, kind_filter,
+                        var_gen,
+                    );
+                } else {
+                    None
+                }
             } else {
+                // Undelimited: try shortest span first (greedy shortest match)
+                // This is the "hint" — the sub-phrase rules determine their own boundary
+                let sub_filter = sub_filter_for_label(label);
+                let effective_lexicon = if available_vars.is_empty() {
+                    None
+                } else {
+                    Some(lexicon.with_pronoun_bindings(available_vars))
+                };
+                let sub_lexicon = effective_lexicon.as_ref().unwrap_or(lexicon);
+                let max_end = tokens.len();
+                for end in (sub_ti + 1)..=max_end {
+                    let sub_tokens = &tokens[sub_ti..end];
+                    let sub_matches = parse_sentence_inner(sub_tokens, sub_lexicon, rules, &sub_filter, var_gen);
+                    if let Some(best) = sub_matches.first() {
+                        let mut new_bindings = bindings.clone();
+                        let mut new_log = log.clone();
+                        new_log.push(Consumption::SubClause { start: sub_start, end });
+                        let sub_key = if sub_count == 0 {
+                            "SUB".to_string()
+                        } else {
+                            format!("SUB{}", sub_count + 1)
+                        };
+                        new_bindings.insert(sub_key, (best.output.clone(), label.clone()));
+                        constituents.push(Constituent {
+                            label: label.clone(),
+                            semantics: best.output.clone(),
+                            free_vars: available_vars.clone(),
+                            span: Some((sub_start, end)),
+                            syntax: best.syntax.clone(),
+                            syntax_tree: best.syntax_tree.clone(),
+                            sem_value: best.sem_value.clone(),
+                        });
+                        if let Some(result) = match_pattern(
+                            pattern, pi + 1, tokens, end,
+                            new_bindings, new_log, lexicon, rules, sub_count + 1, constituents, kind_filter,
+                            var_gen,
+                        ) {
+                            return Some(result);
+                        }
+                        // This span didn't lead to a full match — try longer
+                        constituents.pop();
+                    }
+                }
                 None
             }
         }

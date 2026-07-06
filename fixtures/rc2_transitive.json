@@ -1,0 +1,79 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "man",
+        "roles": {"theme": "e"},
+        "forms": ["man"]
+      },
+      {
+        "name": "woman",
+        "roles": {"theme": "e"},
+        "forms": ["woman"]
+      },
+      {
+        "name": "loves",
+        "roles": {"agent": "e", "patient": "e"},
+        "forms": ["loves"]
+      }
+    ],
+    "entities": [
+      {
+        "name": "sue",
+        "type": "e",
+        "forms": ["Sue"]
+      },
+      {
+        "name": "tom",
+        "type": "e",
+        "forms": ["Tom"]
+      }
+    ]
+  },
+  "grammar": [
+    {
+      "name": "the_dp",
+      "pattern": "THE $N:{theme:e}",
+      "sem": "the_dp($N, theme)",
+      "kind": "dp"
+    },
+    {
+      "name": "a_dp",
+      "pattern": "A $N:{theme:e}",
+      "sem": "exists_dp($N, theme)",
+      "kind": "dp"
+    },
+    {
+      "name": "every_dp",
+      "pattern": "ALL $N:{theme:e}",
+      "sem": "forall_dp($N, theme)",
+      "kind": "dp"
+    },
+    {
+      "name": "bare_dp",
+      "pattern": "$x:e",
+      "sem": "bare_dp($x)",
+      "kind": "dp"
+    },
+    {
+      "name": "s_copula",
+      "pattern": "SUB:dp[$x:e]:COP COP $P:{theme:e}",
+      "sem": "s_copula($SUB, $P, theme)",
+      "kind": "s"
+    },
+    {
+      "name": "s_transitive",
+      "pattern": "SUB:dp[$x:e] $V:{agent:e,patient:e} SUB:dp[$y:e]",
+      "sem": "s_transitive($SUB, $SUB1, $V, agent, patient)",
+      "kind": "s"
+    }
+  ],
+  "sentences": [
+    "the man loves the woman",
+    "a man loves a woman",
+    "every man loves a woman",
+    "sue loves tom",
+    "the man loves sue",
+    "sue loves the woman"
+  ]
+}
