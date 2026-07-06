@@ -60,8 +60,8 @@ fn construct_quant_dp(
         _ => return Err("quant_dp: second arg must be a literal role name".into()),
     };
 
-    let var = var_gen.fresh();
-    let var_type = "e".to_string();
+    let var: String = var_gen.fresh();
+    let var_type: String = "e".to_string();
     let restriction = Expr::Pred {
         name: pred_name,
         roles: vec![(role, Expr::Var {
@@ -171,10 +171,11 @@ fn construct_s_transitive(args: &[Arg]) -> Result<SemValue, String> {
     };
 
     // Expand quantifiers: subject outer, object inner (surface order)
-    let expr = expand_quants(
-        &[(subj_var, subj_type, subj_quant), (obj_var, obj_type, obj_quant)],
-        body,
-    )?;
+    let dps: Vec<(String, String, DpQuant)> = vec![
+        (subj_var, subj_type, subj_quant),
+        (obj_var, obj_type, obj_quant),
+    ];
+    let expr = expand_quants(&dps, body)?;
     Ok(SemValue::Prop(expr))
 }
 
