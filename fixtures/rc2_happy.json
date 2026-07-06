@@ -23,7 +23,7 @@
     },
     {
       "name": "s_copula",
-      "pattern": "SUB:dp[$x:e] COP $P:{theme:e}",
+      "pattern": "SUB:dp[$x:e]:COP COP $P:{theme:e}",
       "sem": "s_copula($SUB, $P, theme)",
       "kind": "s"
     }
