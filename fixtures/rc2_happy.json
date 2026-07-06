@@ -1,0 +1,34 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "man",
+        "roles": {"theme": "e"},
+        "forms": ["man"]
+      },
+      {
+        "name": "happy",
+        "roles": {"theme": "e"},
+        "forms": ["happy"]
+      }
+    ],
+    "entities": []
+  },
+  "grammar": [
+    {
+      "name": "the_dp",
+      "pattern": "THE $N:{theme:e}",
+      "sem": "the_dp($N, theme)",
+      "kind": "dp"
+    },
+    {
+      "name": "s_copula",
+      "pattern": "SUB:dp[$x:e] COP $P:{theme:e}",
+      "sem": "s_copula($SUB, $P, theme)",
+      "kind": "s"
+    }
+  ],
+  "sentences": [
+    "the man is happy"
+  ]
+}
