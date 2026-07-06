@@ -443,7 +443,6 @@ fn match_pattern(
             }
 
             if let Some(delim_kw) = delimiter {
-                // Delimited: scan forward for the delimiter keyword
                 let mut end = tokens.len();
                 for i in sub_ti..tokens.len() {
                     if matches_keyword(&clean_token(&tokens[i]), delim_kw) {
@@ -491,8 +490,7 @@ fn match_pattern(
                     None
                 }
             } else {
-                // Undelimited: try shortest span first (greedy shortest match)
-                // This is the "hint" — the sub-phrase rules determine their own boundary
+                // Undelimited: try shortest span first, backtrack on failure
                 let sub_filter = sub_filter_for_label(label);
                 let effective_lexicon = if available_vars.is_empty() {
                     None
@@ -505,6 +503,7 @@ fn match_pattern(
                     let sub_tokens = &tokens[sub_ti..end];
                     let sub_matches = parse_sentence_inner(sub_tokens, sub_lexicon, rules, &sub_filter, var_gen);
                     if let Some(best) = sub_matches.first() {
+                        let mut trial_constituents = constituents.clone();
                         let mut new_bindings = bindings.clone();
                         let mut new_log = log.clone();
                         new_log.push(Consumption::SubClause { start: sub_start, end });
@@ -514,7 +513,7 @@ fn match_pattern(
                             format!("SUB{}", sub_count + 1)
                         };
                         new_bindings.insert(sub_key, (best.output.clone(), label.clone()));
-                        constituents.push(Constituent {
+                        trial_constituents.push(Constituent {
                             label: label.clone(),
                             semantics: best.output.clone(),
                             free_vars: available_vars.clone(),
@@ -525,13 +524,12 @@ fn match_pattern(
                         });
                         if let Some(result) = match_pattern(
                             pattern, pi + 1, tokens, end,
-                            new_bindings, new_log, lexicon, rules, sub_count + 1, constituents, kind_filter,
+                            new_bindings, new_log, lexicon, rules, sub_count + 1, trial_constituents, kind_filter,
                             var_gen,
                         ) {
                             return Some(result);
                         }
                         // This span didn't lead to a full match — try longer
-                        constituents.pop();
                     }
                 }
                 None
