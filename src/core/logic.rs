@@ -72,19 +72,23 @@ pub enum Expr {
     },
 }
 
-/// True if this expression needs parentheses when it appears as the body
-/// of a quantifier or the consequent of an implication.
-fn needs_parens(expr: &Expr) -> bool {
+/// True if this expression needs parentheses when nested inside another
+/// quantifier body or as the consequent of an implication.
+fn is_quantifier(expr: &Expr) -> bool {
     matches!(
         expr,
-        Expr::Implies { .. }
-            | Expr::ForAll { .. }
+        Expr::ForAll { .. }
             | Expr::The { .. }
             | Expr::This { .. }
             | Expr::That { .. }
             | Expr::Exists { .. }
             | Expr::ExistsMany { .. }
     )
+}
+
+/// True if this expression needs parentheses as the consequent of an implication.
+fn cons_needs_parens(expr: &Expr) -> bool {
+    is_quantifier(expr) || matches!(expr, Expr::Implies { .. })
 }
 
 impl std::fmt::Display for Expr {
@@ -102,7 +106,7 @@ impl std::fmt::Display for Expr {
             Expr::And(l, r) => write!(f, "{} ∧ {}", l, r),
             Expr::Implies { ante, cons } => {
                 write!(f, "{} -> ", ante)?;
-                if needs_parens(cons) {
+                if cons_needs_parens(cons) {
                     write!(f, "({})", cons)
                 } else {
                     write!(f, "{}", cons)
@@ -110,7 +114,7 @@ impl std::fmt::Display for Expr {
             }
             Expr::ForAll { var, var_type, body } => {
                 write!(f, "always [{}:{}]: ", var, var_type)?;
-                if needs_parens(body) {
+                if is_quantifier(body) {
                     write!(f, "({})", body)
                 } else {
                     write!(f, "{}", body)
@@ -118,7 +122,7 @@ impl std::fmt::Display for Expr {
             }
             Expr::The { var, var_type, body } => {
                 write!(f, "the [{}:{}]: ", var, var_type)?;
-                if needs_parens(body) {
+                if is_quantifier(body) {
                     write!(f, "({})", body)
                 } else {
                     write!(f, "{}", body)
@@ -126,7 +130,7 @@ impl std::fmt::Display for Expr {
             }
             Expr::This { var, var_type, body } => {
                 write!(f, "this [{}:{}]: ", var, var_type)?;
-                if needs_parens(body) {
+                if is_quantifier(body) {
                     write!(f, "({})", body)
                 } else {
                     write!(f, "{}", body)
@@ -134,7 +138,7 @@ impl std::fmt::Display for Expr {
             }
             Expr::That { var, var_type, body } => {
                 write!(f, "that [{}:{}]: ", var, var_type)?;
-                if needs_parens(body) {
+                if is_quantifier(body) {
                     write!(f, "({})", body)
                 } else {
                     write!(f, "{}", body)
@@ -149,7 +153,7 @@ impl std::fmt::Display for Expr {
             }
             Expr::ExistsMany { var, var_type, count, body } => {
                 write!(f, "exists_many [{}:{}, {}]: ", var, var_type, count)?;
-                if needs_parens(body) {
+                if is_quantifier(body) {
                     write!(f, "({})", body)
                 } else {
                     write!(f, "{}", body)
