@@ -1,6 +1,8 @@
+
 use anyhow::{anyhow, Result};
 
 use crate::core::fixture::FixtureRule;
+use crate::core::sem_dsl::SemSpec;
 
 #[derive(Debug, Clone)]
 pub enum Slot {
@@ -21,6 +23,8 @@ pub struct Rule {
     pub pattern: Vec<Slot>,
     pub template: String,
     pub kind: String,
+    /// Parsed semantic constructor spec. If present, used instead of template.
+    pub sem: Option<SemSpec>,
 }
 
 pub fn compile_rules(rules: &[FixtureRule]) -> Result<Vec<Rule>> {
@@ -28,14 +32,21 @@ pub fn compile_rules(rules: &[FixtureRule]) -> Result<Vec<Rule>> {
 }
 
 fn compile_rule(r: &FixtureRule) -> Result<Rule> {
-    let pattern: Vec<Slot> = r.pattern.split_whitespace()
+    let pattern: Vec<Slot> = r
+        .pattern
+        .split_whitespace()
         .map(parse_slot)
         .collect::<Result<Vec<_>>>()?;
+    let sem = match &r.sem {
+        Some(s) => Some(crate::core::sem_dsl::parse_sem(s)?),
+        None => None,
+    };
     Ok(Rule {
         name: r.name.clone(),
         pattern,
         template: r.template.clone(),
         kind: r.kind.clone(),
+        sem,
     })
 }
 
@@ -80,7 +91,8 @@ fn parse_sub_slot(rest: &str) -> Result<Slot> {
             b']' => depth -= 1,
             b':' if depth == 0 => {
                 let after = &rest[i + 1..];
-                if !after.is_empty() && after.chars().all(|c| c.is_ascii_uppercase() || c == '_') {
+                if !after.is_empty() && after.chars().all(|c| c.is_ascii_uppercase() || c == '_')
+                {
                     last_keyword_colon = Some(i);
                 }
             }
@@ -112,9 +124,11 @@ fn parse_sub_slot_parts(rest: &str, delimiter: Option<String>) -> Result<Slot> {
     if !vars_str.is_empty() {
         for var_spec in vars_str.split(',') {
             let var_spec = var_spec.trim();
-            let var_spec = var_spec.strip_prefix('$')
+            let var_spec = var_spec
+                .strip_prefix('$')
                 .ok_or_else(|| anyhow!("SUB var must start with $: {}", var_spec))?;
-            let (name, typ) = var_spec.split_once(':')
+            let (name, typ) = var_spec
+                .split_once(':')
                 .ok_or_else(|| anyhow!("SUB var must have :type: {}", var_spec))?;
             available_vars.push((format!("${}", name), typ.to_string()));
         }
@@ -143,21 +157,21 @@ pub fn canonicalize_type(typ: &str) -> String {
 
 pub fn keywords() -> &'static [(&'static str, &'static [&'static str])] {
     &[
-        ("COP",     &["is", "are", "was", "were", "am", "be"]),
-        ("ALL",     &["all", "every"]),
-        ("ANY",     &["any"]),
-        ("IF",      &["if", "when", "whenever"]),
-        ("THEN",    &["then"]),
-        ("AND",     &["and", "&"]),
-        ("NOT",     &["not", "never", "no", "n't"]),
-        ("A",       &["a", "an"]),
+        ("COP", &["is", "are", "was", "were", "am", "be"]),
+        ("ALL", &["all", "every"]),
+        ("ANY", &["any"]),
+        ("IF", &["if", "when", "whenever"]),
+        ("THEN", &["then"]),
+        ("AND", &["and", "&"]),
+        ("NOT", &["not", "never", "no", "n't"]),
+        ("A", &["a", "an"]),
         ("SOMEONE", &["someone", "somebody", "anyone"]),
-        ("WH",      &["who", "what", "where", "when", "why", "how"]),
-        ("THERE",   &["there"]),
-        ("THE",     &["the"]),
-        ("THIS",    &["this"]),
-        ("THAT",    &["that"]),
-        ("WHO",     &["who"]),
+        ("WH", &["who", "what", "where", "when", "why", "how"]),
+        ("THERE", &["there"]),
+        ("THE", &["the"]),
+        ("THIS", &["this"]),
+        ("THAT", &["that"]),
+        ("WHO", &["who"]),
     ]
 }
 

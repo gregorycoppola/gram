@@ -1,9 +1,13 @@
+
 use std::collections::BTreeMap;
 
+use crate::core::construct::{self, Arg, apply_constructor};
 use crate::core::grammar::{is_ignored, matches_keyword, Rule, Slot};
 use crate::core::lexicon::{clean_token, Lexicon};
+use crate::core::sem_dsl::SemArg;
 use crate::core::semantics::parse_with_types;
 use crate::core::template::apply_template;
+use crate::core::value::{SemValue, VarGen};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Constituent {
@@ -16,6 +20,9 @@ pub struct Constituent {
     pub syntax: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub syntax_tree: Option<SyntaxNode>,
+    /// Computed SemValue from the new constructor path (not serialized).
+    #[serde(skip)]
+    pub sem_value: Option<SemValue>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -33,6 +40,9 @@ pub struct Match {
     pub syntax_tree: Option<SyntaxNode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub semantics_check: Option<String>,
+    /// Computed SemValue from the new constructor path (not serialized).
+    #[serde(skip)]
+    pub sem_value: Option<SemValue>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -53,7 +63,7 @@ impl std::fmt::Display for SyntaxNode {
 fn render_tree(f: &mut std::fmt::Formatter, node: &SyntaxNode, depth: usize) -> std::fmt::Result {
     let indent = "  ".repeat(depth);
     if let Some(ref term) = node.terminal {
-        writeln!(f, "{}{} → \"{}\"", indent, node.label, term)?;
+        writeln!(f, "{}{} -> \"{}\"", indent, node.label, term)?;
     } else {
         writeln!(f, "{}{}", indent, node.label)?;
         for child in &node.children {
@@ -118,9 +128,13 @@ fn build_syntax(tokens: &[String], constituents: &[(usize, usize, String)], top_
     let mut ci = 0;
     let mut skip_until = 0;
     for i in 0..tokens.len() {
-        if i < skip_until { continue; }
+        if i < skip_until {
+            continue;
+        }
         let cleaned = clean_token(&tokens[i]);
-        if is_ignored(&cleaned) { continue; }
+        if is_ignored(&cleaned) {
+            continue;
+        }
         if ci < constituents.len() && i == constituents[ci].0 {
             parts.push(constituents[ci].2.clone());
             skip_until = constituents[ci].1;
@@ -146,9 +160,13 @@ fn build_syntax_tree(
     let mut ci = 0;
     let mut skip_until = 0;
     for i in 0..tokens.len() {
-        if i < skip_until { continue; }
+        if i < skip_until {
+            continue;
+        }
         let cleaned = clean_token(&tokens[i]);
-        if is_ignored(&cleaned) { continue; }
+        if is_ignored(&cleaned) {
+            continue;
+        }
         if ci < constituents.len() && i == constituents[ci].0 {
             children.push(constituents[ci].2.clone());
             skip_until = constituents[ci].1;
@@ -199,16 +217,18 @@ pub fn parse_sentence(tokens: &[String], lexicon: &Lexicon, rules: &[Rule]) -> V
 pub fn parse_sentence_with_vars(
     tokens: &[String], lexicon: &Lexicon, rules: &[Rule], available_vars: &[(String, String)],
 ) -> Vec<Match> {
+    let mut var_gen = VarGen::new();
     let effective_lexicon = if available_vars.is_empty() {
-        return parse_sentence_inner(tokens, lexicon, rules, &KindFilter::Any);
+        return parse_sentence_inner(tokens, lexicon, rules, &KindFilter::Any, &mut var_gen);
     } else {
         lexicon.with_pronoun_bindings(available_vars)
     };
-    parse_sentence_inner(tokens, &effective_lexicon, rules, &KindFilter::Any)
+    parse_sentence_inner(tokens, &effective_lexicon, rules, &KindFilter::Any, &mut var_gen)
 }
 
 fn parse_sentence_inner(
     tokens: &[String], lexicon: &Lexicon, rules: &[Rule], kind_filter: &KindFilter,
+    var_gen: &mut VarGen,
 ) -> Vec<Match> {
     let mut results = Vec::new();
     for rule in rules {
@@ -223,8 +243,8 @@ fn parse_sentence_inner(
         let constituents = Vec::new();
         if let Some((b, log, constituents)) = match_pattern(
             &rule.pattern, 0, tokens, 0, bindings, log, lexicon, rules, 0, constituents, kind_filter,
+            var_gen,
         ) {
-            let output = apply_template(&rule.template, &b);
             let annotations = annotate_tokens(tokens, &log);
 
             let constituent_spans: Vec<(usize, usize, String)> = constituents.iter()
@@ -237,9 +257,23 @@ fn parse_sentence_inner(
                 .collect();
             let syntax_tree = build_syntax_tree(tokens, &annotations, &constituent_trees, kind_to_syntax_label(&rule.kind));
 
-            let semantics_check = match parse_with_types(&output, lexicon) {
-                Ok(_) => None,
-                Err(e) => Some(e),
+            // Resolve semantics: new constructor path or old template path
+            let (output, sem_value, semantics_check) = if let Some(ref sem_spec) = rule.sem {
+                match resolve_and_construct(sem_spec, &b, &constituents, var_gen) {
+                    Ok((sv, out)) => (out, Some(sv), None),
+                    Err(e) => {
+                        // Constructor failed — skip this match
+                        continue;
+                    }
+                }
+            } else {
+                // Old template path
+                let out = apply_template(&rule.template, &b);
+                let check = match parse_with_types(&out, lexicon) {
+                    Ok(_) => None,
+                    Err(e) => Some(e),
+                };
+                (out, None, check)
             };
 
             results.push(Match {
@@ -252,10 +286,61 @@ fn parse_sentence_inner(
                 syntax: Some(syntax),
                 syntax_tree: Some(syntax_tree),
                 semantics_check,
+                sem_value,
             });
         }
     }
     results
+}
+
+/// Resolve a SemSpec's args from bindings and constituent sem_values, then call the constructor.
+/// Returns the SemValue and its Display string.
+fn resolve_and_construct(
+    sem_spec: &crate::core::sem_dsl::SemSpec,
+    bindings: &BTreeMap<String, (String, String)>,
+    constituents: &[Constituent],
+    var_gen: &mut VarGen,
+) -> Result<(SemValue, String), String> {
+    // Build a map from SUB key to sem_value
+    let mut sub_values: BTreeMap<String, SemValue> = BTreeMap::new();
+    for (i, constituent) in constituents.iter().enumerate() {
+        let key = if i == 0 {
+            "SUB".to_string()
+        } else {
+            format!("SUB{}", i + 1)
+        };
+        if let Some(ref sv) = constituent.sem_value {
+            sub_values.insert(key, sv.clone());
+        }
+    }
+
+    // Resolve each arg
+    let mut args: Vec<Arg> = Vec::new();
+    for sem_arg in &sem_spec.args {
+        match sem_arg {
+            SemArg::Slot(name) => {
+                // Strip leading $ if present (shouldn't be, but be tolerant)
+                let key = name.strip_prefix('$').unwrap_or(name);
+                // Try sub-values first (SUB, SUB1, etc.)
+                if let Some(sv) = sub_values.get(key) {
+                    args.push(Arg::Sub(sv.clone()));
+                } else if let Some((canonical, typ)) = bindings.get(&format!("${}", key)) {
+                    args.push(Arg::Lexical(canonical.clone(), typ.clone()));
+                } else if let Some((canonical, typ)) = bindings.get(key) {
+                    args.push(Arg::Lexical(canonical.clone(), typ.clone()));
+                } else {
+                    return Err(format!("sem: cannot resolve slot ${}", name));
+                }
+            }
+            SemArg::Literal(s) => {
+                args.push(Arg::Literal(s.clone()));
+            }
+        }
+    }
+
+    let sv = apply_constructor(&sem_spec.constructor, &args, var_gen)?;
+    let out = format!("{}", sv);
+    Ok((sv, out))
 }
 
 fn match_pattern(
@@ -263,6 +348,7 @@ fn match_pattern(
     bindings: BTreeMap<String, (String, String)>, log: Vec<Consumption>,
     lexicon: &Lexicon, rules: &[Rule], sub_count: usize,
     mut constituents: Vec<Constituent>, kind_filter: &KindFilter,
+    var_gen: &mut VarGen,
 ) -> Option<(BTreeMap<String, (String, String)>, Vec<Consumption>, Vec<Constituent>)> {
     let next_is_literal_or_ignore = pi < pattern.len()
         && matches!(pattern[pi], Slot::Literal(_) | Slot::Ignore);
@@ -289,7 +375,9 @@ fn match_pattern(
         return None;
     }
 
-    if ti >= tokens.len() { return None; }
+    if ti >= tokens.len() {
+        return None;
+    }
 
     let slot = &pattern[pi];
     let token = clean_token(&tokens[ti]);
@@ -298,17 +386,17 @@ fn match_pattern(
         Slot::Ignore => {
             let mut log = log;
             log.push(Consumption::Ignore { position: ti });
-            match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter)
+            match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter, var_gen)
         }
         Slot::Literal(lit) => {
             if &token == lit {
                 let mut log = log;
                 log.push(Consumption::Literal { position: ti });
-                match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter)
+                match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter, var_gen)
             } else if is_ignored(&token) {
                 let mut log = log;
                 log.push(Consumption::Skipped { position: ti });
-                match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter)
+                match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter, var_gen)
             } else {
                 None
             }
@@ -317,11 +405,11 @@ fn match_pattern(
             if matches_keyword(&token, kw) {
                 let mut log = log;
                 log.push(Consumption::Keyword { class: kw.clone(), position: ti });
-                match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter)
+                match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter, var_gen)
             } else if is_ignored(&token) {
                 let mut log = log;
                 log.push(Consumption::Skipped { position: ti });
-                match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter)
+                match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter, var_gen)
             } else {
                 None
             }
@@ -343,6 +431,7 @@ fn match_pattern(
                     if let Some(result) = match_pattern(
                         pattern, pi + 1, tokens, ti + consumed,
                         new_bindings, new_log, lexicon, rules, sub_count, constituents.clone(), kind_filter,
+                        var_gen,
                     ) {
                         return Some(result);
                     }
@@ -351,7 +440,7 @@ fn match_pattern(
             if is_ignored(&token) {
                 let mut log = log;
                 log.push(Consumption::Skipped { position: ti });
-                return match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter);
+                return match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter, var_gen);
             }
             None
         }
@@ -365,14 +454,19 @@ fn match_pattern(
             let sub_end = if let Some(delim_kw) = delimiter {
                 let mut end = tokens.len();
                 for i in sub_ti..tokens.len() {
-                    if matches_keyword(&clean_token(&tokens[i]), delim_kw) { end = i; break; }
+                    if matches_keyword(&clean_token(&tokens[i]), delim_kw) {
+                        end = i;
+                        break;
+                    }
                 }
                 end
             } else {
                 tokens.len()
             };
             let sub_tokens = &tokens[sub_ti..sub_end];
-            if sub_tokens.is_empty() { return None; }
+            if sub_tokens.is_empty() {
+                return None;
+            }
             let sub_filter = sub_filter_for_label(label);
             let effective_lexicon = if available_vars.is_empty() {
                 None
@@ -380,12 +474,16 @@ fn match_pattern(
                 Some(lexicon.with_pronoun_bindings(available_vars))
             };
             let sub_lexicon = effective_lexicon.as_ref().unwrap_or(lexicon);
-            let sub_matches = parse_sentence_inner(sub_tokens, sub_lexicon, rules, &sub_filter);
+            let sub_matches = parse_sentence_inner(sub_tokens, sub_lexicon, rules, &sub_filter, var_gen);
             if let Some(best) = sub_matches.first() {
                 let mut new_bindings = bindings.clone();
                 let mut new_log = log.clone();
                 new_log.push(Consumption::SubClause { start: sub_start, end: sub_end });
-                let sub_key = if sub_count == 0 { "SUB".to_string() } else { format!("SUB{}", sub_count + 1) };
+                let sub_key = if sub_count == 0 {
+                    "SUB".to_string()
+                } else {
+                    format!("SUB{}", sub_count + 1)
+                };
                 new_bindings.insert(sub_key, (best.output.clone(), label.clone()));
                 constituents.push(Constituent {
                     label: label.clone(),
@@ -394,10 +492,12 @@ fn match_pattern(
                     span: Some((sub_start, sub_end)),
                     syntax: best.syntax.clone(),
                     syntax_tree: best.syntax_tree.clone(),
+                    sem_value: best.sem_value.clone(),
                 });
                 match_pattern(
                     pattern, pi + 1, tokens, sub_end,
                     new_bindings, new_log, lexicon, rules, sub_count + 1, constituents, kind_filter,
+                    var_gen,
                 )
             } else {
                 None
@@ -415,33 +515,69 @@ fn annotate_tokens(tokens: &[String], log: &[Consumption]) -> Vec<TokenAnnotatio
     for c in log {
         match c {
             Consumption::Var { variable, canonical, typ, start, end } => {
-                let kind = if typ == "e" { TokenKind::Entity } else if typ.starts_with('{') { TokenKind::Predicate } else { TokenKind::Entity };
+                let kind = if typ == "e" {
+                    TokenKind::Entity
+                } else if typ.starts_with('{') {
+                    TokenKind::Predicate
+                } else {
+                    TokenKind::Entity
+                };
                 for i in *start..*end {
                     if i < out.len() {
-                        out[i] = TokenAnnotation { kind, canonical: Some(canonical.clone()), typ: Some(typ.clone()), variable: Some(variable.clone()), keyword_class: None };
+                        out[i] = TokenAnnotation {
+                            kind,
+                            canonical: Some(canonical.clone()),
+                            typ: Some(typ.clone()),
+                            variable: Some(variable.clone()),
+                            keyword_class: None,
+                        };
                     }
                 }
             }
             Consumption::Keyword { class, position } => {
                 if *position < out.len() {
-                    out[*position] = TokenAnnotation { kind: TokenKind::Keyword, canonical: None, typ: None, variable: None, keyword_class: Some(class.clone()) };
+                    out[*position] = TokenAnnotation {
+                        kind: TokenKind::Keyword,
+                        canonical: None,
+                        typ: None,
+                        variable: None,
+                        keyword_class: Some(class.clone()),
+                    };
                 }
             }
             Consumption::Literal { position } => {
                 if *position < out.len() {
-                    out[*position] = TokenAnnotation { kind: TokenKind::Literal, canonical: None, typ: None, variable: None, keyword_class: None };
+                    out[*position] = TokenAnnotation {
+                        kind: TokenKind::Literal,
+                        canonical: None,
+                        typ: None,
+                        variable: None,
+                        keyword_class: None,
+                    };
                 }
             }
             Consumption::SubClause { start, end } => {
                 for i in *start..*end {
                     if i < out.len() && matches!(out[i].kind, TokenKind::Unmatched | TokenKind::Ignored) {
-                        out[i] = TokenAnnotation { kind: TokenKind::SubClause, canonical: None, typ: None, variable: None, keyword_class: None };
+                        out[i] = TokenAnnotation {
+                            kind: TokenKind::SubClause,
+                            canonical: None,
+                            typ: None,
+                            variable: None,
+                            keyword_class: None,
+                        };
                     }
                 }
             }
             Consumption::Ignore { position } | Consumption::Skipped { position } => {
                 if *position < out.len() && matches!(out[*position].kind, TokenKind::Unmatched) {
-                    out[*position] = TokenAnnotation { kind: TokenKind::Ignored, canonical: None, typ: None, variable: None, keyword_class: None };
+                    out[*position] = TokenAnnotation {
+                        kind: TokenKind::Ignored,
+                        canonical: None,
+                        typ: None,
+                        variable: None,
+                        keyword_class: None,
+                    };
                 }
             }
         }
