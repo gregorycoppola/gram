@@ -1,3 +1,4 @@
+
 use anyhow::{Context, Result};
 use clap::Args;
 use std::path::PathBuf;
@@ -108,6 +109,7 @@ fn emit_pretty(results: &[ParsedSentence]) {
             if let Some(syn) = &m.syntax {
                 println!("     {}", syn);
             }
+            emit_stages(m);
             println!("     → {}  [{}]", m.output, m.rule_name);
             if let Some(e) = &m.semantics_check {
                 println!("     ⚠️  semantics: {}", e);
@@ -120,6 +122,7 @@ fn emit_pretty(results: &[ParsedSentence]) {
                 if let Some(syn) = &m.syntax {
                     println!("     {}", syn);
                 }
+                emit_stages(m);
                 println!("     → {}  [{}]", m.output, m.rule_name);
                 if let Some(e) = &m.semantics_check {
                     println!("       ⚠️  semantics: {}", e);
@@ -131,6 +134,19 @@ fn emit_pretty(results: &[ParsedSentence]) {
 
     println!("Parsed: {}/{}  Ambiguous: {}  Failed: {}",
         parsed, results.len(), ambiguous, failed);
+}
+
+fn emit_stages(m: &Match) {
+    for (i, c) in m.constituents.iter().enumerate() {
+        let span_str = match c.span {
+            Some((s, e)) if e > s => format!("tokens[{}..{}]", s, e),
+            _ => String::new(),
+        };
+        println!("     stage {} [{}]: {}", i + 1, c.label, c.semantics);
+        if !span_str.is_empty() {
+            println!("                  {}", span_str);
+        }
+    }
 }
 
 fn emit_json(results: &[ParsedSentence]) -> Result<()> {
