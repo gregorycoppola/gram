@@ -15,7 +15,7 @@ pub struct SemSpec {
     pub args: Vec<SemArg>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SemArg {
     /// Reference to a pattern slot binding: $N, $SUB, $SUB1, etc.
     Slot(String),
