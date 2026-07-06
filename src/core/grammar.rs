@@ -38,7 +38,7 @@ fn compile_rule(r: &FixtureRule) -> Result<Rule> {
         .map(parse_slot)
         .collect::<Result<Vec<_>>>()?;
     let sem = match &r.sem {
-        Some(s) => Some(crate::core::sem_dsl::parse_sem(s)?),
+        Some(s) => Some(crate::core::sem_dsl::parse_sem(s).map_err(|e| anyhow!(e))?),
         None => None,
     };
     Ok(Rule {

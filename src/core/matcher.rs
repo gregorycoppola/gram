@@ -1,7 +1,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::core::construct::{self, Arg, apply_constructor};
+use crate::core::construct::{Arg, apply_constructor};
 use crate::core::grammar::{is_ignored, matches_keyword, Rule, Slot};
 use crate::core::lexicon::{clean_token, Lexicon};
 use crate::core::sem_dsl::SemArg;
@@ -20,7 +20,6 @@ pub struct Constituent {
     pub syntax: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub syntax_tree: Option<SyntaxNode>,
-    /// Computed SemValue from the new constructor path (not serialized).
     #[serde(skip)]
     pub sem_value: Option<SemValue>,
 }
@@ -40,7 +39,6 @@ pub struct Match {
     pub syntax_tree: Option<SyntaxNode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub semantics_check: Option<String>,
-    /// Computed SemValue from the new constructor path (not serialized).
     #[serde(skip)]
     pub sem_value: Option<SemValue>,
 }
@@ -211,7 +209,8 @@ fn sub_filter_for_label(label: &str) -> KindFilter {
 }
 
 pub fn parse_sentence(tokens: &[String], lexicon: &Lexicon, rules: &[Rule]) -> Vec<Match> {
-    parse_sentence_with_vars(tokens, lexicon, rules, &[])
+    let mut var_gen = VarGen::new();
+    parse_sentence_inner(tokens, lexicon, rules, &KindFilter::Any, &mut var_gen)
 }
 
 pub fn parse_sentence_with_vars(
@@ -261,13 +260,11 @@ fn parse_sentence_inner(
             let (output, sem_value, semantics_check) = if let Some(ref sem_spec) = rule.sem {
                 match resolve_and_construct(sem_spec, &b, &constituents, var_gen) {
                     Ok((sv, out)) => (out, Some(sv), None),
-                    Err(e) => {
-                        // Constructor failed — skip this match
+                    Err(_) => {
                         continue;
                     }
                 }
             } else {
-                // Old template path
                 let out = apply_template(&rule.template, &b);
                 let check = match parse_with_types(&out, lexicon) {
                     Ok(_) => None,
@@ -294,7 +291,6 @@ fn parse_sentence_inner(
 }
 
 /// Resolve a SemSpec's args from bindings and constituent sem_values, then call the constructor.
-/// Returns the SemValue and its Display string.
 fn resolve_and_construct(
     sem_spec: &crate::core::sem_dsl::SemSpec,
     bindings: &BTreeMap<String, (String, String)>,
@@ -319,9 +315,7 @@ fn resolve_and_construct(
     for sem_arg in &sem_spec.args {
         match sem_arg {
             SemArg::Slot(name) => {
-                // Strip leading $ if present (shouldn't be, but be tolerant)
                 let key = name.strip_prefix('$').unwrap_or(name);
-                // Try sub-values first (SUB, SUB1, etc.)
                 if let Some(sv) = sub_values.get(key) {
                     args.push(Arg::Sub(sv.clone()));
                 } else if let Some((canonical, typ)) = bindings.get(&format!("${}", key)) {
