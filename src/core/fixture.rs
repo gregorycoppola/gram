@@ -1,3 +1,4 @@
+
 use anyhow::Result;
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -40,18 +41,26 @@ pub struct FixtureEntity {
     pub gloss: String,
 }
 
-fn default_entity_type() -> String { "e".to_string() }
+fn default_entity_type() -> String {
+    "e".to_string()
+}
 
 #[derive(Debug, Deserialize)]
 pub struct FixtureRule {
     pub name: String,
     pub pattern: String,
+    #[serde(default)]
     pub template: String,
     #[serde(default = "default_kind")]
     pub kind: String,
+    /// Semantic constructor spec (new path). If present, used instead of template.
+    #[serde(default)]
+    pub sem: Option<String>,
 }
 
-fn default_kind() -> String { "fact".to_string() }
+fn default_kind() -> String {
+    "fact".to_string()
+}
 
 impl Fixture {
     pub fn from_path(path: &Path) -> Result<Self> {
