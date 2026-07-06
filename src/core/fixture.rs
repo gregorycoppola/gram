@@ -9,7 +9,7 @@ pub struct Fixture {
     pub lexicon: FixtureLexicon,
     pub grammar: Vec<FixtureRule>,
     #[serde(default)]
-    pub sentences: Vec<String>,
+    pub sentences: Vec<SentenceInput>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -53,13 +53,35 @@ pub struct FixtureRule {
     pub template: String,
     #[serde(default = "default_kind")]
     pub kind: String,
-    /// Semantic constructor spec (new path). If present, used instead of template.
     #[serde(default)]
     pub sem: Option<String>,
 }
 
 fn default_kind() -> String {
     "fact".to_string()
+}
+
+/// A labeled span over a token list, used as a parsing hint.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Span {
+    pub label: String,
+    pub start: usize,
+    pub end: usize,
+}
+
+/// A sentence with explicit phrase-structure hints.
+#[derive(Debug, Clone, Deserialize)]
+pub struct InputSentence {
+    pub tokens: Vec<String>,
+    pub spans: Vec<Span>,
+}
+
+/// Sentences can be plain strings (old format) or structured hints (new format).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum SentenceInput {
+    Plain(String),
+    Hinted(InputSentence),
 }
 
 impl Fixture {

@@ -1,5 +1,5 @@
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use crate::core::construct::{Arg, apply_constructor};
 use crate::core::grammar::{is_ignored, matches_keyword, Rule, Slot};
@@ -223,6 +223,236 @@ pub fn parse_sentence_with_vars(
         lexicon.with_pronoun_bindings(available_vars)
     };
     parse_sentence_inner(tokens, &effective_lexicon, rules, &KindFilter::Any, &mut var_gen)
+}
+
+/// Parse a sentence using explicit span hints from the fixture.
+/// Each span is parsed independently, then the S-level constructor combines them.
+/// Gap tokens (not covered by any span) are looked up in the lexicon and injected
+/// as lexical bindings for unresolved constructor args.
+pub fn parse_hinted_sentence(
+    sentence: &crate::core::fixture::InputSentence,
+    lexicon: &Lexicon,
+    rules: &[Rule],
+) -> Vec<Match> {
+    let mut var_gen = VarGen::new();
+
+    // 1. Build set of span-covered token indices
+    let mut covered: HashSet<usize> = HashSet::new();
+    for span in &sentence.spans {
+        for i in span.start..span.end {
+            covered.insert(i);
+        }
+    }
+
+    // 2. Parse each child span
+    let mut child_results: Vec<(&str, SemValue, String, Option<String>, Option<SyntaxNode>, (usize, usize))> = Vec::new();
+    for span in &sentence.spans {
+        let sub_tokens = &sentence.tokens[span.start..span.end];
+        let filter = sub_filter_for_label(&span.label);
+        let matches = parse_sentence_inner(sub_tokens, lexicon, rules, &filter, &mut var_gen);
+        if let Some(best) = matches.first() {
+            let sv = best.sem_value.clone().unwrap_or_else(|| {
+                // Fallback: parse the output string if no SemValue (old template path)
+                match crate::core::semantics::parse(&best.output) {
+                    Ok(expr) => SemValue::Prop(expr),
+                    Err(_) => SemValue::Prop(crate::core::logic::Expr::Entity("_error".into())),
+                }
+            });
+            child_results.push((
+                &span.label,
+                sv,
+                best.output.clone(),
+                best.syntax.clone(),
+                best.syntax_tree.clone(),
+                (span.start, span.end),
+            ));
+        } else {
+            return Vec::new();
+        }
+    }
+
+    // 3. Collect gap tokens (not covered by any span) with lexicon lookups
+    let mut gap_entries: Vec<(String, String, usize)> = Vec::new();
+    for (i, token) in sentence.tokens.iter().enumerate() {
+        if !covered.contains(&i) {
+            if let Some((canonical, _cat, _consumed)) = lexicon.lookup_at(&[token.clone()], 0) {
+                let typ = lexicon.get_type(&canonical).unwrap_or_default();
+                gap_entries.push((canonical, typ, i));
+            }
+        }
+    }
+
+    // 4. Try each S-level rule
+    let mut results = Vec::new();
+    for rule in rules {
+        if rule.kind != "s" {
+            continue;
+        }
+        let sem_spec = match &rule.sem {
+            Some(s) => s,
+            None => continue,
+        };
+
+        // 5. Resolve constructor args: child spans first (by SUB name), then gap tokens
+        let mut sub_idx = 0;
+        let mut gap_idx = 0;
+        let mut args: Vec<Arg> = Vec::new();
+        let mut ok = true;
+
+        for sem_arg in &sem_spec.args {
+            match sem_arg {
+                SemArg::Slot(name) => {
+                    let key = name.strip_prefix('$').unwrap_or(name);
+                    // Check if this looks like a SUB reference
+                    if key == "SUB" || key.starts_with("SUB") {
+                        if let Some(idx) = parse_sub_index(key) {
+                            if idx < child_results.len() {
+                                args.push(Arg::Sub(child_results[idx].1.clone()));
+                                sub_idx = idx + 1;
+                                continue;
+                            }
+                        }
+                    }
+                    // Fall through to gap tokens
+                    if gap_idx < gap_entries.len() {
+                        let (canonical, typ, _) = &gap_entries[gap_idx];
+                        args.push(Arg::Lexical(canonical.clone(), typ.clone()));
+                        gap_idx += 1;
+                    } else {
+                        ok = false;
+                        break;
+                    }
+                }
+                SemArg::Literal(s) => {
+                    args.push(Arg::Literal(s.clone()));
+                }
+            }
+        }
+
+        if !ok {
+            continue;
+        }
+
+        // 6. Call constructor
+        match apply_constructor(&sem_spec.constructor, &args, &mut var_gen) {
+            Ok(sv) => {
+                let output = format!("{}", sv);
+
+                let constituents: Vec<Constituent> = child_results.iter().map(|(label, sv, sem, syn, syn_tree, span)| {
+                    Constituent {
+                        label: label.to_string(),
+                        semantics: sem.clone(),
+                        free_vars: Vec::new(),
+                        span: Some(*span),
+                        syntax: syn.clone(),
+                        syntax_tree: syn_tree.clone(),
+                        sem_value: Some(sv.clone()),
+                    }
+                }).collect();
+
+                let annotations = build_annotations_from_hints(
+                    &sentence.tokens,
+                    &sentence.spans,
+                    &gap_entries,
+                    lexicon,
+                );
+
+                let constituent_spans: Vec<(usize, usize, String)> = constituents.iter()
+                    .filter_map(|c| c.span.map(|(s, e)| (s, e, c.syntax.clone().unwrap_or_default())))
+                    .collect();
+                let syntax = build_syntax(&sentence.tokens, &constituent_spans, "S");
+
+                let constituent_trees: Vec<(usize, usize, SyntaxNode)> = constituents.iter()
+                    .filter_map(|c| c.span.zip(c.syntax_tree.clone()).map(|(s, t)| (s.0, s.1, t)))
+                    .collect();
+                let syntax_tree = build_syntax_tree(&sentence.tokens, &annotations, &constituent_trees, "S");
+
+                results.push(Match {
+                    rule_name: rule.name.clone(),
+                    kind: rule.kind.clone(),
+                    output,
+                    bindings: BTreeMap::new(),
+                    token_annotations: annotations,
+                    constituents,
+                    syntax: Some(syntax),
+                    syntax_tree: Some(syntax_tree),
+                    semantics_check: None,
+                    sem_value: Some(sv),
+                });
+            }
+            Err(_) => {
+                continue;
+            }
+        }
+    }
+
+    results
+}
+
+/// Parse "SUB", "SUB1", "SUB2", etc. into a 0-based index.
+fn parse_sub_index(key: &str) -> Option<usize> {
+    if key == "SUB" {
+        Some(0)
+    } else if let Some(rest) = key.strip_prefix("SUB") {
+        rest.parse::<usize>().ok().map(|n| n - 1)
+    } else {
+        None
+    }
+}
+
+/// Build token annotations from span hints and gap token lookups.
+fn build_annotations_from_hints(
+    tokens: &[String],
+    spans: &[crate::core::fixture::Span],
+    gap_entries: &[(String, String, usize)],
+    lexicon: &Lexicon,
+) -> Vec<TokenAnnotation> {
+    let mut out: Vec<TokenAnnotation> = tokens.iter()
+        .map(|_| TokenAnnotation {
+            kind: TokenKind::Unmatched,
+            canonical: None,
+            typ: None,
+            variable: None,
+            keyword_class: None,
+        })
+        .collect();
+
+    // Mark span-covered tokens as SubClause
+    for span in spans {
+        for i in span.start..span.end {
+            if i < out.len() {
+                out[i] = TokenAnnotation {
+                    kind: TokenKind::SubClause,
+                    canonical: None,
+                    typ: None,
+                    variable: None,
+                    keyword_class: None,
+                };
+            }
+        }
+    }
+
+    // Annotate gap tokens from lexicon lookups
+    for (canonical, typ, pos) in gap_entries {
+        if *pos < out.len() {
+            let kind = if typ == "e" {
+                TokenKind::Entity
+            } else if typ.starts_with('{') {
+                TokenKind::Predicate
+            } else {
+                TokenKind::Entity
+            };
+            out[*pos] = TokenAnnotation {
+                kind,
+                canonical: Some(canonical.clone()),
+                typ: Some(typ.clone()),
+                variable: None,
+                keyword_class: None,
+            };
+        }
+    }
+
+    out
 }
 
 fn parse_sentence_inner(
@@ -529,7 +759,6 @@ fn match_pattern(
                         ) {
                             return Some(result);
                         }
-                        // This span didn't lead to a full match — try longer
                     }
                 }
                 None
