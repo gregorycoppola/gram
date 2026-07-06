@@ -1,9 +1,10 @@
+
 /// Core logical form AST.
 /// Represents the semantic output of the grammar.
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
-    /// Predicate application: name(role: arg, role: arg, ...)
+    /// Predicate application: name(role: arg, ...)
     Pred {
         name: String,
         roles: Vec<(String, Expr)>,
@@ -71,6 +72,21 @@ pub enum Expr {
     },
 }
 
+/// True if this expression needs parentheses when it appears as the body
+/// of a quantifier or the consequent of an implication.
+fn needs_parens(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Implies { .. }
+            | Expr::ForAll { .. }
+            | Expr::The { .. }
+            | Expr::This { .. }
+            | Expr::That { .. }
+            | Expr::Exists { .. }
+            | Expr::ExistsMany { .. }
+    )
+}
+
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -84,18 +100,45 @@ impl std::fmt::Display for Expr {
             }
             Expr::Not(e) => write!(f, "not {}", e),
             Expr::And(l, r) => write!(f, "{} ∧ {}", l, r),
-            Expr::Implies { ante, cons } => write!(f, "{} -> {}", ante, cons),
+            Expr::Implies { ante, cons } => {
+                write!(f, "{} -> ", ante)?;
+                if needs_parens(cons) {
+                    write!(f, "({})", cons)
+                } else {
+                    write!(f, "{}", cons)
+                }
+            }
             Expr::ForAll { var, var_type, body } => {
-                write!(f, "always [{}:{}]: {}", var, var_type, body)
+                write!(f, "always [{}:{}]: ", var, var_type)?;
+                if needs_parens(body) {
+                    write!(f, "({})", body)
+                } else {
+                    write!(f, "{}", body)
+                }
             }
             Expr::The { var, var_type, body } => {
-                write!(f, "the [{}:{}]: {}", var, var_type, body)
+                write!(f, "the [{}:{}]: ", var, var_type)?;
+                if needs_parens(body) {
+                    write!(f, "({})", body)
+                } else {
+                    write!(f, "{}", body)
+                }
             }
             Expr::This { var, var_type, body } => {
-                write!(f, "this [{}:{}]: {}", var, var_type, body)
+                write!(f, "this [{}:{}]: ", var, var_type)?;
+                if needs_parens(body) {
+                    write!(f, "({})", body)
+                } else {
+                    write!(f, "{}", body)
+                }
             }
             Expr::That { var, var_type, body } => {
-                write!(f, "that [{}:{}]: {}", var, var_type, body)
+                write!(f, "that [{}:{}]: ", var, var_type)?;
+                if needs_parens(body) {
+                    write!(f, "({})", body)
+                } else {
+                    write!(f, "{}", body)
+                }
             }
             Expr::Exists { var, var_type, body, count } => {
                 write!(f, "exists [{}:{}]: {}", var, var_type, body)?;
@@ -105,9 +148,14 @@ impl std::fmt::Display for Expr {
                 Ok(())
             }
             Expr::ExistsMany { var, var_type, count, body } => {
-                write!(f, "exists_many [{}:{}, {}]: {}", var, var_type, count, body)
+                write!(f, "exists_many [{}:{}, {}]: ", var, var_type, count)?;
+                if needs_parens(body) {
+                    write!(f, "({})", body)
+                } else {
+                    write!(f, "{}", body)
+                }
             }
-            Expr::Var { name, typ } => write!(f, "{}:{}", name, typ),
+            Expr::Var { name, .. } => write!(f, "{}", name),
             Expr::Entity(s) => write!(f, "{}", s),
             Expr::Question { label, body } => {
                 write!(f, "? ")?;
