@@ -538,6 +538,7 @@ fn parse_sentence_inner(
         match kind_filter {
             KindFilter::Any => {}
             KindFilter::Only(k) if rule.kind != *k => continue,
+            KindFilter::Only(_) => {}
         }
         let bindings = BTreeMap::new();
         let log: Vec<Consumption> = Vec::new();
