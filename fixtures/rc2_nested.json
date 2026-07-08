@@ -10,6 +10,16 @@
         "name": "said",
         "roles": {"agent": "e", "theme": "s"},
         "forms": ["said"]
+      },
+      {
+        "name": "man",
+        "roles": {"theme": "e"},
+        "forms": ["man"]
+      },
+      {
+        "name": "woman",
+        "roles": {"theme": "e"},
+        "forms": ["woman"]
       }
     ],
     "entities": [
@@ -22,16 +32,6 @@
         "name": "sue",
         "type": "e",
         "forms": ["Sue"]
-      },
-      {
-        "name": "man",
-        "type": "e",
-        "forms": ["man"]
-      },
-      {
-        "name": "woman",
-        "type": "e",
-        "forms": ["woman"]
       }
     ]
   },
