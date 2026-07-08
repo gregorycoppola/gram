@@ -768,7 +768,7 @@ fn annotate_tokens(tokens: &[String], log: &[Consumption]) -> Vec<TokenAnnotatio
                 } else if typ.starts_with('{') {
                     TokenKind::Predicate
                 } else {
-                    TokenKind::Error => TokenKind::Entity
+                    TokenKind::Entity
                 };
                 for i in *start..*end {
                     if i < out.len() {
@@ -796,7 +796,7 @@ fn annotate_tokens(tokens: &[String], log: &[Consumption]) -> Vec<TokenAnnotatio
             Consumption::Literal { position } => {
                 if *position < out.len() {
                     out[*position] = TokenAnnotation {
-                        kind: Token::Literal,
+                        kind: TokenKind::Literal,
                         canonical: None,
                         typ: None,
                         variable: None,

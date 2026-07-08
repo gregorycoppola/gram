@@ -11,7 +11,7 @@ use crate::core::tokenize::{split_sentences, tokenize};
 
 #[derive(Args)]
 pub struct TreeArgs {
-    #[root]
+    #[arg(long)]
     pub fixture: PathBuf,
 }
 

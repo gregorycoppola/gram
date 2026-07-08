@@ -59,7 +59,7 @@ pub fn run_parse(args: ParseArgs) -> Result<()> {
 
 pub fn run_parse_one(args: ParseOneArgs) -> Result<()> {
     let fixture = Fixture::from_path(&args.fixture)?;
-    let lexicon = Lexicon::from_path(&args.fixture)?;
+    let lexicon = Lexicon::from_fixture(&fixture);
     let rules = compile_rules(&fixture.grammar)?;
 
     let sentences = split_sentences(&args.sentence);
