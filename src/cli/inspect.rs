@@ -1,8 +1,9 @@
+
 use anyhow::Result;
 use clap::Args;
 use std::path::PathBuf;
 
-use crate::core::fixture::Fixture;
+use crate::core::fixture::{Fixture, SentenceInput};
 use crate::core::grammar::compile_rules;
 use crate::core::lexicon::Lexicon;
 use crate::core::tokenize::{split_sentences, tokenize};
@@ -43,15 +44,24 @@ pub fn run_inspect(args: InspectArgs) -> Result<()> {
     println!();
 
     println!("✂️  Sentences");
-    for raw in &fixture.sentences {
-        for sent in split_sentences(raw) {
-            let tokens = tokenize(&sent);
-            println!("  {:?}", sent);
-            println!("    tokens: {:?}", tokens);
-            for (i, tok) in tokens.iter().enumerate() {
-                let cleaned = crate::core::lexicon::clean_token(tok);
-                let lookup = lexicon.lookup_at(&tokens, i);
-                println!("    [{:>2}] {:?} clean={:?} lookup={:?}", i, tok, cleaned, lookup);
+    for input in &fixture.sentences {
+        match input {
+            SentenceInput::Plain(raw) => {
+                for sent in split_sentences(raw) {
+                    let tokens = tokenize(&sent);
+                    println!("  {:?}", sent);
+                    println!("    tokens: {:?}", tokens);
+                    for (i, tok) in tokens.iter().enumerate() {
+                        let cleaned = crate::core::lexicon::clean_token(tok);
+                        let lookup = lexicon.lookup_at(&tokens, i);
+                        println!("    [{:>2}] {:?} clean={:?} lookup={:?}", i, tok, cleaned, lookup);
+                    }
+                }
+            }
+            SentenceInput::Hinted(s) => {
+                println!("  {:?} (hinted)", s.tokens.join(" "));
+                println!("    tokens: {:?}", s.tokens);
+                println!("    spans: {:?}", s.spans);
             }
         }
     }

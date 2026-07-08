@@ -1,3 +1,4 @@
+
 use axum::{
     extract::{Path, State},
     Json,
@@ -5,7 +6,7 @@ use axum::{
 use serde_json::Value;
 use std::path::PathBuf;
 
-use crate::core::fixture::Fixture;
+use crate::core::fixture::{Fixture, SentenceInput};
 use crate::core::grammar::compile_rules;
 use crate::core::lexicon::Lexicon;
 use crate::core::matcher::parse_sentence;
@@ -77,10 +78,20 @@ pub async fn parse_fixture(
     let rules = compile_rules(&fixture.grammar)?;
 
     let mut results = Vec::new();
-    for raw in &fixture.sentences {
-        for sent in split_sentences(raw) {
-            let tokens = tokenize(&sent);
-            let matches = parse_sentence(&tokens, &lexicon, &rules);
+    for input in &fixture.sentences {
+        let plain_matches: Vec<_> = match input {
+            SentenceInput::Plain(s) => {
+                split_sentences(s).into_iter().map(|sent| {
+                    let tokens = tokenize(&sent);
+                    let matches = parse_sentence(&tokens, &lexicon, &rules);
+                    (sent, tokens, matches)
+                }).collect()
+            }
+            SentenceInput::Hinted(s) => {
+                vec![(s.tokens.join(" "), s.tokens.clone(), Vec::new())]
+            }
+        };
+        for (sent, tokens, matches) in plain_matches {
             let status = ParseStatus::from_matches(&matches);
             results.push(ParseResult { sentence: sent, tokens, matches, status });
         }
