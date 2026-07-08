@@ -118,7 +118,7 @@ fn emit_pretty(results: &[ParsedSentence]) {
             if let Some(syn) = &m.syntax {
                 println!("     {}", syn);
             }
-            emit_stages(m);
+            emit_constituents(&m.constituents, 2);
             println!("     → {}  [{}]", m.output, m.rule_name);
             if let Some(e) = &m.semantics_check {
                 println!("     ⚠️  semantics: {}", e);
@@ -131,7 +131,7 @@ fn emit_pretty(results: &[ParsedSentence]) {
                 if let Some(syn) = &m.syntax {
                     println!("     {}", syn);
                 }
-                emit_stages(m);
+                emit_constituents(&m.constituents, 2);
                 println!("     → {}  [{}]", m.output, m.rule_name);
                 if let Some(e) = &m.semantics_check {
                     println!("       ⚠️  semantics: {}", e);
@@ -145,15 +145,19 @@ fn emit_pretty(results: &[ParsedSentence]) {
         parsed, results.len(), ambiguous, failed);
 }
 
-fn emit_stages(m: &Match) {
-    for (i, c) in m.constituents.iter().enumerate() {
+fn emit_constituents(constituents: &[crate::core::matcher::Constituent], indent: usize) {
+    let pad = " ".repeat(indent);
+    for c in constituents {
         let span_str = match c.span {
             Some((s, e)) if e > s => format!("tokens[{}..{}]", s, e),
             _ => String::new(),
         };
-        println!("     stage {} [{}]: {}", i + 1, c.label, c.semantics);
+        println!("{}[{}] {}", pad, c.label, c.semantics);
         if !span_str.is_empty() {
-            println!("                  {}", span_str);
+            println!("{}     {}", pad, span_str);
+        }
+        if !c.children.is_empty() {
+            emit_constituents(&c.children, indent + 2);
         }
     }
 }
