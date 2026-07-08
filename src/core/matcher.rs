@@ -2,6 +2,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use crate::core::construct::{Arg, apply_constructor};
+use crate::core::fixture::{InputSentence, Span};
 use crate::core::grammar::{is_ignored, matches_keyword, Rule, Slot};
 use crate::core::lexicon::{clean_token, Lexicon};
 use crate::core::sem_dsl::SemArg;
@@ -225,48 +226,135 @@ pub fn parse_sentence_with_vars(
     parse_sentence_inner(tokens, &effective_lexicon, rules, &KindFilter::Any, &mut var_gen)
 }
 
+// --- Span tree helpers for hinted parsing ---
+
+/// Build a parent map from flat spans using strict containment.
+/// parent_map[i] = Some(j) means span i is directly contained in span j.
+/// parent_map[i] = None means span i is top-level.
+fn build_parent_map(spans: &[Span]) -> Vec<Option<usize>> {
+    let n = spans.len();
+    let mut parents: Vec<Option<usize>> = vec![None; n];
+    for i in 0..n {
+        let mut best: Option<usize> = None;
+        for j in 0..n {
+            if i == j {
+                continue;
+            }
+            // Is span i strictly contained in span j?
+            if spans[i].start >= spans[j].start && spans[i].end <= spans[j].end {
+                match best {
+                    None => best = Some(j),
+                    Some(b) if spans[j].start >= spans[b].start && spans[j].end <= spans[b].end => {
+                        best = Some(j);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        parents[i] = best;
+    }
+    parents
+}
+
+/// Build a sub-InputSentence for a nested S span, with direct children adjusted.
+fn make_sub_sentence(
+    tokens: &[String],
+    spans: &[Span],
+    parent_idx: usize,
+    parent_map: &[Option<usize>],
+) -> InputSentence {
+    let parent = &spans[parent_idx];
+    let sub_tokens: Vec<String> = tokens[parent.start..parent.end].to_vec();
+    let mut sub_spans: Vec<Span> = Vec::new();
+    for (i, span) in spans.iter().enumerate() {
+        if parent_map[i] == Some(parent_idx) {
+            sub_spans.push(Span {
+                label: span.label.clone(),
+                start: span.start - parent.start,
+                end: span.end - parent.start,
+            });
+        }
+    }
+    InputSentence { tokens: sub_tokens, spans: sub_spans }
+}
+
 pub fn parse_hinted_sentence(
-    sentence: &crate::core::fixture::InputSentence,
+    sentence: &InputSentence,
     lexicon: &Lexicon,
     rules: &[Rule],
 ) -> Vec<Match> {
     let mut var_gen = VarGen::new();
 
-    // 1. Build set of span-covered token indices
+    if sentence.spans.is_empty() {
+        return Vec::new();
+    }
+
+    // 1. Build span tree
+    let parent_map = build_parent_map(&sentence.spans);
+
+    // 2. Find top-level spans (no parent)
+    let top_level: Vec<usize> = (0..sentence.spans.len())
+        .filter(|&i| parent_map[i].is_none())
+        .collect();
+
+    // 3. Parse each top-level child
+    let mut child_results: Vec<(&str, SemValue, String, Option<String>, Option<SyntaxNode>, (usize, usize))> = Vec::new();
+    for &idx in &top_level {
+        let span = &sentence.spans[idx];
+        let sub_tokens = &sentence.tokens[span.start..span.end];
+
+        if span.label == "s" {
+            // Nested S: build sub-sentence and recurse
+            let sub_sentence = make_sub_sentence(&sentence.tokens, &sentence.spans, idx, &parent_map);
+            let matches = parse_hinted_sentence(&sub_sentence, lexicon, rules);
+            if let Some(best) = matches.first() {
+                let sv = best.sem_value.clone().unwrap_or_else(|| {
+                    SemValue::Prop(crate::core::logic::Expr::Entity("_error".into()))
+                });
+                child_results.push((
+                    &span.label,
+                    sv,
+                    best.output.clone(),
+                    best.syntax.clone(),
+                    best.syntax_tree.clone(),
+                    (span.start, span.end),
+                ));
+            } else {
+                return Vec::new();
+            }
+        } else {
+            // DP or other: parse with pattern matcher
+            let filter = sub_filter_for_label(&span.label);
+            let matches = parse_sentence_inner(sub_tokens, lexicon, rules, &filter, &mut var_gen);
+            if let Some(best) = matches.first() {
+                let sv = best.sem_value.clone().unwrap_or_else(|| {
+                    match crate::core::semantics::parse(&best.output) {
+                        Ok(expr) => SemValue::Prop(expr),
+                        Err(_) => SemValue::Prop(crate::core::logic::Expr::Entity("_error".into())),
+                    }
+                });
+                child_results.push((
+                    &span.label,
+                    sv,
+                    best.output.clone(),
+                    best.syntax.clone(),
+                    best.syntax_tree.clone(),
+                    (span.start, span.end),
+                ));
+            } else {
+                return Vec::new();
+            }
+        }
+    }
+
+    // 4. Collect gap tokens (not covered by any top-level span)
     let mut covered: HashSet<usize> = HashSet::new();
-    for span in &sentence.spans {
+    for &idx in &top_level {
+        let span = &sentence.spans[idx];
         for i in span.start..span.end {
             covered.insert(i);
         }
     }
-
-    // 2. Parse each child span
-    let mut child_results: Vec<(&str, SemValue, String, Option<String>, Option<SyntaxNode>, (usize, usize))> = Vec::new();
-    for span in &sentence.spans {
-        let sub_tokens = &sentence.tokens[span.start..span.end];
-        let filter = sub_filter_for_label(&span.label);
-        let matches = parse_sentence_inner(sub_tokens, lexicon, rules, &filter, &mut var_gen);
-        if let Some(best) = matches.first() {
-            let sv = best.sem_value.clone().unwrap_or_else(|| {
-                match crate::core::semantics::parse(&best.output) {
-                    Ok(expr) => SemValue::Prop(expr),
-                    Err(_) => SemValue::Prop(crate::core::logic::Expr::Entity("_error".into())),
-                }
-            });
-            child_results.push((
-                &span.label,
-                sv,
-                best.output.clone(),
-                best.syntax.clone(),
-                best.syntax_tree.clone(),
-                (span.start, span.end),
-            ));
-        } else {
-            return Vec::new();
-        }
-    }
-
-    // 3. Collect gap tokens (not covered by any span) with lexicon lookups
     let mut gap_entries: Vec<(String, String, usize)> = Vec::new();
     for (i, token) in sentence.tokens.iter().enumerate() {
         if !covered.contains(&i) {
@@ -277,7 +365,7 @@ pub fn parse_hinted_sentence(
         }
     }
 
-    // 4. Try each S-level rule
+    // 5. Try each S-level rule
     let mut results = Vec::new();
     for rule in rules {
         if rule.kind != "s" {
@@ -288,7 +376,7 @@ pub fn parse_hinted_sentence(
             None => continue,
         };
 
-        // 5. Resolve constructor args: child spans by SUB name, gap tokens by position
+        // 6. Resolve constructor args: child spans by SUB name, gap tokens by position
         let mut consumed_children: HashSet<usize> = HashSet::new();
         let mut gap_idx = 0;
         let mut args: Vec<Arg> = Vec::new();
@@ -326,7 +414,7 @@ pub fn parse_hinted_sentence(
             continue;
         }
 
-        // 6. All child spans and gap tokens must be consumed
+        // 7. All child spans and gap tokens must be consumed
         if consumed_children.len() != child_results.len() {
             continue;
         }
@@ -334,7 +422,7 @@ pub fn parse_hinted_sentence(
             continue;
         }
 
-        // 7. Call constructor
+        // 8. Call constructor
         match apply_constructor(&sem_spec.constructor, &args, &mut var_gen) {
             Ok(sv) => {
                 let output = format!("{}", sv);
@@ -355,6 +443,7 @@ pub fn parse_hinted_sentence(
                     &sentence.tokens,
                     &sentence.spans,
                     &gap_entries,
+                    &top_level,
                 );
 
                 let constituent_spans: Vec<(usize, usize, String)> = constituents.iter()
@@ -403,8 +492,9 @@ fn parse_sub_index(key: &str) -> Option<usize> {
 /// Build token annotations from span hints and gap token lookups.
 fn build_annotations_from_hints(
     tokens: &[String],
-    spans: &[crate::core::fixture::Span],
+    spans: &[Span],
     gap_entries: &[(String, String, usize)],
+    top_level: &[usize],
 ) -> Vec<TokenAnnotation> {
     let mut out: Vec<TokenAnnotation> = tokens.iter()
         .map(|_| TokenAnnotation {
@@ -416,7 +506,9 @@ fn build_annotations_from_hints(
         })
         .collect();
 
-    for span in spans {
+    // Mark top-level spans as SubClause
+    for &idx in top_level {
+        let span = &spans[idx];
         for i in span.start..span.end {
             if i < out.len() {
                 out[i] = TokenAnnotation {

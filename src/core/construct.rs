@@ -29,6 +29,7 @@ pub fn apply_constructor(
         // S constructors
         "s_copula" => construct_s_copula(args),
         "s_transitive" => construct_s_transitive(args),
+        "s_complement" => construct_s_complement(args),
 
         _ => Err(format!("unknown constructor: {}", name)),
     }
@@ -176,6 +177,48 @@ fn construct_s_transitive(args: &[Arg]) -> Result<SemValue, String> {
         (obj_var, obj_type, obj_quant),
     ];
     let expr = expand_quants(&dps, body)?;
+    Ok(SemValue::Prop(expr))
+}
+
+/// S constructor for complement clauses: "John said that Sue is happy"
+/// Args: [Sub(Dp_subject), Sub(Prop_complement), Lexical(verb_name, verb_type),
+///        Literal(agent_role), Literal(theme_role)]
+fn construct_s_complement(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 5 {
+        return Err(format!("s_complement expects 5 args, got {}", args.len()));
+    }
+    let (subj_var, subj_type, subj_quant) = match &args[0] {
+        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
+            (var.clone(), var_type.clone(), quant.clone())
+        }
+        _ => return Err("s_complement: first arg must be a DP".into()),
+    };
+    let complement = match &args[1] {
+        Arg::Sub(SemValue::Prop(expr)) => expr.clone(),
+        _ => return Err("s_complement: second arg must be a Prop (embedded S)".into()),
+    };
+    let verb_name = match &args[2] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("s_complement: third arg must be a lexical binding".into()),
+    };
+    let agent_role = match &args[3] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("s_complement: fourth arg must be a literal role name".into()),
+    };
+    let theme_role = match &args[4] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("s_complement: fifth arg must be a literal role name".into()),
+    };
+
+    let body = Expr::Pred {
+        name: verb_name,
+        roles: vec![
+            (agent_role, Expr::Var { name: subj_var.clone(), typ: subj_type.clone() }),
+            (theme_role, complement),
+        ],
+    };
+
+    let expr = expand_quant(subj_var, subj_type, &subj_quant, body)?;
     Ok(SemValue::Prop(expr))
 }
 
@@ -579,6 +622,78 @@ mod tests {
                 assert_eq!(
                     format!("{}", expr),
                     "always [x:e]: man(theme: x) -> (exists [y:e]: woman(theme: y) ∧ loves(agent: x, patient: y))"
+                );
+            }
+            _ => panic!("expected Prop"),
+        }
+    }
+
+    #[test]
+    fn test_s_complement_bare() {
+        let dp_subj = SemValue::Dp {
+            var: "john".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        };
+        let inner_prop = SemValue::Prop(Expr::Pred {
+            name: "happy".into(),
+            roles: vec![("theme".into(), Expr::Entity("sue".into()))],
+        });
+        let args = vec![
+            Arg::Sub(dp_subj),
+            Arg::Sub(inner_prop),
+            Arg::Lexical("said".into(), "{agent:e,theme:s}".into()),
+            Arg::Literal("agent".into()),
+            Arg::Literal("theme".into()),
+        ];
+        let result = apply_constructor("s_complement", &args, &mut VarGen::new()).unwrap();
+        match result {
+            SemValue::Prop(expr) => {
+                assert_eq!(format!("{}", expr), "said(agent: john, theme: happy(theme: sue))");
+            }
+            _ => panic!("expected Prop"),
+        }
+    }
+
+    #[test]
+    fn test_s_complement_quantified() {
+        let dp_subj = SemValue::Dp {
+            var: "x".into(),
+            var_type: "e".into(),
+            quant: DpQuant::The {
+                restriction: Expr::Pred {
+                    name: "man".into(),
+                    roles: vec![("theme".into(), Expr::Var { name: "x".into(), typ: "e".into() })],
+                },
+            },
+        };
+        let inner_prop = SemValue::Prop(Expr::The {
+            var: "y".into(),
+            var_type: "e".into(),
+            body: Box::new(Expr::Implies {
+                ante: Box::new(Expr::Pred {
+                    name: "woman".into(),
+                    roles: vec![("theme".into(), Expr::Var { name: "y".into(), typ: "e".into() })],
+                }),
+                cons: Box::new(Expr::Pred {
+                    name: "happy".into(),
+                    roles: vec![("theme".into(), Expr::Var { name: "y".into(), typ: "e".into() })],
+                }),
+            }),
+        });
+        let args = vec![
+            Arg::Sub(dp_subj),
+            Arg::Sub(inner_prop),
+            Arg::Lexical("said".into(), "{agent:e,theme:s}".into()),
+            Arg::Literal("agent".into()),
+            Arg::Literal("theme".into()),
+        ];
+        let result = apply_constructor("s_complement", &args, &mut VarGen::new()).unwrap();
+        match result {
+            SemValue::Prop(expr) => {
+                assert_eq!(
+                    format!("{}", expr),
+                    "the [x:e]: man(theme: x) -> said(agent: x, theme: the [y:e]: woman(theme: y) -> happy(theme: y))"
                 );
             }
             _ => panic!("expected Prop"),

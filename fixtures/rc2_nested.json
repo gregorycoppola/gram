@@ -1,0 +1,104 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "happy",
+        "roles": {"theme": "e"},
+        "forms": ["happy"]
+      },
+      {
+        "name": "said",
+        "roles": {"agent": "e", "theme": "s"},
+        "forms": ["said"]
+      },
+      {
+        "name": "man",
+        "roles": {"theme": "e"},
+        "forms": ["man"]
+      },
+      {
+        "name": "woman",
+        "roles": {"theme": "e"},
+        "forms": ["woman"]
+      }
+    ],
+    "entities": [
+      {
+        "name": "john",
+        "type": "e",
+        "forms": ["John"]
+      },
+      {
+        "name": "sue",
+        "type": "e",
+        "forms": ["Sue"]
+      }
+    ]
+  },
+  "grammar": [
+    {
+      "name": "bare_dp",
+      "pattern": "$x:e",
+      "sem": "bare_dp($x)",
+      "kind": "dp"
+    },
+    {
+      "name": "the_dp",
+      "pattern": "THE $N:{theme:e}",
+      "sem": "the_dp($N, theme)",
+      "kind": "dp"
+    },
+    {
+      "name": "s_copula",
+      "pattern": "IGNORE",
+      "sem": "s_copula($SUB, $P, theme)",
+      "kind": "s"
+    },
+    {
+      "name": "s_complement",
+      "pattern": "IGNORE",
+      "sem": "s_complement($SUB, $SUB1, $V, agent, theme)",
+      "kind": "s"
+    }
+  ],
+  "sentences": [
+    {
+      "tokens": ["sue", "is", "happy"],
+      "spans": [
+        ["dp", 0, 1]
+      ]
+    },
+    {
+      "tokens": ["john", "said", "that", "sue", "is", "happy"],
+      "spans": [
+        ["dp", 0, 1],
+        ["s", 2, 6],
+        ["dp", 3, 4]
+      ]
+    },
+    {
+      "tokens": ["the", "man", "said", "that", "the", "woman", "is", "happy"],
+      "spans": [
+        ["dp", 0, 2],
+        ["s", 3, 8],
+        ["dp", 4, 6]
+      ]
+    },
+    {
+      "tokens": ["the", "man", "said", "that", "sue", "is", "happy"],
+      "spans": [
+        ["dp", 0, 2],
+        ["s", 3, 7],
+        ["dp", 4, 5]
+      ]
+    },
+    {
+      "tokens": ["john", "said", "that", "the", "woman", "is", "happy"],
+      "spans": [
+        ["dp", 0, 1],
+        ["s", 2, 7],
+        ["dp", 3, 5]
+      ]
+    }
+  ]
+}
