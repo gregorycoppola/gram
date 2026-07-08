@@ -103,7 +103,6 @@ pub enum TokenKind {
 enum KindFilter {
     Any,
     Only(String),
-    Exclude(Vec<String>),
 }
 
 #[derive(Debug, Clone)]
@@ -119,7 +118,6 @@ enum Consumption {
 fn kind_to_syntax_label(kind: &str) -> &'static str {
     match kind {
         "dp" => "DP",
-        "s_gapped" => "S",
         _ => "S",
     }
 }
@@ -200,13 +198,13 @@ fn build_syntax_tree(
     SyntaxNode { label: top_label.to_string(), children, terminal: None }
 }
 
-const CONSTITUENT_KINDS: &[&str] = &["dp", "s_gapped"];
-
 fn sub_filter_for_label(label: &str) -> KindFilter {
     match label {
         "dp" => KindFilter::Only("dp".to_string()),
-        "s_gapped" => KindFilter::Only("s_gapped".to_string()),
-        "s" => KindFilter::Exclude(CONSTITUENT_KINDS.iter().map(|s| s.to_string()).collect()),
+        "s\\agent" => KindFilter::Only("s\\agent".to_string()),
+        "s\\patient" => KindFilter::Only("s\\patient".to_string()),
+        "s\\theme" => KindFilter::Only("s\\theme".to_string()),
+        "s" => KindFilter::Only("s".to_string()),
         _ => KindFilter::Any,
     }
 }
@@ -540,8 +538,6 @@ fn parse_sentence_inner(
         match kind_filter {
             KindFilter::Any => {}
             KindFilter::Only(k) if rule.kind != *k => continue,
-            KindFilter::Exclude(ks) if ks.contains(&rule.kind) => continue,
-            _ => {}
         }
         let bindings = BTreeMap::new();
         let log: Vec<Consumption> = Vec::new();
