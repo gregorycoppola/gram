@@ -72,6 +72,12 @@
       "kind": "s"
     },
     {
+      "name": "s_rel_copula",
+      "pattern": "IGNORE",
+      "template": "REL_COPULA($SUB, $SUB1)",
+      "kind": "s"
+    },
+    {
       "name": "s_gap_agent",
       "pattern": "$V:{agent:e,patient:e} SUB:dp[$x:e]",
       "template": "GAP_AGENT($V, $x)",
@@ -91,32 +97,58 @@
     },
     {
       "name": "rel_dp_agent",
-      "pattern": "SUB:dp LIT:who SUB:s\\agent",
+      "pattern": "IGNORE",
       "template": "REL($SUB, $SUB1)",
       "kind": "dp"
     },
     {
       "name": "rel_dp_patient",
-      "pattern": "SUB:dp LIT:who SUB:s\\patient",
+      "pattern": "IGNORE",
       "template": "REL($SUB, $SUB1)",
       "kind": "dp"
     },
     {
       "name": "rel_dp_theme",
-      "pattern": "SUB:dp LIT:who SUB:s\\theme",
+      "pattern": "IGNORE",
       "template": "REL($SUB, $SUB1)",
       "kind": "dp"
     }
   ],
   "sentences": [
-    "the man who loves sue is happy",
-    "the man who sue loves is happy",
-    "the woman who is happy said that sue is happy",
+    {
+      "tokens": ["the", "man", "who", "loves", "sue", "is", "happy"],
+      "spans": [
+        ["dp", 0, 5],
+        ["s\\agent", 3, 5],
+        ["dp", 4, 5],
+        ["dp", 0, 2]
+      ]
+    },
+    {
+      "tokens": ["the", "man", "who", "sue", "loves", "is", "happy"],
+      "spans": [
+        ["dp", 0, 6],
+        ["s\\patient", 3, 5],
+        ["dp", 3, 4],
+        ["dp", 0, 2]
+      ]
+    },
+    {
+      "tokens": ["the", "woman", "who", "is", "happy", "said", "that", "sue", "is", "happy"],
+      "spans": [
+        ["dp", 0, 6],
+        ["s\\theme", 3, 5],
+        ["dp", 0, 2],
+        ["s", 6, 10],
+        ["dp", 7, 8]
+      ]
+    },
     {
       "tokens": ["the", "man", "who", "is", "happy", "loves", "sue"],
       "spans": [
-        ["dp", 0, 5],
+        ["dp", 0, 6],
         ["s\\theme", 3, 5],
+        ["dp", 0, 2],
         ["dp", 6, 7]
       ]
     },
@@ -126,7 +158,8 @@
         ["dp", 0, 1],
         ["dp", 2, 7],
         ["s\\agent", 5, 7],
-        ["dp", 6, 7]
+        ["dp", 6, 7],
+        ["dp", 2, 4]
       ]
     }
   ]
