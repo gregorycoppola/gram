@@ -1,4 +1,6 @@
 
+use std::path::Path;
+
 use gram::core::fixture::Fixture;
 use gram::core::grammar::compile_rules;
 use gram::core::lexicon::Lexicon;
@@ -7,7 +9,7 @@ use gram::core::tokenize::tokenize;
 
 #[test]
 fn the_man_is_happy() {
-    let fixture = Fixture::from_path("fixtures/rc2_happy.json").unwrap();
+    let fixture = Fixture::from_path(Path::new("fixtures/rc2_happy.json")).unwrap();
     let lexicon = Lexicon::from_fixture(&fixture);
     let rules = compile_rules(&fixture.grammar).unwrap();
 
