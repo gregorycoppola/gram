@@ -336,7 +336,6 @@ fn make_sub_sentence(
         if i == parent_idx {
             continue;
         }
-        // Include all descendants, not just direct children
         if span.start >= parent.start && span.end <= parent.end {
             sub_spans.push(Span {
                 label: span.label.clone(),
@@ -364,7 +363,6 @@ fn parse_hinted_inner(
 
     let parent_map = build_parent_map(&sentence.spans);
 
-    // Trace: span tree
     if let Some(t) = &mut trace {
         t.push(&format!("tokens: {:?}", sentence.tokens));
         t.push("span tree:");
@@ -383,81 +381,84 @@ fn parse_hinted_inner(
         .filter(|&i| parent_map[i].is_none())
         .collect();
 
-    let mut child_results: Vec<(&str, SemValue, String, Option<String>, Option<SyntaxNode>, (usize, usize), Vec<Constituent>)> = Vec::new();
-    for &idx in &top_level {
+    // Phase 1: for a single top-level span, try pattern matching directly.
+    // Rules with real patterns (like s_copula, rel_dp_agent, s_gap_agent) can
+    // match recursively without needing hinted assembly.
+    if top_level.len() == 1 {
+        let &idx = &top_level[0];
         let span = &sentence.spans[idx];
-        let has_children = parent_map.iter().any(|&p| p == Some(idx));
         let span_tokens = &sentence.tokens[span.start..span.end];
+        let filter = sub_filter_for_label(&span.label);
 
         if let Some(t) = &mut trace {
-            let mode = if has_children { "hinted" } else { "inner" };
-            let fl = if has_children { "n/a".to_string() } else { filter_label(&sub_filter_for_label(&span.label)) };
-            t.enter(&format!("parse [{}] {}..{} ({}, filter: {})",
-                span.label, span.start, span.end, mode, fl));
+            t.enter(&format!("phase 1: pattern match [{}] {}..{} (filter: {})",
+                span.label, span.start, span.end, filter_label(&filter)));
             t.push(&format!("tokens: {:?}", span_tokens));
         }
 
-        if has_children {
-            let sub_sentence = make_sub_sentence(&sentence.tokens, &sentence.spans, idx, &parent_map);
-            let matches = parse_hinted_inner(&sub_sentence, lexicon, rules, trace.as_deref_mut());
-            if let Some(best) = matches.first() {
-                let sv = best.sem_value.clone().unwrap_or_else(|| {
-                    SemValue::Prop(crate::core::logic::Expr::Entity("_error".into()))
-                });
-                child_results.push((
-                    &span.label,
-                    sv,
-                    best.output.clone(),
-                    best.syntax.clone(),
-                    best.syntax_tree.clone(),
-                    (span.start, span.end),
-                    best.constituents.clone(),
-                ));
-                if let Some(t) = &mut trace {
-                    t.push(&format!("→ {}", best.output));
-                }
+        let matches = parse_sentence_inner(span_tokens, lexicon, rules, &filter, &mut var_gen, trace.as_deref_mut());
+
+        if let Some(t) = &mut trace {
+            if matches.is_empty() {
+                t.push("no pattern match");
             } else {
-                if let Some(t) = &mut trace {
-                    t.push("FAIL: no match from children");
-                }
-                if let Some(t) = &mut trace { t.leave(); }
-                return Vec::new();
+                t.push(&format!("{} match(es)", matches.len()));
+            }
+            t.leave();
+        }
+
+        if !matches.is_empty() {
+            return matches;
+        }
+
+        if let Some(t) = &mut trace {
+            t.push("falling back to phase 2: hinted assembly");
+        }
+    }
+
+    // Phase 2: hinted assembly for IGNORE-pattern rules.
+    // Parse each top-level span's children, then assemble with sem specs.
+
+    let mut child_results: Vec<(&str, SemValue, String, Option<String>, Option<SyntaxNode>, (usize, usize), Vec<Constituent>)> = Vec::new();
+    for &idx in &top_level {
+        let span = &sentence.spans[idx];
+        let span_tokens = &sentence.tokens[span.start..span.end];
+
+        if let Some(t) = &mut trace {
+            t.enter(&format!("phase 2: assemble [{}] {}..{}",
+                span.label, span.start, span.end));
+            t.push(&format!("tokens: {:?}", span_tokens));
+        }
+
+        let sub_sentence = make_sub_sentence(&sentence.tokens, &sentence.spans, idx, &parent_map);
+        let matches = parse_hinted_inner(&sub_sentence, lexicon, rules, trace.as_deref_mut());
+        if let Some(best) = matches.first() {
+            let sv = best.sem_value.clone().unwrap_or_else(|| {
+                SemValue::Prop(crate::core::logic::Expr::Entity("_error".into()))
+            });
+            child_results.push((
+                &span.label,
+                sv,
+                best.output.clone(),
+                best.syntax.clone(),
+                best.syntax_tree.clone(),
+                (span.start, span.end),
+                best.constituents.clone(),
+            ));
+            if let Some(t) = &mut trace {
+                t.push(&format!("→ {}", best.output));
             }
         } else {
-            let filter = sub_filter_for_label(&span.label);
-            let matches = parse_sentence_inner(span_tokens, lexicon, rules, &filter, &mut var_gen, None);
-            if let Some(best) = matches.first() {
-                let sv = best.sem_value.clone().unwrap_or_else(|| {
-                    match crate::core::semantics::parse(&best.output) {
-                        Ok(expr) => SemValue::Prop(expr),
-                        Err(_) => SemValue::Prop(crate::core::logic::Expr::Entity("_error".into())),
-                    }
-                });
-                child_results.push((
-                    &span.label,
-                    sv,
-                    best.output.clone(),
-                    best.syntax.clone(),
-                    best.syntax_tree.clone(),
-                    (span.start, span.end),
-                    Vec::new(),
-                ));
-                if let Some(t) = &mut trace {
-                    t.push(&format!("→ {} [{}]", best.output, best.rule_name));
-                }
-            } else {
-                if let Some(t) = &mut trace {
-                    t.push("FAIL: no matching rule");
-                }
-                if let Some(t) = &mut trace { t.leave(); }
-                return Vec::new();
+            if let Some(t) = &mut trace {
+                t.push("FAIL: no match from children");
             }
+            if let Some(t) = &mut trace { t.leave(); }
+            return Vec::new();
         }
 
         if let Some(t) = &mut trace { t.leave(); }
     }
 
-    // Gap entries
     let mut covered: HashSet<usize> = HashSet::new();
     for &idx in &top_level {
         let span = &sentence.spans[idx];
