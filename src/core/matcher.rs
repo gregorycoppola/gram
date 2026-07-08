@@ -289,6 +289,7 @@ pub fn parse_hinted_sentence(
         };
 
         // 5. Resolve constructor args: child spans by SUB name, gap tokens by position
+        let mut consumed_children: HashSet<usize> = HashSet::new();
         let mut gap_idx = 0;
         let mut args: Vec<Arg> = Vec::new();
         let mut ok = true;
@@ -300,6 +301,7 @@ pub fn parse_hinted_sentence(
                     if key == "SUB" || key.starts_with("SUB") {
                         if let Some(idx) = parse_sub_index(key) {
                             if idx < child_results.len() {
+                                consumed_children.insert(idx);
                                 args.push(Arg::Sub(child_results[idx].1.clone()));
                                 continue;
                             }
@@ -324,7 +326,15 @@ pub fn parse_hinted_sentence(
             continue;
         }
 
-        // 6. Call constructor
+        // 6. All child spans and gap tokens must be consumed
+        if consumed_children.len() != child_results.len() {
+            continue;
+        }
+        if gap_idx != gap_entries.len() {
+            continue;
+        }
+
+        // 7. Call constructor
         match apply_constructor(&sem_spec.constructor, &args, &mut var_gen) {
             Ok(sv) => {
                 let output = format!("{}", sv);
