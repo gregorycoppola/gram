@@ -10,6 +10,49 @@ use crate::core::semantics::parse_with_types;
 use crate::core::template::apply_template;
 use crate::core::value::{SemValue, VarGen};
 
+// --- Debug trace ---
+
+pub struct DebugTrace {
+    lines: Vec<String>,
+    indent: usize,
+}
+
+impl DebugTrace {
+    pub fn new() -> Self {
+        Self { lines: Vec::new(), indent: 0 }
+    }
+
+    pub fn push(&mut self, msg: &str) {
+        self.lines.push(format!("{}{}", "  ".repeat(self.indent), msg));
+    }
+
+    pub fn enter(&mut self, msg: &str) {
+        self.push(msg);
+        self.indent += 1;
+    }
+
+    pub fn leave(&mut self) {
+        if self.indent > 0 {
+            self.indent -= 1;
+        }
+    }
+
+    pub fn emit(&self) {
+        for line in &self.lines {
+            eprintln!("{}", line);
+        }
+    }
+}
+
+fn filter_label(f: &KindFilter) -> String {
+    match f {
+        KindFilter::Any => "any".to_string(),
+        KindFilter::Only(k) => format!("only({})", k),
+    }
+}
+
+// --- Public types ---
+
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Constituent {
     pub label: String,
@@ -209,9 +252,11 @@ fn sub_filter_for_label(label: &str) -> KindFilter {
     }
 }
 
+// --- Public API (no trace) ---
+
 pub fn parse_sentence(tokens: &[String], lexicon: &Lexicon, rules: &[Rule]) -> Vec<Match> {
     let mut var_gen = VarGen::new();
-    parse_sentence_inner(tokens, lexicon, rules, &KindFilter::Any, &mut var_gen)
+    parse_sentence_inner(tokens, lexicon, rules, &KindFilter::Any, &mut var_gen, None)
 }
 
 pub fn parse_sentence_with_vars(
@@ -219,14 +264,40 @@ pub fn parse_sentence_with_vars(
 ) -> Vec<Match> {
     let mut var_gen = VarGen::new();
     let effective_lexicon = if available_vars.is_empty() {
-        return parse_sentence_inner(tokens, lexicon, rules, &KindFilter::Any, &mut var_gen);
+        return parse_sentence_inner(tokens, lexicon, rules, &KindFilter::Any, &mut var_gen, None);
     } else {
         lexicon.with_pronoun_bindings(available_vars)
     };
-    parse_sentence_inner(tokens, &effective_lexicon, rules, &KindFilter::Any, &mut var_gen)
+    parse_sentence_inner(tokens, &effective_lexicon, rules, &KindFilter::Any, &mut var_gen, None)
 }
 
-// --- Span tree helpers for hinted parsing ---
+pub fn parse_hinted_sentence(
+    sentence: &InputSentence,
+    lexicon: &Lexicon,
+    rules: &[Rule],
+) -> Vec<Match> {
+    parse_hinted_inner(sentence, lexicon, rules, None)
+}
+
+// --- Traced API ---
+
+pub fn parse_sentence_traced(
+    tokens: &[String], lexicon: &Lexicon, rules: &[Rule], trace: &mut DebugTrace,
+) -> Vec<Match> {
+    let mut var_gen = VarGen::new();
+    parse_sentence_inner(tokens, lexicon, rules, &KindFilter::Any, &mut var_gen, Some(trace))
+}
+
+pub fn parse_hinted_sentence_traced(
+    sentence: &InputSentence,
+    lexicon: &Lexicon,
+    rules: &[Rule],
+    trace: &mut DebugTrace,
+) -> Vec<Match> {
+    parse_hinted_inner(sentence, lexicon, rules, Some(trace))
+}
+
+// --- Span tree helpers ---
 
 fn build_parent_map(spans: &[Span]) -> Vec<Option<usize>> {
     let n = spans.len();
@@ -273,10 +344,13 @@ fn make_sub_sentence(
     InputSentence { tokens: sub_tokens, spans: sub_spans }
 }
 
-pub fn parse_hinted_sentence(
+// --- Hinted parsing (internal) ---
+
+fn parse_hinted_inner(
     sentence: &InputSentence,
     lexicon: &Lexicon,
     rules: &[Rule],
+    mut trace: Option<&mut DebugTrace>,
 ) -> Vec<Match> {
     let mut var_gen = VarGen::new();
 
@@ -286,6 +360,21 @@ pub fn parse_hinted_sentence(
 
     let parent_map = build_parent_map(&sentence.spans);
 
+    // Trace: span tree
+    if let Some(t) = &mut trace {
+        t.push(&format!("tokens: {:?}", sentence.tokens));
+        t.push("span tree:");
+        for (i, span) in sentence.spans.iter().enumerate() {
+            let rel = match parent_map[i] {
+                None => "TOP".to_string(),
+                Some(p) => format!("child of [{}] {}..{}",
+                    sentence.spans[p].label, sentence.spans[p].start, sentence.spans[p].end),
+            };
+            t.push(&format!("  [{}] {}..{}  {}", span.label, span.start, span.end, rel));
+        }
+        t.push("");
+    }
+
     let top_level: Vec<usize> = (0..sentence.spans.len())
         .filter(|&i| parent_map[i].is_none())
         .collect();
@@ -294,10 +383,19 @@ pub fn parse_hinted_sentence(
     for &idx in &top_level {
         let span = &sentence.spans[idx];
         let has_children = parent_map.iter().any(|&p| p == Some(idx));
+        let span_tokens = &sentence.tokens[span.start..span.end];
+
+        if let Some(t) = &mut trace {
+            let mode = if has_children { "hinted" } else { "inner" };
+            let fl = if has_children { "n/a".to_string() } else { filter_label(&sub_filter_for_label(&span.label)) };
+            t.enter(&format!("parse [{}] {}..{} ({}, filter: {})",
+                span.label, span.start, span.end, mode, fl));
+            t.push(&format!("tokens: {:?}", span_tokens));
+        }
 
         if has_children {
             let sub_sentence = make_sub_sentence(&sentence.tokens, &sentence.spans, idx, &parent_map);
-            let matches = parse_hinted_sentence(&sub_sentence, lexicon, rules);
+            let matches = parse_hinted_inner(&sub_sentence, lexicon, rules, trace.as_deref_mut());
             if let Some(best) = matches.first() {
                 let sv = best.sem_value.clone().unwrap_or_else(|| {
                     SemValue::Prop(crate::core::logic::Expr::Entity("_error".into()))
@@ -311,13 +409,19 @@ pub fn parse_hinted_sentence(
                     (span.start, span.end),
                     best.constituents.clone(),
                 ));
+                if let Some(t) = &mut trace {
+                    t.push(&format!("→ {}", best.output));
+                }
             } else {
+                if let Some(t) = &mut trace {
+                    t.push("FAIL: no match from children");
+                }
+                if let Some(t) = &mut trace { t.leave(); }
                 return Vec::new();
             }
         } else {
-            let span_tokens = &sentence.tokens[span.start..span.end];
             let filter = sub_filter_for_label(&span.label);
-            let matches = parse_sentence_inner(span_tokens, lexicon, rules, &filter, &mut var_gen);
+            let matches = parse_sentence_inner(span_tokens, lexicon, rules, &filter, &mut var_gen, None);
             if let Some(best) = matches.first() {
                 let sv = best.sem_value.clone().unwrap_or_else(|| {
                     match crate::core::semantics::parse(&best.output) {
@@ -334,12 +438,22 @@ pub fn parse_hinted_sentence(
                     (span.start, span.end),
                     Vec::new(),
                 ));
+                if let Some(t) = &mut trace {
+                    t.push(&format!("→ {} [{}]", best.output, best.rule_name));
+                }
             } else {
+                if let Some(t) = &mut trace {
+                    t.push("FAIL: no matching rule");
+                }
+                if let Some(t) = &mut trace { t.leave(); }
                 return Vec::new();
             }
         }
+
+        if let Some(t) = &mut trace { t.leave(); }
     }
 
+    // Gap entries
     let mut covered: HashSet<usize> = HashSet::new();
     for &idx in &top_level {
         let span = &sentence.spans[idx];
@@ -357,6 +471,18 @@ pub fn parse_hinted_sentence(
         }
     }
 
+    if let Some(t) = &mut trace {
+        t.push(&format!("gap entries ({}):", gap_entries.len()));
+        for (canonical, typ, pos) in &gap_entries {
+            t.push(&format!("  {} ({}) at token {}", canonical, typ, pos));
+        }
+        t.push("");
+        t.enter(&format!("assembly: {} children, {} gaps", child_results.len(), gap_entries.len()));
+        for (i, (label, _, output, _, _, (s, e), _)) in child_results.iter().enumerate() {
+            t.push(&format!("  child[{}]: [{}] {}..{} → {}", i, label, s, e, output));
+        }
+    }
+
     let mut results = Vec::new();
     for rule in rules {
         if rule.kind != "s" {
@@ -366,6 +492,10 @@ pub fn parse_hinted_sentence(
             Some(s) => s,
             None => continue,
         };
+
+        if let Some(t) = &mut trace {
+            t.push(&format!("try: {} (sem args: {:?})", rule.name, sem_spec.args));
+        }
 
         let mut consumed_children: HashSet<usize> = HashSet::new();
         let mut gap_idx = 0;
@@ -379,41 +509,69 @@ pub fn parse_hinted_sentence(
                     if key == "SUB" || key.starts_with("SUB") {
                         if let Some(idx) = parse_sub_index(key) {
                             if idx < child_results.len() {
+                                if let Some(t) = &mut trace {
+                                    t.push(&format!("  ${} → child[{}]", name, idx));
+                                }
                                 consumed_children.insert(idx);
                                 args.push(Arg::Sub(child_results[idx].1.clone()));
                                 continue;
+                            } else {
+                                if let Some(t) = &mut trace {
+                                    t.push(&format!("  ${} → child[{}] OUT OF RANGE (have {})", name, idx, child_results.len()));
+                                }
                             }
                         }
                     }
                     if gap_idx < gap_entries.len() {
                         let (canonical, typ, _) = &gap_entries[gap_idx];
+                        if let Some(t) = &mut trace {
+                            t.push(&format!("  ${} → gap[{}] = {} ({})", name, gap_idx, canonical, typ));
+                        }
                         args.push(Arg::Lexical(canonical.clone(), typ.clone()));
                         gap_idx += 1;
                     } else {
+                        if let Some(t) = &mut trace {
+                            t.push(&format!("  ${} → NO MORE GAPS (need {}, have {})", name, gap_idx + 1, gap_entries.len()));
+                        }
                         ok = false;
                         break;
                     }
                 }
                 SemArg::Literal(s) => {
+                    if let Some(t) = &mut trace {
+                        t.push(&format!("  literal: {:?}", s));
+                    }
                     args.push(Arg::Literal(s.clone()));
                 }
             }
         }
 
         if !ok {
+            if let Some(t) = &mut trace {
+                t.push("  FAIL: args exhausted");
+            }
             continue;
         }
 
         if consumed_children.len() != child_results.len() {
+            if let Some(t) = &mut trace {
+                t.push(&format!("  FAIL: consumed {}/{} children", consumed_children.len(), child_results.len()));
+            }
             continue;
         }
         if gap_idx != gap_entries.len() {
+            if let Some(t) = &mut trace {
+                t.push(&format!("  FAIL: consumed {}/{} gaps", gap_idx, gap_entries.len()));
+            }
             continue;
         }
 
         match apply_constructor(&sem_spec.constructor, &args, &mut var_gen) {
             Ok(sv) => {
                 let output = format!("{}", sv);
+                if let Some(t) = &mut trace {
+                    t.push(&format!("  ✓ SUCCESS → {}", output));
+                }
 
                 let constituents: Vec<Constituent> = child_results.iter().map(|(label, sv, sem, syn, syn_tree, span, children)| {
                     Constituent {
@@ -458,9 +616,18 @@ pub fn parse_hinted_sentence(
                     sem_value: Some(sv),
                 });
             }
-            Err(_) => {
-                continue;
+            Err(e) => {
+                if let Some(t) = &mut trace {
+                    t.push(&format!("  FAIL: constructor error: {}", e));
+                }
             }
+        }
+    }
+
+    if let Some(t) = &mut trace {
+        t.leave();
+        if results.is_empty() {
+            t.push("NO ASSEMBLY MATCH");
         }
     }
 
@@ -530,16 +697,26 @@ fn build_annotations_from_hints(
     out
 }
 
+// --- Inner parsing ---
+
 fn parse_sentence_inner(
     tokens: &[String], lexicon: &Lexicon, rules: &[Rule], kind_filter: &KindFilter,
     var_gen: &mut VarGen,
+    mut trace: Option<&mut DebugTrace>,
 ) -> Vec<Match> {
+    if let Some(t) = &mut trace {
+        t.enter(&format!("parse_inner (filter: {}, tokens: {:?})", filter_label(kind_filter), tokens));
+    }
+
     let mut results = Vec::new();
     for rule in rules {
         match kind_filter {
             KindFilter::Any => {}
             KindFilter::Only(k) if rule.kind != *k => continue,
             KindFilter::Only(_) => {}
+        }
+        if let Some(t) = &mut trace {
+            t.push(&format!("try: {} (kind: {})", rule.name, rule.kind));
         }
         let bindings = BTreeMap::new();
         let log: Vec<Consumption> = Vec::new();
@@ -563,7 +740,10 @@ fn parse_sentence_inner(
             let (output, sem_value, semantics_check) = if let Some(ref sem_spec) = rule.sem {
                 match resolve_and_construct(sem_spec, &b, &constituents, var_gen) {
                     Ok((sv, out)) => (out, Some(sv), None),
-                    Err(_) => {
+                    Err(e) => {
+                        if let Some(t) = &mut trace {
+                            t.push(&format!("  ✗ sem construct failed: {}", e));
+                        }
                         continue;
                     }
                 }
@@ -575,6 +755,10 @@ fn parse_sentence_inner(
                 };
                 (out, None, check)
             };
+
+            if let Some(t) = &mut trace {
+                t.push(&format!("  ✓ → {}", output));
+            }
 
             results.push(Match {
                 rule_name: rule.name.clone(),
@@ -588,8 +772,20 @@ fn parse_sentence_inner(
                 semantics_check,
                 sem_value,
             });
+        } else {
+            if let Some(t) = &mut trace {
+                t.push("  ✗ pattern didn't match");
+            }
         }
     }
+
+    if let Some(t) = &mut trace {
+        if results.is_empty() {
+            t.push("NO MATCH");
+        }
+        t.leave();
+    }
+
     results
 }
 
@@ -765,7 +961,7 @@ fn match_pattern(
                     Some(lexicon.with_pronoun_bindings(available_vars))
                 };
                 let sub_lexicon = effective_lexicon.as_ref().unwrap_or(lexicon);
-                let sub_matches = parse_sentence_inner(sub_tokens, sub_lexicon, rules, &sub_filter, var_gen);
+                let sub_matches = parse_sentence_inner(sub_tokens, sub_lexicon, rules, &sub_filter, var_gen, None);
                 if let Some(best) = sub_matches.first() {
                     let mut new_bindings = bindings.clone();
                     let mut new_log = log.clone();
@@ -805,7 +1001,7 @@ fn match_pattern(
                 let max_end = tokens.len();
                 for end in (sub_ti + 1)..=max_end {
                     let sub_tokens = &tokens[sub_ti..end];
-                    let sub_matches = parse_sentence_inner(sub_tokens, sub_lexicon, rules, &sub_filter, var_gen);
+                    let sub_matches = parse_sentence_inner(sub_tokens, sub_lexicon, rules, &sub_filter, var_gen, None);
                     if let Some(best) = sub_matches.first() {
                         let mut trial_constituents = constituents.clone();
                         let mut new_bindings = bindings.clone();

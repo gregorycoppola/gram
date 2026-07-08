@@ -6,7 +6,10 @@ use std::path::PathBuf;
 use crate::core::fixture::{Fixture, SentenceInput};
 use crate::core::grammar::{compile_rules, Rule};
 use crate::core::lexicon::Lexicon;
-use crate::core::matcher::{parse_hinted_sentence, parse_sentence, Match};
+use crate::core::matcher::{
+    parse_hinted_sentence, parse_hinted_sentence_traced, parse_sentence, parse_sentence_traced,
+    DebugTrace, Match,
+};
 use crate::core::tokenize::{split_sentences, tokenize};
 
 #[derive(Args)]
@@ -15,6 +18,10 @@ pub struct ParseArgs {
     pub fixture: PathBuf,
     #[arg(long)]
     pub json: bool,
+    #[arg(long)]
+    pub debug: bool,
+    #[arg(long)]
+    pub focus: Option<usize>,
 }
 
 #[derive(Args)]
@@ -41,10 +48,27 @@ pub fn run_parse(args: ParseArgs) -> Result<()> {
     let rules = compile_rules(&fixture.grammar)?;
 
     let mut results = Vec::new();
-    for sent in &fixture.sentences {
+    for (i, sent) in fixture.sentences.iter().enumerate() {
+        if let Some(focus) = args.focus {
+            if i + 1 != focus {
+                continue;
+            }
+        }
         let parsed = match sent {
-            SentenceInput::Plain(s) => parse_plain(s, &lexicon, &rules),
-            SentenceInput::Hinted(s) => parse_hinted(s, &lexicon, &rules),
+            SentenceInput::Plain(s) => {
+                if args.debug {
+                    parse_plain_debug(s, &lexicon, &rules)
+                } else {
+                    parse_plain(s, &lexicon, &rules)
+                }
+            }
+            SentenceInput::Hinted(s) => {
+                if args.debug {
+                    parse_hinted_debug(s, &lexicon, &rules)
+                } else {
+                    parse_hinted(s, &lexicon, &rules)
+                }
+            }
         };
         results.extend(parsed);
     }
@@ -90,9 +114,39 @@ fn parse_plain(s: &str, lexicon: &Lexicon, rules: &[Rule]) -> Vec<ParsedSentence
     out
 }
 
+fn parse_plain_debug(s: &str, lexicon: &Lexicon, rules: &[Rule]) -> Vec<ParsedSentence> {
+    let mut out = Vec::new();
+    for split in split_sentences(s) {
+        let tokens = tokenize(&split);
+        let mut trace = DebugTrace::new();
+        let matches = parse_sentence_traced(&tokens, lexicon, rules, &mut trace);
+        trace.emit();
+        eprintln!();
+        out.push(ParsedSentence {
+            sentence: split,
+            tokens,
+            matches,
+        });
+    }
+    out
+}
+
 fn parse_hinted(s: &crate::core::fixture::InputSentence, lexicon: &Lexicon, rules: &[Rule]) -> Vec<ParsedSentence> {
     let display = s.tokens.join(" ");
     let matches = parse_hinted_sentence(s, lexicon, rules);
+    vec![ParsedSentence {
+        sentence: display,
+        tokens: s.tokens.clone(),
+        matches,
+    }]
+}
+
+fn parse_hinted_debug(s: &crate::core::fixture::InputSentence, lexicon: &Lexicon, rules: &[Rule]) -> Vec<ParsedSentence> {
+    let display = s.tokens.join(" ");
+    let mut trace = DebugTrace::new();
+    let matches = parse_hinted_sentence_traced(s, lexicon, rules, &mut trace);
+    trace.emit();
+    eprintln!();
     vec![ParsedSentence {
         sentence: display,
         tokens: s.tokens.clone(),
