@@ -327,13 +327,17 @@ fn make_sub_sentence(
     tokens: &[String],
     spans: &[Span],
     parent_idx: usize,
-    parent_map: &[Option<usize>],
+    _parent_map: &[Option<usize>],
 ) -> InputSentence {
     let parent = &spans[parent_idx];
     let sub_tokens: Vec<String> = tokens[parent.start..parent.end].to_vec();
     let mut sub_spans: Vec<Span> = Vec::new();
     for (i, span) in spans.iter().enumerate() {
-        if parent_map[i] == Some(parent_idx) {
+        if i == parent_idx {
+            continue;
+        }
+        // Include all descendants, not just direct children
+        if span.start >= parent.start && span.end <= parent.end {
             sub_spans.push(Span {
                 label: span.label.clone(),
                 start: span.start - parent.start,
