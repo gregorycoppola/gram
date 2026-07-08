@@ -348,12 +348,12 @@ pub fn parse_hinted_sentence(
                 );
 
                 let constituent_spans: Vec<(usize, usize, String)> = constituents.iter()
-                    .filter_map(|c| c.span.map(|(s, e)| (s, e, c.syntax.clone().unwrap_or_default()))
+                    .filter_map(|c| c.span.map(|(s, e)| (s, e, c.syntax.clone().unwrap_or_default())))
                     .collect();
                 let syntax = build_syntax(&sentence.tokens, &constituent_spans, "S");
 
                 let constituent_trees: Vec<(usize, usize, SyntaxNode)> = constituents.iter()
-                    .filter_map(|c| c.span.zip(c.syntax_tree.clone()).map(|(s, t)| (s.0, s.1, t))
+                    .filter_map(|c| c.span.zip(c.syntax_tree.clone()).map(|(s, t)| (s.0, s.1, t)))
                     .collect();
                 let syntax_tree = build_syntax_tree(&sentence.tokens, &annotations, &constituent_trees, "S");
 
@@ -464,12 +464,12 @@ fn parse_sentence_inner(
             let annotations = annotate_tokens(tokens, &log);
 
             let constituent_spans: Vec<(usize, usize, String)> = constituents.iter()
-                .filter_map(|c| c.span.map(|(s, e)| (s, e, c.syntax.clone().unwrap_or_default()))
+                .filter_map(|c| c.span.map(|(s, e)| (s, e, c.syntax.clone().unwrap_or_default())))
                 .collect();
             let syntax = build_syntax(tokens, &constituent_spans, kind_to_syntax_label(&rule.kind));
 
             let constituent_trees: Vec<(usize, usize, SyntaxNode)> = constituents.iter()
-                .filter_map(|c| c.span.zip(c.syntax_tree.clone()).map(|(s, t)| (s.0, s.1, t))
+                .filter_map(|c| c.span.zip(c.syntax_tree.clone()).map(|(s, t)| (s.0, s.1, t)))
                 .collect();
             let syntax_tree = build_syntax_tree(tokens, &annotations, &constituent_trees, kind_to_syntax_label(&rule.kind));
 
@@ -631,7 +631,7 @@ fn match_pattern(
                 if type_ok {
                     let mut new_bindings = bindings.clone();
                     let mut new_log = log.clone();
-                    new_bindings.insert(name.clone(), (canonical.clone(), actual_type.clone());
+                    new_bindings.insert(name.clone(), (canonical.clone(), actual_type.clone()));
                     new_log.push(Consumption::Var {
                         variable: name.clone(), canonical, typ: actual_type, start: ti, end: ti + consumed,
                     });
@@ -688,7 +688,7 @@ fn match_pattern(
                     } else {
                         format!("SUB{}", sub_count + 1)
                     };
-                    new_bindings.insert(sub_key, (best.output.clone(), label.clone());
+                    new_bindings.insert(sub_key, (best.output.clone(), label.clone()));
                     constituents.push(Constituent {
                         label: label.clone(),
                         semantics: best.output.clone(),
@@ -729,7 +729,7 @@ fn match_pattern(
                         } else {
                             format!("SUB{}", sub_count + 1)
                         };
-                        new_bindings.insert(sub_key, (best.output.clone(), label.clone());
+                        new_bindings.insert(sub_key, (best.output.clone(), label.clone()));
                         trial_constituents.push(Constituent {
                             label: label.clone(),
                             semantics: best.output.clone(),

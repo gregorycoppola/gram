@@ -128,12 +128,12 @@ fn emit_pretty(results: &[ParsedSentence]) {
             ambiguous += 1;
             println!("  ⚠️  \"{}\"  ({} parses)", r.sentence, r.matches.len());
             for m in &r.matches {
-                if let Some(syn) &m.syntax {
+                if let Some(syn) = &m.syntax {
                     println!("     {}", syn);
                 }
                 emit_stages(m);
                 println!("     → {}  [{}]", m.output, m.rule_name);
-                if let Some(e) &m.semantics_check {
+                if let Some(e) = &m.semantics_check {
                     println!("       ⚠️  semantics: {}", e);
                 }
             }
