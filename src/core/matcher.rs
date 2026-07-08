@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::core::construct::{Arg, apply_constructor};
 use crate::core::fixture::{InputSentence, Span};
-use crate::core::grammar::{is_ignored, matches_keyword, Rule, Slot};
+use crate::core::grammar::{is_punctuation, matches_keyword, Rule, Slot};
 use crate::core::lexicon::{clean_token, Lexicon};
 use crate::core::sem_dsl::SemArg;
 use crate::core::semantics::parse_with_types;
@@ -133,7 +133,7 @@ fn build_syntax(tokens: &[String], constituents: &[(usize, usize, String)], top_
             continue;
         }
         let cleaned = clean_token(&tokens[i]);
-        if is_ignored(&cleaned) {
+        if is_punctuation(&cleaned) {
             continue;
         }
         if ci < constituents.len() && i == constituents[ci].0 {
@@ -165,7 +165,7 @@ fn build_syntax_tree(
             continue;
         }
         let cleaned = clean_token(&tokens[i]);
-        if is_ignored(&cleaned) {
+        if is_punctuation(&cleaned) {
             continue;
         }
         if ci < constituents.len() && i == constituents[ci].0 {
@@ -652,7 +652,7 @@ fn match_pattern(
     let mut ti = ti;
     let mut log = log;
     if !next_is_literal_or_ignore {
-        while ti < tokens.len() && is_ignored(&clean_token(&tokens[ti])) {
+        while ti < tokens.len() && is_punctuation(&clean_token(&tokens[ti])) {
             log.push(Consumption::Skipped { position: ti });
             ti += 1;
         }
@@ -661,7 +661,7 @@ fn match_pattern(
     if pi >= pattern.len() {
         let mut ti = ti;
         let mut log = log;
-        while ti < tokens.len() && is_ignored(&clean_token(&tokens[ti])) {
+        while ti < tokens.len() && is_punctuation(&clean_token(&tokens[ti])) {
             log.push(Consumption::Skipped { position: ti });
             ti += 1;
         }
@@ -689,7 +689,7 @@ fn match_pattern(
                 let mut log = log;
                 log.push(Consumption::Literal { position: ti });
                 match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter, var_gen)
-            } else if is_ignored(&token) {
+            } else if is_punctuation(&token) {
                 let mut log = log;
                 log.push(Consumption::Skipped { position: ti });
                 match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter, var_gen)
@@ -702,7 +702,7 @@ fn match_pattern(
                 let mut log = log;
                 log.push(Consumption::Keyword { class: kw.clone(), position: ti });
                 match_pattern(pattern, pi + 1, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter, var_gen)
-            } else if is_ignored(&token) {
+            } else if is_punctuation(&token) {
                 let mut log = log;
                 log.push(Consumption::Skipped { position: ti });
                 match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter, var_gen)
@@ -733,7 +733,7 @@ fn match_pattern(
                     }
                 }
             }
-            if is_ignored(&token) {
+            if is_punctuation(&token) {
                 let mut log = log;
                 log.push(Consumption::Skipped { position: ti });
                 return match_pattern(pattern, pi, tokens, ti + 1, bindings, log, lexicon, rules, sub_count, constituents, kind_filter, var_gen);
@@ -743,7 +743,7 @@ fn match_pattern(
         Slot::Sub { label, available_vars, delimiter } => {
             let sub_start = ti;
             let mut sub_ti = ti;
-            while sub_ti < tokens.len() && is_ignored(&clean_token(&tokens[sub_ti])) {
+            while sub_ti < tokens.len() && is_punctuation(&clean_token(&tokens[sub_ti])) {
                 log.push(Consumption::Skipped { position: sub_ti });
                 sub_ti += 1;
             }
