@@ -293,9 +293,9 @@ pub fn parse_hinted_sentence(
     let mut child_results: Vec<(&str, SemValue, String, Option<String>, Option<SyntaxNode>, (usize, usize), Vec<Constituent>)> = Vec::new();
     for &idx in &top_level {
         let span = &sentence.spans[idx];
-        let sub_tokens = &sentence.tokens[span.start..span.end];
+        let has_children = parent_map.iter().any(|&p| p == Some(idx));
 
-        if span.label == "s" {
+        if has_children {
             let sub_sentence = make_sub_sentence(&sentence.tokens, &sentence.spans, idx, &parent_map);
             let matches = parse_hinted_sentence(&sub_sentence, lexicon, rules);
             if let Some(best) = matches.first() {
@@ -315,8 +315,9 @@ pub fn parse_hinted_sentence(
                 return Vec::new();
             }
         } else {
+            let span_tokens = &sentence.tokens[span.start..span.end];
             let filter = sub_filter_for_label(&span.label);
-            let matches = parse_sentence_inner(sub_tokens, lexicon, rules, &filter, &mut var_gen);
+            let matches = parse_sentence_inner(span_tokens, lexicon, rules, &filter, &mut var_gen);
             if let Some(best) = matches.first() {
                 let sv = best.sem_value.clone().unwrap_or_else(|| {
                     match crate::core::semantics::parse(&best.output) {
