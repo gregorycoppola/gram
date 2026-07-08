@@ -175,7 +175,7 @@ pub fn keywords() -> &'static [(&'static str, &'static [&'static str])] {
     ]
 }
 
-pub fn ignored_tokens() -> &'static [&'static str] {
+pub fn punctuation_tokens() -> &'static [&'static str] {
     &[".", ",", "!", "?"]
 }
 
@@ -188,8 +188,8 @@ pub fn matches_keyword(token: &str, keyword: &str) -> bool {
     false
 }
 
-pub fn is_ignored(token: &str) -> bool {
-    ignored_tokens().iter().any(|i| i.eq_ignore_ascii_case(token))
+pub fn is_punctuation(token: &str) -> bool {
+    punctuation_tokens().iter().any(|p| p.eq_ignore_ascii_case(token))
 }
 
 pub fn pronouns() -> &'static [&'static str] {
