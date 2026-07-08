@@ -384,7 +384,7 @@ fn parse_sub_index(key: &str) -> Option<usize> {
     if key == "SUB" {
         Some(0)
     } else if let Some(rest) = key.strip_prefix("SUB") {
-        rest.parse::<usize>().ok().map(|n| n - 1)
+        rest.parse::<usize>().ok()
     } else {
         None
     }

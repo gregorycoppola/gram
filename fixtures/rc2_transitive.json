@@ -15,6 +15,11 @@
         "name": "loves",
         "roles": {"agent": "e", "patient": "e"},
         "forms": ["loves"]
+      },
+      {
+        "name": "happy",
+        "roles": {"theme": "e"},
+        "forms": ["happy"]
       }
     ],
     "entities": [
