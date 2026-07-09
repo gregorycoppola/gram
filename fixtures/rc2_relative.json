@@ -74,37 +74,37 @@
     {
       "name": "s_gap_agent",
       "pattern": "$V:{agent:e,patient:e} SUB:dp[$x:e]",
-      "template": "GAP_AGENT($V, $x)",
+      "sem": "s_gap_agent($V, agent, patient, $SUB)",
       "kind": "s\\agent"
     },
     {
       "name": "s_gap_patient",
       "pattern": "SUB:dp[$x:e] $V:{agent:e,patient:e}",
-      "template": "GAP_PATIENT($V, $x)",
+      "sem": "s_gap_patient($V, agent, patient, $SUB)",
       "kind": "s\\patient"
     },
     {
       "name": "s_gap_theme",
       "pattern": "COP $P:{theme:e}",
-      "template": "GAP_THEME($P)",
+      "sem": "s_gap_theme($P, theme)",
       "kind": "s\\theme"
     },
     {
       "name": "rel_dp_agent",
       "pattern": "THE $N:{theme:e} LIT:who SUB:s\\agent",
-      "template": "REL($N, $SUB1)",
+      "sem": "rel_dp_agent($N, theme, $SUB)",
       "kind": "dp"
     },
     {
       "name": "rel_dp_patient",
       "pattern": "THE $N:{theme:e} LIT:who SUB:s\\patient",
-      "template": "REL($N, $SUB1)",
+      "sem": "rel_dp_patient($N, theme, $SUB)",
       "kind": "dp"
     },
     {
       "name": "rel_dp_theme",
       "pattern": "THE $N:{theme:e} LIT:who SUB:s\\theme",
-      "template": "REL($N, $SUB1)",
+      "sem": "rel_dp_theme($N, theme, $SUB)",
       "kind": "dp"
     }
   ],

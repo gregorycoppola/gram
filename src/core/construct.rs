@@ -1094,7 +1094,7 @@ mod tests {
         let result3 = substitute_var_name(expr3, "y", "x");
         assert_eq!(
             format!("{}", result3),
-            "always [z:e]: man(theme: y) -> loves(agent: x, patient: sue)"
+            "always [z:e]: man(theme: x) -> loves(agent: x, patient: sue)"
         );
     }
 }
