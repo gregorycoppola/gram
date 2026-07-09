@@ -292,6 +292,57 @@ fn offset_constituents(constituents: &[Constituent], offset: usize) -> Vec<Const
     }).collect()
 }
 
+/// Build a SyntaxNode tree from a SpanResult.  `tokens` must be the exact slice
+/// the SpanResult was parsed on (local to the span).  `offset` is the global
+/// index of `tokens[0]` so that constituent spans (which are global) can be
+/// mapped back into the local slice.
+fn build_syntax_tree_for_result(
+    result: &SpanResult,
+    tokens: &[String],
+    offset: usize,
+) -> SyntaxNode {
+    let mut annotations: Vec<TokenAnnotation> = tokens.iter()
+        .map(|_| TokenAnnotation {
+            kind: TokenKind::Unmatched, canonical: None, typ: None, variable: None, keyword_class: None,
+        })
+        .collect();
+    for (i, ann) in result.token_annotations.iter().enumerate() {
+        if i < annotations.len() {
+            annotations[i] = ann.clone();
+        }
+    }
+
+    let constituent_trees: Vec<(usize, usize, SyntaxNode)> = result.constituents.iter()
+        .filter_map(|c| {
+            let (s, e) = c.span?;
+            let local_s = s.saturating_sub(offset);
+            let local_e = e.saturating_sub(offset);
+            if local_s >= tokens.len() {
+                return None;
+            }
+            let local_e = local_e.min(tokens.len());
+
+            let tree = c.syntax_tree.clone().unwrap_or_else(|| {
+                SyntaxNode {
+                    label: kind_to_syntax_label(&c.label).to_string(),
+                    children: tokens[local_s..local_e].iter().filter_map(|t| {
+                        let cleaned = clean_token(t);
+                        if is_punctuation(&cleaned) {
+                            None
+                        } else {
+                            Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned) })
+                        }
+                    }).collect(),
+                    terminal: None,
+                }
+            });
+            Some((local_s, local_e, tree))
+        })
+        .collect();
+
+    build_syntax_tree(tokens, &annotations, &constituent_trees, kind_to_syntax_label(&result.kind))
+}
+
 // --- Public API ---
 
 pub fn parse_hinted_sentence(
@@ -911,12 +962,17 @@ fn try_assembly(
                 }
 
                 let constituents: Vec<Constituent> = sorted_children.iter().zip(child_results.iter()).map(|(child_key, cached)| {
+                    let child_local_start = child_key.start - global_start;
+                    let child_local_end = child_key.end - global_start;
+                    let child_tokens = &span_tokens[child_local_start..child_local_end];
+                    let syntax_tree = Some(build_syntax_tree_for_result(cached, child_tokens, child_key.start));
                     Constituent {
                         label: child_key.label.clone(),
                         semantics: cached.output.clone(),
                         free_vars: Vec::new(),
                         span: Some((child_key.start, child_key.end)),
-                        syntax: None, syntax_tree: None,
+                        syntax: None,
+                        syntax_tree,
                         sem_value: Some(cached.sem_value.clone()),
                         children: cached.constituents.clone(),
                     }
@@ -1057,11 +1113,14 @@ fn try_assemble_top_level(
                 }
 
                 let constituents: Vec<Constituent> = top_keys.iter().zip(child_results.iter()).map(|(key, cached)| {
+                    let child_tokens = &all_tokens[key.start..key.end];
+                    let syntax_tree = Some(build_syntax_tree_for_result(cached, child_tokens, key.start));
                     Constituent {
                         label: key.label.clone(), semantics: cached.output.clone(),
                         free_vars: Vec::new(),
                         span: Some((key.start, key.end)),
-                        syntax: None, syntax_tree: None,
+                        syntax: None,
+                        syntax_tree,
                         sem_value: Some(cached.sem_value.clone()),
                         children: cached.constituents.clone(),
                     }
