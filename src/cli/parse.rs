@@ -37,6 +37,8 @@ struct ParsedSentence {
     sentence: String,
     tokens: Vec<String>,
     matches: Vec<Match>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
 }
 
 pub fn run_parse(args: ParseArgs) -> Result<()> {
@@ -79,27 +81,44 @@ pub fn run_parse_one(_args: ParseOneArgs) -> Result<()> {
     anyhow::bail!("parse-one requires hinted sentences (tokens + spans); use --fixture with a hinted JSON file instead")
 }
 
-fn parse_hinted(s: &crate::core::fixture::InputSentence, lexicon: &Lexicon, rules: &[crate::core::grammar::Rule]) -> Vec<ParsedSentence> {
+fn parse_hinted(s: &crate::core::fixture::InputSentence, lexicon: &Lexicon, rules: &[crate::core::grammar::Rule]) -> ParsedSentence {
     let display = s.tokens.join(" ");
-    let matches = parse_hinted_sentence(s, lexicon, rules);
-    vec![ParsedSentence {
-        sentence: display,
-        tokens: s.tokens.clone(),
-        matches,
-    }]
+    match parse_hinted_sentence(s, lexicon, rules) {
+        Ok(matches) => ParsedSentence {
+            sentence: display,
+            tokens: s.tokens.clone(),
+            matches,
+            error: None,
+        },
+        Err(e) => ParsedSentence {
+            sentence: display,
+            tokens: s.tokens.clone(),
+            matches: Vec::new(),
+            error: Some(e),
+        },
+    }
 }
 
-fn parse_hinted_debug(s: &crate::core::fixture::InputSentence, lexicon: &Lexicon, rules: &[crate::core::grammar::Rule]) -> Vec<ParsedSentence> {
+fn parse_hinted_debug(s: &crate::core::fixture::InputSentence, lexicon: &Lexicon, rules: &[crate::core::grammar::Rule]) -> ParsedSentence {
     let display = s.tokens.join(" ");
     let mut trace = DebugTrace::new();
-    let matches = parse_hinted_sentence_traced(s, lexicon, rules, &mut trace);
+    let result = parse_hinted_sentence_traced(s, lexicon, rules, &mut trace);
     trace.emit();
     eprintln!();
-    vec![ParsedSentence {
-        sentence: display,
-        tokens: s.tokens.clone(),
-        matches,
-    }]
+    match result {
+        Ok(matches) => ParsedSentence {
+            sentence: display,
+            tokens: s.tokens.clone(),
+            matches,
+            error: None,
+        },
+        Err(e) => ParsedSentence {
+            sentence: display,
+            tokens: s.tokens.clone(),
+            matches: Vec::new(),
+            error: Some(e),
+        },
+    }
 }
 
 fn emit_pretty(results: &[ParsedSentence]) {
@@ -107,9 +126,15 @@ fn emit_pretty(results: &[ParsedSentence]) {
     let mut parsed = 0;
     let mut ambiguous = 0;
     let mut failed = 0;
+    let mut errored = 0;
 
     for r in results {
-        if r.matches.is_empty() {
+        if let Some(ref e) = r.error {
+            errored += 1;
+            println!("  💥 \"{}\"", r.sentence);
+            println!("     {}", e);
+            println!();
+        } else if r.matches.is_empty() {
             failed += 1;
             println!("  ❌ \"{}\"", r.sentence);
             println!("     no matching rule\n");
@@ -143,8 +168,8 @@ fn emit_pretty(results: &[ParsedSentence]) {
         }
     }
 
-    println!("Parsed: {}/{}  Ambiguous: {}  Failed: {}",
-        parsed, results.len(), ambiguous, failed);
+    println!("Parsed: {}/{}  Ambiguous: {}  Failed: {}  Errored: {}",
+        parsed, results.len(), ambiguous, failed, errored);
 }
 
 fn emit_constituents(constituents: &[crate::core::matcher::Constituent], indent: usize) {

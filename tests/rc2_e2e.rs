@@ -18,7 +18,7 @@ fn the_man_is_happy() {
             gram::core::fixture::Span { label: "s".into(), start: 0, end: 4 },
         ],
     };
-    let matches = parse_hinted_sentence(&hinted, &lexicon, &rules);
+    let matches = parse_hinted_sentence(&hinted, &lexicon, &rules).unwrap();
 
     assert_eq!(matches.len(), 1, "expected exactly 1 match, got {}: {:?}", matches.len(), matches.iter().map(|m| &m.rule_name).collect::<Vec<_>>());
     let m = &matches[0];

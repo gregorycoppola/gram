@@ -1,3 +1,4 @@
+
 use serde::{Deserialize, Serialize};
 
 use crate::core::matcher::Match;
@@ -17,6 +18,7 @@ pub enum ParseStatus {
     Parsed,
     Ambiguous,
     Failed,
+    Error(String),
 }
 
 impl ParseStatus {

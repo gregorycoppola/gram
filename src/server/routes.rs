@@ -83,12 +83,22 @@ pub async fn parse_fixture(
                 continue;
             }
             SentenceInput::Hinted(s) => {
-                let matches = parse_hinted_sentence(s, &lexicon, &rules);
-                let status = ParseStatus::from_matches(&matches);
+                let status = match parse_hinted_sentence(s, &lexicon, &rules) {
+                    Ok(matches) => {
+                        results.push(ParseResult {
+                            sentence: s.tokens.join(" "),
+                            tokens: s.tokens.clone(),
+                            matches,
+                            status: ParseStatus::from_matches(&matches),
+                        });
+                        continue;
+                    }
+                    Err(e) => ParseStatus::Error(e),
+                };
                 results.push(ParseResult {
                     sentence: s.tokens.join(" "),
                     tokens: s.tokens.clone(),
-                    matches,
+                    matches: Vec::new(),
                     status,
                 });
             }
