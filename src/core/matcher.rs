@@ -6,7 +6,6 @@ use crate::core::fixture::{InputSentence, Span};
 use crate::core::grammar::{is_punctuation, matches_keyword, Rule, Slot};
 use crate::core::lexicon::{clean_token, Lexicon};
 use crate::core::sem_dsl::SemArg;
-use crate::core::semantics::parse_with_types;
 use crate::core::template::apply_template;
 use crate::core::value::{SemValue, VarGen};
 
@@ -294,10 +293,6 @@ fn offset_constituents(constituents: &[Constituent], offset: usize) -> Vec<Const
     }).collect()
 }
 
-fn offset_annotations(annotations: &[TokenAnnotation], _offset: usize) -> Vec<TokenAnnotation> {
-    annotations.to_vec()
-}
-
 // --- Public API ---
 
 pub fn parse_hinted_sentence(
@@ -335,10 +330,6 @@ fn parse_bottom_up(
     let mut indexed: Vec<(usize, &Span)> = sentence.spans.iter().enumerate().collect();
     indexed.sort_by_key(|(_, span)| (span.end - span.start, span.start));
 
-    let span_set: HashSet<SpanKey> = sentence.spans.iter()
-        .map(|s| SpanKey { start: s.start, end: s.end, label: s.label.clone() })
-        .collect();
-
     // 2. Determine parentage: a span's parent is the smallest span that contains it
     let mut parent_map: HashMap<SpanKey, Option<SpanKey>> = HashMap::new();
     for (i, span) in &sentence.spans {
@@ -370,7 +361,7 @@ fn parse_bottom_up(
     if let Some(t) = &mut trace {
         t.push(&format!("tokens: {:?}", sentence.tokens));
         t.push(&format!("{} spans (sorted bottom-up):", indexed.len()));
-        for (i, span) in &indexed {
+        for (_i, span) in &indexed {
             let parent_str = match parent_map.get(&SpanKey { start: span.start, end: span.end, label: span.label.clone() }) {
                 None => "NONE".to_string(),
                 Some(None) => "TOP".to_string(),
@@ -476,25 +467,6 @@ fn parse_bottom_up(
     }
 }
 
-fn find_direct_children(
-    span: &Span,
-    all_spans: &[Span],
-    parent_map: &HashMap<SpanKey, Option<SpanKey>>,
-) -> Vec<SpanKey> {
-    let key = SpanKey { start: span.start, end: span.end, label: span.label.clone() };
-    all_spans.iter()
-        .filter_map(|s| {
-            let child_key = SpanKey { start: s.start, end: s.end, label: s.label.clone() };
-            if child_key == key { return None; }
-            if s.start < span.start || s.end > span.end { return None; }
-            match parent_map.get(&child_key) {
-                Some(Some(parent)) if *parent == key => Some(child_key),
-                _ => None,
-            }
-        })
-        .collect()
-}
-
 fn match_span(
     span_tokens: &[String],
     global_start: usize,
@@ -567,9 +539,9 @@ fn try_pattern_match(
             let local_annotations = annotate_tokens(tokens, &log);
             let global_constituents = offset_constituents(&constituents, global_offset);
 
-            let (output, sem_value, _semantics_check) = if let Some(ref sem_spec) = rule.sem {
+            let (output, sem_value) = if let Some(ref sem_spec) = rule.sem {
                 match resolve_and_construct(sem_spec, &b, &constituents, var_gen) {
-                    Ok((sv, out)) => (out, Some(sv), None),
+                    Ok((sv, out)) => (out, Some(sv)),
                     Err(e) => {
                         if let Some(t) = &mut trace {
                             t.push(&format!("  ✗ sem construct failed: {}", e));
@@ -579,7 +551,7 @@ fn try_pattern_match(
                 }
             } else {
                 let out = apply_template(&rule.template, &b);
-                (out, None, None)
+                (out, None)
             };
 
             if let Some(t) = &mut trace {
@@ -616,7 +588,7 @@ fn match_pattern(
     pattern: &[Slot], pi: usize, tokens: &[String], ti: usize,
     bindings: BTreeMap<String, (String, String)>, log: Vec<Consumption>,
     lexicon: &Lexicon, rules: &[Rule], sub_count: usize,
-    mut constituents: Vec<Constituent>, kind_filter: &KindFilter,
+    constituents: Vec<Constituent>, kind_filter: &KindFilter,
     var_gen: &mut VarGen,
     cache: &HashMap<SpanKey, SpanResult>,
     global_offset: usize,
@@ -883,7 +855,7 @@ fn try_assembly(
         }
     }
     let mut gap_entries: Vec<(String, String, usize)> = Vec::new();
-    for (i, token) in span_tokens.iter().enumerate() {
+    for (i, _token) in span_tokens.iter().enumerate() {
         if !covered.contains(&i) {
             if let Some((canonical, _cat, _consumed)) = lexicon.lookup_at(span_tokens, i) {
                 let typ = lexicon.get_type(&canonical).unwrap_or_default();
@@ -899,7 +871,7 @@ fn try_assembly(
             t.push(&format!("  child[{}]: [{}] {}..{} → {}", i, child_key.label, child_key.start, child_key.end, cached.output));
         }
         for (canonical, typ, pos) in &gap_entries {
-            t.push(&format!("  gap[{}]: {} ({}) at local {}", gap_entries.iter().position(|g| g.2 == *pos).unwrap(), canonical, typ, pos));
+            t.push(&format!("  gap: {} ({}) at local {}", canonical, typ, pos));
         }
     }
 
@@ -1072,7 +1044,7 @@ fn try_assemble_top_level(
         }
     }
     let mut gap_entries: Vec<(String, String, usize)> = Vec::new();
-    for (i, token) in all_tokens.iter().enumerate() {
+    for (i, _token) in all_tokens.iter().enumerate() {
         if !covered.contains(&i) {
             if let Some((canonical, _cat, _consumed)) = lexicon.lookup_at(all_tokens, i) {
                 let typ = lexicon.get_type(&canonical).unwrap_or_default();
