@@ -1,4 +1,3 @@
-
 use axum::{
     extract::{Path, State},
     Json,
@@ -10,6 +9,7 @@ use crate::core::fixture::{Fixture, SentenceInput};
 use crate::core::grammar::compile_rules;
 use crate::core::lexicon::Lexicon;
 use crate::core::matcher::parse_hinted_sentence;
+use crate::core::tokenize::tokenize;
 
 use super::error::AppResult;
 use super::types::{FixtureSummary, ParseRequest, ParseResult, ParseStatus};
@@ -79,8 +79,14 @@ pub async fn parse_fixture(
     let mut results = Vec::new();
     for input in &fixture.sentences {
         match input {
-            SentenceInput::Plain(_) => {
-                continue;
+            SentenceInput::Plain(text) => {
+                let tokens = tokenize(text);
+                results.push(ParseResult {
+                    sentence: text.clone(),
+                    tokens,
+                    matches: Vec::new(),
+                    status: ParseStatus::Failed,
+                });
             }
             SentenceInput::Hinted(s) => {
                 let (matches, status) = match parse_hinted_sentence(s, &lexicon, &rules) {

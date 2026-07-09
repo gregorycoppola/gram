@@ -1,4 +1,3 @@
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::core::construct::{Arg, apply_constructor};
@@ -1098,9 +1097,23 @@ fn try_assemble_top_level(
                     .filter_map(|c| c.span.map(|(s, e)| (s, e, format!("[{}]", c.label))))
                     .collect();
                 let syntax = build_syntax(all_tokens, &constituent_spans, "S");
+
                 let constituent_trees: Vec<(usize, usize, SyntaxNode)> = constituents.iter()
                     .filter_map(|c| {
-                        c.span.zip(c.syntax_tree.clone()).map(|((s, _), t)| (s, c.span.unwrap().1, t))
+                        let (s, e) = c.span?;
+                        let tree = c.syntax_tree.clone().unwrap_or_else(|| {
+                            SyntaxNode {
+                                label: kind_to_syntax_label(&c.label).to_string(),
+                                children: all_tokens[s..e].iter().filter_map(|t| {
+                                    let cleaned = clean_token(t);
+                                    if is_punctuation(&cleaned) { None } else {
+                                        Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned) })
+                                    }
+                                }).collect(),
+                                terminal: None,
+                            }
+                        });
+                        Some((s, e, tree))
                     })
                     .collect();
                 let syntax_tree = build_syntax_tree(all_tokens, &annotations, &constituent_trees, "S");
@@ -1141,7 +1154,20 @@ fn span_result_to_match(result: &SpanResult, span: &Span, all_tokens: &[String])
 
     let constituent_trees: Vec<(usize, usize, SyntaxNode)> = result.constituents.iter()
         .filter_map(|c| {
-            c.span.zip(c.syntax_tree.clone()).map(|((s, _), t)| (s, c.span.unwrap().1, t))
+            let (s, e) = c.span?;
+            let tree = c.syntax_tree.clone().unwrap_or_else(|| {
+                SyntaxNode {
+                    label: kind_to_syntax_label(&c.label).to_string(),
+                    children: all_tokens[s..e].iter().filter_map(|t| {
+                        let cleaned = clean_token(t);
+                        if is_punctuation(&cleaned) { None } else {
+                            Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned) })
+                        }
+                    }).collect(),
+                    terminal: None,
+                }
+            });
+            Some((s, e, tree))
         })
         .collect();
     let syntax_tree = build_syntax_tree(all_tokens, &full_annotations, &constituent_trees, kind_to_syntax_label(&result.kind));
