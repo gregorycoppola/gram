@@ -854,11 +854,11 @@ fn match_pattern(
                         label: label.clone(),
                         semantics: cached.output.clone(),
                         free_vars: Vec::new(),
-                        span: Some((global_offset + sub_start, global_offset + end)),
+                        span: Some((sub_start, end)),
                         syntax: None,
                         syntax_tree,
                         sem_value: Some(cached.sem_value.clone()),
-                        children: cached.constituents.clone(),
+                        children: vec![],
                     };
                     let mut trial_constituents = constituents;
                     trial_constituents.push(constituent);
@@ -891,11 +891,11 @@ fn match_pattern(
                             label: label.clone(),
                             semantics: cached.output.clone(),
                             free_vars: Vec::new(),
-                            span: Some((global_offset + sub_start, global_offset + end)),
+                            span: Some((sub_start, end)),
                             syntax: None,
                             syntax_tree,
                             sem_value: Some(cached.sem_value.clone()),
-                            children: cached.constituents.clone(),
+                            children: vec![],
                         });
                         if let Some(result) = match_pattern(
                             pattern, pi + 1, tokens, end,
