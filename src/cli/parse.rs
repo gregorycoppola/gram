@@ -54,19 +54,19 @@ pub fn run_parse(args: ParseArgs) -> Result<()> {
                 continue;
             }
         }
-        let parsed = match sent {
+        match sent {
             SentenceInput::Plain(_) => {
                 continue;
             }
             SentenceInput::Hinted(s) => {
-                if args.debug {
+                let parsed = if args.debug {
                     parse_hinted_debug(s, &lexicon, &rules)
                 } else {
                     parse_hinted(s, &lexicon, &rules)
-                }
+                };
+                results.push(parsed);
             }
-        };
-        results.extend(parsed);
+        }
     }
 
     if args.json {

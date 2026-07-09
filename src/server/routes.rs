@@ -84,7 +84,10 @@ pub async fn parse_fixture(
             }
             SentenceInput::Hinted(s) => {
                 let (matches, status) = match parse_hinted_sentence(s, &lexicon, &rules) {
-                    Ok(m) => (m, ParseStatus::from_matches(&m)),
+                    Ok(m) => {
+                        let status = ParseStatus::from_matches(&m);
+                        (m, status)
+                    }
                     Err(e) => (Vec::new(), ParseStatus::Error(e)),
                 };
                 results.push(ParseResult {
