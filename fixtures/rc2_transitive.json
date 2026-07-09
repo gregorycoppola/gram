@@ -74,9 +74,27 @@
     }
   ],
   "sentences": [
-    "the man is happy",
-    "a man is happy",
-    "every man is happy",
+    {
+      "tokens": ["the", "man", "is", "happy"],
+      "spans": [
+        ["dp", 0, 2],
+        ["s", 0, 4]
+      ]
+    },
+    {
+      "tokens": ["a", "man", "is", "happy"],
+      "spans": [
+        ["dp", 0, 2],
+        ["s", 0, 4]
+      ]
+    },
+    {
+      "tokens": ["every", "man", "is", "happy"],
+      "spans": [
+        ["dp", 0, 2],
+        ["s", 0, 4]
+      ]
+    },
     {
       "tokens": ["the", "man", "loves", "the", "woman"],
       "spans": [
