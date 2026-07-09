@@ -16,6 +16,7 @@ fn the_man_is_happy() {
         tokens: vec!["the".into(), "man".into(), "is".into(), "happy".into()],
         spans: vec![
             gram::core::fixture::Span { label: "s".into(), start: 0, end: 4 },
+            gram::core::fixture::Span { label: "dp".into(), start: 0, end: 2 },
         ],
     };
     let matches = parse_hinted_sentence(&hinted, &lexicon, &rules).unwrap();
