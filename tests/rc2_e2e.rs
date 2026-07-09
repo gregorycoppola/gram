@@ -40,3 +40,12 @@ fn nested_all_parse() {
     }
     assert_eq!(results.len(), 5);
 }
+
+#[test]
+fn relative_all_parse() {
+    let results = parse_fixture("rc2_relative");
+    for (sentence, result) in &results {
+        assert!(result.is_ok(), "relative failed on \"{}\": {}", sentence, result.as_ref().unwrap_err());
+    }
+    assert_eq!(results.len(), 5);
+}

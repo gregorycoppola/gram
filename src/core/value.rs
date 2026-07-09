@@ -12,6 +12,16 @@ pub enum DpQuant {
     Bare,
 }
 
+/// A proposition with exactly one free variable and a designated gap role.
+/// Used for relative clause gaps like "loves sue" (agent gap).
+#[derive(Debug, Clone)]
+pub struct GapProp {
+    pub var: String,
+    pub var_type: String,
+    pub gap_role: String,
+    pub body: crate::core::logic::Expr,
+}
+
 /// Semantic value produced by a phrase during bottom-up parsing.
 #[derive(Debug, Clone)]
 pub enum SemValue {
@@ -23,6 +33,8 @@ pub enum SemValue {
         var_type: String,
         quant: DpQuant,
     },
+    /// A gapped proposition: a predicate with one free variable and a designated hole.
+    GapProp(GapProp),
 }
 
 impl std::fmt::Display for SemValue {
@@ -47,6 +59,9 @@ impl std::fmt::Display for SemValue {
                         write!(f, "{}:{}", var, var_type)
                     }
                 }
+            }
+            SemValue::GapProp(g) => {
+                write!(f, "_[{}] {}", g.gap_role, g.body)
             }
         }
     }
@@ -78,5 +93,11 @@ impl VarGen {
 impl Default for VarGen {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl std::fmt::Display for GapProp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "_[{}] {}", self.gap_role, self.body)
     }
 }
