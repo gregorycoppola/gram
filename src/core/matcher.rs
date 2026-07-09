@@ -94,6 +94,8 @@ pub struct SyntaxNode {
     pub children: Vec<SyntaxNode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub terminal: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub semantics: Option<String>,
 }
 
 impl std::fmt::Display for SyntaxNode {
@@ -240,26 +242,26 @@ fn build_syntax_tree(
         let node = match ann.kind {
             TokenKind::Keyword => {
                 let label = ann.keyword_class.as_deref().unwrap_or("KW");
-                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned) }
+                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
             }
             TokenKind::Entity => {
                 let label = ann.canonical.as_deref().unwrap_or(&cleaned);
-                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned) }
+                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
             }
             TokenKind::Predicate => {
                 let label = ann.canonical.as_deref().unwrap_or(&cleaned);
-                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned) }
+                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
             }
             TokenKind::Literal => {
-                SyntaxNode { label: "LIT".to_string(), children: vec![], terminal: Some(cleaned) }
+                SyntaxNode { label: "LIT".to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
             }
             _ => {
-                SyntaxNode { label: "UNK".to_string(), children: vec![], terminal: Some(cleaned) }
+                SyntaxNode { label: "UNK".to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
             }
         };
         children.push(node);
     }
-    SyntaxNode { label: top_label.to_string(), children, terminal: None }
+    SyntaxNode { label: top_label.to_string(), children, terminal: None, semantics: None }
 }
 
 fn sub_filter_for_label(label: &str) -> KindFilter {
@@ -330,17 +332,20 @@ fn build_syntax_tree_for_result(
                         if is_punctuation(&cleaned) {
                             None
                         } else {
-                            Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned) })
+                            Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned), semantics: None })
                         }
                     }).collect(),
                     terminal: None,
+                    semantics: None,
                 }
             });
             Some((local_s, local_e, tree))
         })
         .collect();
 
-    build_syntax_tree(tokens, &annotations, &constituent_trees, kind_to_syntax_label(&result.kind))
+    let mut tree = build_syntax_tree(tokens, &annotations, &constituent_trees, kind_to_syntax_label(&result.kind));
+    tree.semantics = Some(result.output.clone());
+    tree
 }
 
 // --- Public API ---
@@ -1166,16 +1171,18 @@ fn try_assemble_top_level(
                                 children: all_tokens[s..e].iter().filter_map(|t| {
                                     let cleaned = clean_token(t);
                                     if is_punctuation(&cleaned) { None } else {
-                                        Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned) })
+                                        Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned), semantics: None })
                                     }
                                 }).collect(),
                                 terminal: None,
+                                semantics: None,
                             }
                         });
                         Some((s, e, tree))
                     })
                     .collect();
-                let syntax_tree = build_syntax_tree(all_tokens, &annotations, &constituent_trees, "S");
+                let mut syntax_tree = build_syntax_tree(all_tokens, &annotations, &constituent_trees, "S");
+                syntax_tree.semantics = Some(output.clone());
 
                 return Some(Match {
                     rule_name: rule.name.clone(), kind: rule.kind.clone(), output,
@@ -1220,16 +1227,18 @@ fn span_result_to_match(result: &SpanResult, span: &Span, all_tokens: &[String])
                     children: all_tokens[s..e].iter().filter_map(|t| {
                         let cleaned = clean_token(t);
                         if is_punctuation(&cleaned) { None } else {
-                            Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned) })
+                            Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned), semantics: None })
                         }
                     }).collect(),
                     terminal: None,
+                    semantics: None,
                 }
             });
             Some((s, e, tree))
         })
         .collect();
-    let syntax_tree = build_syntax_tree(all_tokens, &full_annotations, &constituent_trees, kind_to_syntax_label(&result.kind));
+    let mut syntax_tree = build_syntax_tree(all_tokens, &full_annotations, &constituent_trees, kind_to_syntax_label(&result.kind));
+    syntax_tree.semantics = Some(result.output.clone());
 
     Match {
         rule_name: result.rule_name.clone(), kind: result.kind.clone(), output: result.output.clone(),
