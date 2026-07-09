@@ -48,7 +48,7 @@ pub async fn list_fixtures(
                     sentences: fixture.sentences.len(),
                 });
             }
-            Err(_) => continue;
+            Err(_) => continue,
         }
     }
 
