@@ -6,8 +6,7 @@ use std::path::PathBuf;
 use crate::core::fixture::{Fixture, SentenceInput};
 use crate::core::grammar::compile_rules;
 use crate::core::lexicon::Lexicon;
-use crate::core::matcher::parse_sentence;
-use crate::core::tokenize::{split_sentences, tokenize};
+use crate::core::matcher::parse_hinted_sentence;
 
 #[derive(Args)]
 pub struct TreeArgs {
@@ -23,31 +22,23 @@ pub fn run_tree(args: TreeArgs) -> Result<()> {
 
     for input in &fixture.sentences {
         match input {
-            SentenceInput::Plain(raw) => {
-                for sent in split_sentences(raw) {
-                    let tokens = tokenize(&sent);
-                    let matches = parse_sentence(&tokens, &lexicon, &rules);
-
-                    if matches.is_empty() {
-                        println!("❌ \"{}\"", sent);
-                        println!("   no matching rule\n");
-                        continue;
-                    }
-
-                    for m in &matches {
-                        println!("\"{}\"", sent);
-                        if let Some(ref tree) = m.syntax_tree {
-                            println!("{}", tree);
-                        }
-                        println!("→ {}  [{}]\n", m.output, m.rule_name);
-                    }
-                }
+            SentenceInput::Plain(_) => {
+                continue;
             }
             SentenceInput::Hinted(s) => {
                 let tokens = &s.tokens;
                 println!("\"{}\" (hinted)", tokens.join(" "));
-                // hinted sentences don't go through parse_sentence yet in tree view
-                println!("   (hinted parse — use `gram parse` to see results)\n");
+                let matches = parse_hinted_sentence(s, &lexicon, &rules);
+                if matches.is_empty() {
+                    println!("   no matching rule\n");
+                    continue;
+                }
+                for m in &matches {
+                    if let Some(ref tree) = m.syntax_tree {
+                        println!("{}", tree);
+                    }
+                    println!("→ {}  [{}]\n", m.output, m.rule_name);
+                }
             }
         }
     }

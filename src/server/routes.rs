@@ -9,8 +9,7 @@ use std::path::PathBuf;
 use crate::core::fixture::{Fixture, SentenceInput};
 use crate::core::grammar::compile_rules;
 use crate::core::lexicon::Lexicon;
-use crate::core::matcher::parse_sentence;
-use crate::core::tokenize::{split_sentences, tokenize};
+use crate::core::matcher::parse_hinted_sentence;
 
 use super::error::AppResult;
 use super::types::{FixtureSummary, ParseRequest, ParseResult, ParseStatus};
@@ -49,7 +48,7 @@ pub async fn list_fixtures(
                     sentences: fixture.sentences.len(),
                 });
             }
-            Err(_) => continue,
+            Err(_) => continue;
         }
     }
 
@@ -79,43 +78,31 @@ pub async fn parse_fixture(
 
     let mut results = Vec::new();
     for input in &fixture.sentences {
-        let plain_matches: Vec<_> = match input {
-            SentenceInput::Plain(s) => {
-                split_sentences(s).into_iter().map(|sent| {
-                    let tokens = tokenize(&sent);
-                    let matches = parse_sentence(&tokens, &lexicon, &rules);
-                    (sent, tokens, matches)
-                }).collect()
+        match input {
+            SentenceInput::Plain(_) => {
+                continue;
             }
             SentenceInput::Hinted(s) => {
-                vec![(s.tokens.join(" "), s.tokens.clone(), Vec::new())]
+                let matches = parse_hinted_sentence(s, &lexicon, &rules);
+                let status = ParseStatus::from_matches(&matches);
+                results.push(ParseResult {
+                    sentence: s.tokens.join(" "),
+                    tokens: s.tokens.clone(),
+                    matches,
+                    status,
+                });
             }
-        };
-        for (sent, tokens, matches) in plain_matches {
-            let status = ParseStatus::from_matches(&matches);
-            results.push(ParseResult { sentence: sent, tokens, matches, status });
         }
     }
     Ok(Json(results))
 }
 
 pub async fn parse_one(
-    State(state): State<AppState>,
-    Json(req): Json<ParseRequest>,
+    _state: State<AppState>,
+    _req: Json<ParseRequest>,
 ) -> AppResult<Json<Vec<ParseResult>>> {
-    let path = fixture_path(state.fixtures_dir.as_ref(), &req.fixture);
-    let fixture = Fixture::from_path(&path)?;
-    let lexicon = Lexicon::from_fixture(&fixture);
-    let rules = compile_rules(&fixture.grammar)?;
-
-    let mut results = Vec::new();
-    for sent in split_sentences(&req.sentence) {
-        let tokens = tokenize(&sent);
-        let matches = parse_sentence(&tokens, &lexicon, &rules);
-        let status = ParseStatus::from_matches(&matches);
-        results.push(ParseResult { sentence: sent, tokens, matches, status });
-    }
-    Ok(Json(results))
+    use super::error::AppError;
+    Err(AppError::from(anyhow::anyhow!("parse-one requires hinted sentences (tokens + spans); POST a JSON body with tokens and spans fields")))
 }
 
 fn fixture_path(dir: &PathBuf, name: &str) -> PathBuf {
