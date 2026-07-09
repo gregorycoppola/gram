@@ -95,3 +95,9 @@ impl Default for VarGen {
         Self::new()
     }
 }
+
+impl std::fmt::Display for GapProp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "_[{}] {}", self.gap_role, self.body)
+    }
+}
