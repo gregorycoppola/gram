@@ -1,4 +1,3 @@
-
 /// The quantifier component of a DP.
 #[derive(Debug, Clone)]
 pub enum DpQuant {
@@ -22,6 +21,14 @@ pub enum SemValue {
         var: String,
         var_type: String,
         quant: DpQuant,
+    },
+    /// A proposition with exactly one free variable (a gap).
+    /// Used for relative clauses like "who loves sue" where the agent role is missing.
+    GapProp {
+        var: String,
+        var_type: String,
+        gap_role: String,
+        body: crate::core::logic::Expr,
     },
 }
 
@@ -47,6 +54,10 @@ impl std::fmt::Display for SemValue {
                         write!(f, "{}:{}", var, var_type)
                     }
                 }
+            }
+            SemValue::GapProp { var, var_type, gap_role, body } => {
+                write!(f, "_[{}] ", gap_role)?;
+                write!(f, "{}", body)
             }
         }
     }
