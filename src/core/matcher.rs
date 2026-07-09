@@ -252,24 +252,7 @@ fn sub_filter_for_label(label: &str) -> KindFilter {
     }
 }
 
-// --- Public API (no trace) ---
-
-pub fn parse_sentence(tokens: &[String], lexicon: &Lexicon, rules: &[Rule]) -> Vec<Match> {
-    let mut var_gen = VarGen::new();
-    parse_sentence_inner(tokens, lexicon, rules, &KindFilter::Any, &mut var_gen, None)
-}
-
-pub fn parse_sentence_with_vars(
-    tokens: &[String], lexicon: &Lexicon, rules: &[Rule], available_vars: &[(String, String)],
-) -> Vec<Match> {
-    let mut var_gen = VarGen::new();
-    let effective_lexicon = if available_vars.is_empty() {
-        return parse_sentence_inner(tokens, lexicon, rules, &KindFilter::Any, &mut var_gen, None);
-    } else {
-        lexicon.with_pronoun_bindings(available_vars)
-    };
-    parse_sentence_inner(tokens, &effective_lexicon, rules, &KindFilter::Any, &mut var_gen, None)
-}
+// --- Public API (hinted only) ---
 
 pub fn parse_hinted_sentence(
     sentence: &InputSentence,
@@ -277,15 +260,6 @@ pub fn parse_hinted_sentence(
     rules: &[Rule],
 ) -> Vec<Match> {
     parse_hinted_inner(sentence, lexicon, rules, None)
-}
-
-// --- Traced API ---
-
-pub fn parse_sentence_traced(
-    tokens: &[String], lexicon: &Lexicon, rules: &[Rule], trace: &mut DebugTrace,
-) -> Vec<Match> {
-    let mut var_gen = VarGen::new();
-    parse_sentence_inner(tokens, lexicon, rules, &KindFilter::Any, &mut var_gen, Some(trace))
 }
 
 pub fn parse_hinted_sentence_traced(
@@ -702,7 +676,7 @@ fn build_annotations_from_hints(
     out
 }
 
-// --- Inner parsing ---
+// --- Inner parsing (used as subroutine by hinted path) ---
 
 fn parse_sentence_inner(
     tokens: &[String], lexicon: &Lexicon, rules: &[Rule], kind_filter: &KindFilter,
