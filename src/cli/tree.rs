@@ -28,16 +28,22 @@ pub fn run_tree(args: TreeArgs) -> Result<()> {
             SentenceInput::Hinted(s) => {
                 let tokens = &s.tokens;
                 println!("\"{}\" (hinted)", tokens.join(" "));
-                let matches = parse_hinted_sentence(s, &lexicon, &rules);
-                if matches.is_empty() {
-                    println!("   no matching rule\n");
-                    continue;
-                }
-                for m in &matches {
-                    if let Some(ref tree) = m.syntax_tree {
-                        println!("{}", tree);
+                match parse_hinted_sentence(s, &lexicon, &rules) {
+                    Ok(matches) => {
+                        if matches.is_empty() {
+                            println!("   no matching rule\n");
+                            continue;
+                        }
+                        for m in &matches {
+                            if let Some(ref tree) = m.syntax_tree {
+                                println!("{}", tree);
+                            }
+                            println!("→ {}  [{}]\n", m.output, m.rule_name);
+                        }
                     }
-                    println!("→ {}  [{}]\n", m.output, m.rule_name);
+                    Err(e) => {
+                        println!("   error: {}\n", e);
+                    }
                 }
             }
         }
