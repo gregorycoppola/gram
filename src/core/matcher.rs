@@ -94,6 +94,8 @@ pub struct SyntaxNode {
     pub children: Vec<SyntaxNode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub terminal: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub semantics: Option<String>,
 }
 
 impl std::fmt::Display for SyntaxNode {
@@ -179,10 +181,14 @@ struct SpanResult {
 
 // --- Helper functions ---
 
-fn kind_to_syntax_label(kind: &str) -> &'static str {
+fn kind_to_syntax_label(kind: &str) -> String {
     match kind {
-        "dp" => "DP",
-        _ => "S",
+        "dp" => "DP".to_string(),
+        "s" => "S".to_string(),
+        "s\\agent" => "S\\agent".to_string(),
+        "s\\patient" => "S\\patient".to_string(),
+        "s\\theme" => "S\\theme".to_string(),
+        _ => kind.to_uppercase(),
     }
 }
 
@@ -240,26 +246,29 @@ fn build_syntax_tree(
         let node = match ann.kind {
             TokenKind::Keyword => {
                 let label = ann.keyword_class.as_deref().unwrap_or("KW");
-                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned) }
+                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
             }
             TokenKind::Entity => {
                 let label = ann.canonical.as_deref().unwrap_or(&cleaned);
-                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned) }
+                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
             }
             TokenKind::Predicate => {
                 let label = ann.canonical.as_deref().unwrap_or(&cleaned);
-                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned) }
+                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
             }
             TokenKind::Literal => {
-                SyntaxNode { label: "LIT".to_string(), children: vec![], terminal: Some(cleaned) }
+                SyntaxNode { label: "LIT".to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
+            }
+            TokenKind::SubClause => {
+                SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned), semantics: None }
             }
             _ => {
-                SyntaxNode { label: "UNK".to_string(), children: vec![], terminal: Some(cleaned) }
+                SyntaxNode { label: "UNK".to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
             }
         };
         children.push(node);
     }
-    SyntaxNode { label: top_label.to_string(), children, terminal: None }
+    SyntaxNode { label: top_label.to_string(), children, terminal: None, semantics: None }
 }
 
 fn sub_filter_for_label(label: &str) -> KindFilter {
@@ -290,6 +299,75 @@ fn offset_constituents(constituents: &[Constituent], offset: usize) -> Vec<Const
         c.children = offset_constituents(&c.children, offset);
         c
     }).collect()
+}
+
+/// Build a SyntaxNode tree from a Constituent's children when syntax_tree is absent.
+/// Recursively walks nested children to produce proper SVG subtrees.
+fn build_syntax_tree_from_constituent(
+    c: &Constituent,
+    all_tokens: &[String],
+    global_offset: usize,
+) -> SyntaxNode {
+    let (s, e) = match c.span {
+        Some((s, e)) => (s, e),
+        None => {
+            return SyntaxNode {
+                label: kind_to_syntax_label(&c.label),
+                children: vec![],
+                terminal: None,
+                semantics: Some(c.semantics.clone()),
+            };
+        }
+    };
+    let local_s = s.saturating_sub(global_offset);
+    let local_e = e.saturating_sub(global_offset);
+    if local_s >= all_tokens.len() {
+        return SyntaxNode {
+            label: kind_to_syntax_label(&c.label),
+            children: vec![],
+            terminal: None,
+            semantics: Some(c.semantics.clone()),
+        };
+    }
+    let local_e = local_e.min(all_tokens.len());
+
+    let mut children = Vec::new();
+    let mut ci = 0;
+    let mut skip_until = local_s;
+    for i in local_s..local_e {
+        if i < skip_until {
+            continue;
+        }
+        let cleaned = clean_token(&all_tokens[i]);
+        if is_punctuation(&cleaned) {
+            continue;
+        }
+        if ci < c.children.len() {
+            let child = &c.children[ci];
+            if let Some((child_s, _)) = child.span {
+                if child_s == i + global_offset {
+                    children.push(build_syntax_tree_from_constituent(child, all_tokens, global_offset));
+                    if let Some((_, child_e)) = child.span {
+                        skip_until = child_e.saturating_sub(global_offset);
+                    }
+                    ci += 1;
+                    continue;
+                }
+            }
+        }
+        children.push(SyntaxNode {
+            label: cleaned.clone(),
+            children: vec![],
+            terminal: Some(cleaned),
+            semantics: None,
+        });
+    }
+    SyntaxNode {
+        label: kind_to_syntax_label(&c.label),
+        children,
+        terminal: None,
+        semantics: Some(c.semantics.clone()),
+    }
 }
 
 /// Build a SyntaxNode tree from a SpanResult.  `tokens` must be the exact slice
@@ -323,24 +401,31 @@ fn build_syntax_tree_for_result(
             let local_e = local_e.min(tokens.len());
 
             let tree = c.syntax_tree.clone().unwrap_or_else(|| {
-                SyntaxNode {
-                    label: kind_to_syntax_label(&c.label).to_string(),
-                    children: tokens[local_s..local_e].iter().filter_map(|t| {
-                        let cleaned = clean_token(t);
-                        if is_punctuation(&cleaned) {
-                            None
-                        } else {
-                            Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned) })
-                        }
-                    }).collect(),
-                    terminal: None,
+                if c.children.is_empty() {
+                    SyntaxNode {
+                        label: kind_to_syntax_label(&c.label),
+                        children: tokens[local_s..local_e].iter().filter_map(|t| {
+                            let cleaned = clean_token(t);
+                            if is_punctuation(&cleaned) {
+                                None
+                            } else {
+                                Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned), semantics: None })
+                            }
+                        }).collect(),
+                        terminal: None,
+                        semantics: None,
+                    }
+                } else {
+                    build_syntax_tree_from_constituent(c, tokens, offset)
                 }
             });
             Some((local_s, local_e, tree))
         })
         .collect();
 
-    build_syntax_tree(tokens, &annotations, &constituent_trees, kind_to_syntax_label(&result.kind))
+    let mut tree = build_syntax_tree(tokens, &annotations, &constituent_trees, &kind_to_syntax_label(&result.kind));
+    tree.semantics = Some(result.output.clone());
+    tree
 }
 
 // --- Public API ---
@@ -763,12 +848,15 @@ fn match_pattern(
                     new_log.push(Consumption::SubClause { start: sub_start, end });
                     let sub_key = if sub_count == 0 { "SUB".into() } else { format!("SUB{}", sub_count + 1) };
                     new_bindings.insert(sub_key, (cached.output.clone(), label.clone()));
+                    let sub_tokens_slice = &tokens[sub_start..end];
+                    let syntax_tree = Some(build_syntax_tree_for_result(cached, sub_tokens_slice, global_offset + sub_start));
                     let constituent = Constituent {
                         label: label.clone(),
                         semantics: cached.output.clone(),
                         free_vars: Vec::new(),
                         span: Some((global_offset + sub_start, global_offset + end)),
-                        syntax: None, syntax_tree: None,
+                        syntax: None,
+                        syntax_tree,
                         sem_value: Some(cached.sem_value.clone()),
                         children: cached.constituents.clone(),
                     };
@@ -797,12 +885,15 @@ fn match_pattern(
                         new_log.push(Consumption::SubClause { start: sub_start, end });
                         let sub_key = if sub_count == 0 { "SUB".into() } else { format!("SUB{}", sub_count + 1) };
                         new_bindings.insert(sub_key, (cached.output.clone(), label.clone()));
+                        let sub_tokens_slice = &tokens[sub_start..end];
+                        let syntax_tree = Some(build_syntax_tree_for_result(cached, sub_tokens_slice, global_offset + sub_start));
                         trial_constituents.push(Constituent {
                             label: label.clone(),
                             semantics: cached.output.clone(),
                             free_vars: Vec::new(),
                             span: Some((global_offset + sub_start, global_offset + end)),
-                            syntax: None, syntax_tree: None,
+                            syntax: None,
+                            syntax_tree,
                             sem_value: Some(cached.sem_value.clone()),
                             children: cached.constituents.clone(),
                         });
@@ -1161,21 +1252,27 @@ fn try_assemble_top_level(
                     .filter_map(|c| {
                         let (s, e) = c.span?;
                         let tree = c.syntax_tree.clone().unwrap_or_else(|| {
-                            SyntaxNode {
-                                label: kind_to_syntax_label(&c.label).to_string(),
-                                children: all_tokens[s..e].iter().filter_map(|t| {
-                                    let cleaned = clean_token(t);
-                                    if is_punctuation(&cleaned) { None } else {
-                                        Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned) })
-                                    }
-                                }).collect(),
-                                terminal: None,
+                            if c.children.is_empty() {
+                                SyntaxNode {
+                                    label: kind_to_syntax_label(&c.label),
+                                    children: all_tokens[s..e].iter().filter_map(|t| {
+                                        let cleaned = clean_token(t);
+                                        if is_punctuation(&cleaned) { None } else {
+                                            Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned), semantics: None })
+                                        }
+                                    }).collect(),
+                                    terminal: None,
+                                    semantics: None,
+                                }
+                            } else {
+                                build_syntax_tree_from_constituent(c, all_tokens, 0)
                             }
                         });
                         Some((s, e, tree))
                     })
                     .collect();
-                let syntax_tree = build_syntax_tree(all_tokens, &annotations, &constituent_trees, "S");
+                let mut syntax_tree = build_syntax_tree(all_tokens, &annotations, &constituent_trees, "S");
+                syntax_tree.semantics = Some(output.clone());
 
                 return Some(Match {
                     rule_name: rule.name.clone(), kind: rule.kind.clone(), output,
@@ -1209,27 +1306,33 @@ fn span_result_to_match(result: &SpanResult, span: &Span, all_tokens: &[String])
     let constituent_spans: Vec<(usize, usize, String)> = result.constituents.iter()
         .filter_map(|c| c.span.map(|(s, e)| (s, e, format!("[{}]", c.label))))
         .collect();
-    let syntax = build_syntax(all_tokens, &constituent_spans, kind_to_syntax_label(&result.kind));
+    let syntax = build_syntax(all_tokens, &constituent_spans, &kind_to_syntax_label(&result.kind));
 
     let constituent_trees: Vec<(usize, usize, SyntaxNode)> = result.constituents.iter()
         .filter_map(|c| {
             let (s, e) = c.span?;
             let tree = c.syntax_tree.clone().unwrap_or_else(|| {
-                SyntaxNode {
-                    label: kind_to_syntax_label(&c.label).to_string(),
-                    children: all_tokens[s..e].iter().filter_map(|t| {
-                        let cleaned = clean_token(t);
-                        if is_punctuation(&cleaned) { None } else {
-                            Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned) })
-                        }
-                    }).collect(),
-                    terminal: None,
+                if c.children.is_empty() {
+                    SyntaxNode {
+                        label: kind_to_syntax_label(&c.label),
+                        children: all_tokens[s..e].iter().filter_map(|t| {
+                            let cleaned = clean_token(t);
+                            if is_punctuation(&cleaned) { None } else {
+                                Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned), semantics: None })
+                            }
+                        }).collect(),
+                        terminal: None,
+                        semantics: None,
+                    }
+                } else {
+                    build_syntax_tree_from_constituent(c, all_tokens, 0)
                 }
             });
             Some((s, e, tree))
         })
         .collect();
-    let syntax_tree = build_syntax_tree(all_tokens, &full_annotations, &constituent_trees, kind_to_syntax_label(&result.kind));
+    let mut syntax_tree = build_syntax_tree(all_tokens, &full_annotations, &constituent_trees, &kind_to_syntax_label(&result.kind));
+    syntax_tree.semantics = Some(result.output.clone());
 
     Match {
         rule_name: result.rule_name.clone(), kind: result.kind.clone(), output: result.output.clone(),
