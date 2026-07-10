@@ -1,4 +1,3 @@
-
 use std::path::Path;
 
 use gram::core::fixture::{Fixture, SentenceInput};
@@ -29,7 +28,7 @@ fn transitive_all_parse() {
     for (sentence, result) in &results {
         assert!(result.is_ok(), "transitive failed on \"{}\": {}", sentence, result.as_ref().unwrap_err());
     }
-    assert_eq!(results.len(), 6);
+    assert_eq!(results.len(), 9);
 }
 
 #[test]

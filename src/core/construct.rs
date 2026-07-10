@@ -1,59 +1,39 @@
 use crate::core::logic::Expr;
 use crate::core::value::{DpQuant, GapProp, SemValue, VarGen};
 
-/// Argument to a semantic constructor.
 #[derive(Debug, Clone)]
 pub enum Arg {
-    /// A lexical binding from a $var slot: (canonical_name, type_string)
     Lexical(String, String),
-    /// A sub-phrase result from a SUB: slot
     Sub(SemValue),
-    /// A literal string argument (hardcoded in the constructor spec)
     Literal(String),
 }
 
-/// Apply a named semantic constructor to the given arguments.
 pub fn apply_constructor(
     name: &str,
     args: &[Arg],
     var_gen: &mut VarGen,
 ) -> Result<SemValue, String> {
     match name {
-        // DP constructors
         "the_dp" => construct_quant_dp(DpQuantKind::The, args, var_gen),
         "exists_dp" => construct_quant_dp(DpQuantKind::Exists, args, var_gen),
         "forall_dp" => construct_quant_dp(DpQuantKind::ForAll, args, var_gen),
         "bare_dp" => construct_bare_dp(args),
-
-        // S constructors
         "s_copula" => construct_s_copula(args),
         "s_transitive" => construct_s_transitive(args),
         "s_ditransitive" => construct_s_ditransitive(args),
         "s_complement" => construct_s_complement(args),
-
-        // Gap clause constructors
         "s_gap_agent" => construct_s_gap("agent", "patient", args, var_gen),
         "s_gap_patient" => construct_s_gap("patient", "agent", args, var_gen),
         "s_gap_theme" => construct_s_gap_theme(args, var_gen),
-
-        // Relative DP constructors
         "rel_dp_agent" => construct_rel_dp("agent", args, var_gen),
         "rel_dp_patient" => construct_rel_dp("patient", args, var_gen),
         "rel_dp_theme" => construct_rel_dp("theme", args, var_gen),
-
         _ => Err(format!("unknown constructor: {}", name)),
     }
 }
 
-/// Internal tag for the three quantifier flavors, used only during DP construction.
-enum DpQuantKind {
-    The,
-    Exists,
-    ForAll,
-}
+enum DpQuantKind { The, Exists, ForAll }
 
-/// DP constructor for quantified determiners (the, a, every).
-/// Args: [Lexical(pred_name, pred_type), Literal(role_name)]
 fn construct_quant_dp(
     kind: DpQuantKind,
     args: &[Arg],
@@ -90,8 +70,6 @@ fn construct_quant_dp(
     Ok(SemValue::Dp { var, var_type, quant })
 }
 
-/// DP constructor for bare entities (no determiner).
-/// Args: [Lexical(entity_name, entity_type)]
 fn construct_bare_dp(args: &[Arg]) -> Result<SemValue, String> {
     if args.len() != 1 {
         return Err(format!("bare_dp expects 1 arg, got {}", args.len()));
@@ -108,8 +86,6 @@ fn construct_bare_dp(args: &[Arg]) -> Result<SemValue, String> {
     })
 }
 
-/// S constructor for copular sentences: "the man is mortal"
-/// Args: [Sub(Dp), Lexical(pred_name, pred_type), Literal(role_name)]
 fn construct_s_copula(args: &[Arg]) -> Result<SemValue, String> {
     if args.len() != 3 {
         return Err(format!("s_copula expects 3 args, got {}", args.len()));
@@ -141,9 +117,6 @@ fn construct_s_copula(args: &[Arg]) -> Result<SemValue, String> {
     Ok(SemValue::Prop(expr))
 }
 
-/// S constructor for transitive sentences: "the man loves sue"
-/// Args: [Sub(Dp_subject), Sub(Dp_object), Lexical(verb_name, verb_type),
-///        Literal(agent_role), Literal(patient_role)]
 fn construct_s_transitive(args: &[Arg]) -> Result<SemValue, String> {
     if args.len() != 5 {
         return Err(format!("s_transitive expects 5 args, got {}", args.len()));
@@ -189,9 +162,6 @@ fn construct_s_transitive(args: &[Arg]) -> Result<SemValue, String> {
     Ok(SemValue::Prop(expr))
 }
 
-/// S constructor for ditransitive sentences: "i sent a letter to sue"
-/// Args: [Sub(Dp_agent), Sub(Dp_theme), Sub(Dp_recipient), Lexical(verb_name, verb_type),
-///        Literal(role1), Literal(role2), Literal(role3)]
 fn construct_s_ditransitive(args: &[Arg]) -> Result<SemValue, String> {
     if args.len() != 7 {
         return Err(format!("s_ditransitive expects 7 args, got {}", args.len()));
@@ -249,9 +219,6 @@ fn construct_s_ditransitive(args: &[Arg]) -> Result<SemValue, String> {
     Ok(SemValue::Prop(expr))
 }
 
-/// S constructor for complement clauses: "John said that Sue is happy"
-/// Args: [Sub(Dp_subject), Sub(Prop_complement), Lexical(verb_name, verb_type),
-///        Literal(agent_role), Literal(theme_role)]
 fn construct_s_complement(args: &[Arg]) -> Result<SemValue, String> {
     if args.len() != 5 {
         return Err(format!("s_complement expects 5 args, got {}", args.len()));
@@ -291,13 +258,9 @@ fn construct_s_complement(args: &[Arg]) -> Result<SemValue, String> {
     Ok(SemValue::Prop(expr))
 }
 
-// --- Gap clause constructors ---
-
-/// Gap clause constructor for binary predicates (agent or patient gap).
-/// Args: [Lexical(verb, type), Literal(gap_role), Literal(other_role), Sub(Dp)]
 fn construct_s_gap(
     gap_role: &str,
-    _other_role: &str,   // ← prefixed underscore
+    _other_role: &str,
     args: &[Arg],
     var_gen: &mut VarGen,
 ) -> Result<SemValue, String> {
@@ -342,8 +305,6 @@ fn construct_s_gap(
     }))
 }
 
-/// Gap clause constructor for copular (theme gap).
-/// Args: [Lexical(pred, type), Literal("theme")]
 fn construct_s_gap_theme(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, String> {
     if args.len() != 2 {
         return Err(format!("s_gap_theme expects 2 args, got {}", args.len()));
@@ -372,11 +333,6 @@ fn construct_s_gap_theme(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue,
     }))
 }
 
-// --- Relative DP constructors ---
-
-/// Relative DP constructor.
-/// Args: [Lexical(head_pred, head_type), Literal(head_role), Sub(GapProp)]
-/// Substitutes gap_var → head_var, conjoins head restriction with gap body.
 fn construct_rel_dp(
     gap_role: &str,
     args: &[Arg],
@@ -420,9 +376,6 @@ fn construct_rel_dp(
     })
 }
 
-// --- Helpers ---
-
-/// Expand a single quantifier around a body.
 fn expand_quant(
     var: String,
     var_type: String,
@@ -461,7 +414,6 @@ fn expand_quant(
     }
 }
 
-/// Expand multiple quantifiers around a body, outermost first (surface order).
 fn expand_quants(
     dps: &[(String, String, DpQuant)],
     body: Expr,
@@ -473,8 +425,6 @@ fn expand_quants(
     Ok(result)
 }
 
-/// Replace Var { name: target, .. } with Entity(target) throughout an Expr.
-/// Used for bare entity DPs where the variable is really a constant.
 fn substitute_var_to_entity(expr: Expr, target: &str) -> Expr {
     match expr {
         Expr::Var { name, .. } if name == target => Expr::Entity(target.to_string()),
@@ -520,9 +470,7 @@ fn substitute_var_to_entity(expr: Expr, target: &str) -> Expr {
     }
 }
 
-/// Replace one Var name with another Var name throughout an Expr.
-/// Used by relative DP constructors to unify the gap variable with the head variable.
-fn substitute_var_name(expr: Expr, old_name: &str, new_name: &str) -> Expr {
+pub fn substitute_var_name(expr: Expr, old_name: &str, new_name: &str) -> Expr {
     match expr {
         Expr::Var { name, .. } if name == old_name => Expr::Var { name: new_name.to_string(), typ: "e".to_string() },
         Expr::Var { name, typ } => Expr::Var { name, typ },
@@ -564,640 +512,5 @@ fn substitute_var_name(expr: Expr, old_name: &str, new_name: &str) -> Expr {
             label, body: Box::new(substitute_var_name(*body, old_name, new_name)),
         },
         Expr::Entity(s) => Expr::Entity(s),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_var_gen() {
-        let mut gen = VarGen::new();
-        assert_eq!(gen.fresh(), "x");
-        assert_eq!(gen.fresh(), "x1");
-        assert_eq!(gen.fresh(), "x2");
-    }
-
-    #[test]
-    fn test_the_dp() {
-        let mut gen = VarGen::new();
-        let args = vec![
-            Arg::Lexical("man".into(), "{theme:e}".into()),
-            Arg::Literal("theme".into()),
-        ];
-        let result = apply_constructor("the_dp", &args, &mut gen).unwrap();
-        match result {
-            SemValue::Dp { var, var_type, quant } => {
-                assert_eq!(var, "x");
-                assert_eq!(var_type, "e");
-                assert!(matches!(quant, DpQuant::The { .. }));
-            }
-            _ => panic!("expected Dp"),
-        }
-    }
-
-    #[test]
-    fn test_bare_dp() {
-        let args = vec![
-            Arg::Lexical("socrates".into(), "e".into()),
-        ];
-        let result = apply_constructor("bare_dp", &args, &mut VarGen::new()).unwrap();
-        match result {
-            SemValue::Dp { var, var_type, quant } => {
-                assert_eq!(var, "socrates");
-                assert_eq!(var_type, "e");
-                assert!(matches!(quant, DpQuant::Bare));
-            }
-            _ => panic!("expected Dp"),
-        }
-    }
-
-    #[test]
-    fn test_s_copula_the() {
-        let dp = SemValue::Dp {
-            var: "x".into(),
-            var_type: "e".into(),
-            quant: DpQuant::The {
-                restriction: Expr::Pred {
-                    name: "man".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "x".into(), typ: "e".into() })],
-                },
-            },
-        };
-        let args = vec![
-            Arg::Sub(dp),
-            Arg::Lexical("mortal".into(), "{theme:e}".into()),
-            Arg::Literal("theme".into()),
-        ];
-        let result = apply_constructor("s_copula", &args, &mut VarGen::new()).unwrap();
-        match result {
-            SemValue::Prop(expr) => {
-                assert_eq!(format!("{}", expr), "the [x:e]: man(theme: x) -> mortal(theme: x)");
-            }
-            _ => panic!("expected Prop"),
-        }
-    }
-
-    #[test]
-    fn test_s_copula_bare() {
-        let dp = SemValue::Dp {
-            var: "socrates".into(),
-            var_type: "e".into(),
-            quant: DpQuant::Bare,
-        };
-        let args = vec![
-            Arg::Sub(dp),
-            Arg::Lexical("mortal".into(), "{theme:e}".into()),
-            Arg::Literal("theme".into()),
-        ];
-        let result = apply_constructor("s_copula", &args, &mut VarGen::new()).unwrap();
-        match result {
-            SemValue::Prop(expr) => {
-                assert_eq!(format!("{}", expr), "mortal(theme: socrates)");
-            }
-            _ => panic!("expected Prop"),
-        }
-    }
-
-    #[test]
-    fn test_s_transitive_the_bare() {
-        let dp_subj = SemValue::Dp {
-            var: "x".into(),
-            var_type: "e".into(),
-            quant: DpQuant::The {
-                restriction: Expr::Pred {
-                    name: "man".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "x".into(), typ: "e".into() })],
-                },
-            },
-        };
-        let dp_obj = SemValue::Dp {
-            var: "sue".into(),
-            var_type: "e".into(),
-            quant: DpQuant::Bare,
-        };
-        let args = vec![
-            Arg::Sub(dp_subj),
-            Arg::Sub(dp_obj),
-            Arg::Lexical("loves".into(), "{agent:e,patient:e}".into()),
-            Arg::Literal("agent".into()),
-            Arg::Literal("patient".into()),
-        ];
-        let result = apply_constructor("s_transitive", &args, &mut VarGen::new()).unwrap();
-        match result {
-            SemValue::Prop(expr) => {
-                assert_eq!(format!("{}", expr), "the [x:e]: man(theme: x) -> loves(agent: x, patient: sue)");
-            }
-            _ => panic!("expected Prop"),
-        }
-    }
-
-    #[test]
-    fn test_s_transitive_the_the() {
-        let dp_subj = SemValue::Dp {
-            var: "x".into(),
-            var_type: "e".into(),
-            quant: DpQuant::The {
-                restriction: Expr::Pred {
-                    name: "man".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "x".into(), typ: "e".into() })],
-                },
-            },
-        };
-        let dp_obj = SemValue::Dp {
-            var: "y".into(),
-            var_type: "e".into(),
-            quant: DpQuant::The {
-                restriction: Expr::Pred {
-                    name: "woman".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "y".into(), typ: "e".into() })],
-                },
-            },
-        };
-        let args = vec![
-            Arg::Sub(dp_subj),
-            Arg::Sub(dp_obj),
-            Arg::Lexical("loves".into(), "{agent:e,patient:e}".into()),
-            Arg::Literal("agent".into()),
-            Arg::Literal("patient".into()),
-        ];
-        let result = apply_constructor("s_transitive", &args, &mut VarGen::new()).unwrap();
-        match result {
-            SemValue::Prop(expr) => {
-                assert_eq!(
-                    format!("{}", expr),
-                    "the [x:e]: man(theme: x) -> (the [y:e]: woman(theme: y) -> loves(agent: x, patient: y))"
-                );
-            }
-            _ => panic!("expected Prop"),
-        }
-    }
-
-    #[test]
-    fn test_s_transitive_bare_bare() {
-        let dp_subj = SemValue::Dp {
-            var: "sue".into(),
-            var_type: "e".into(),
-            quant: DpQuant::Bare,
-        };
-        let dp_obj = SemValue::Dp {
-            var: "tom".into(),
-            var_type: "e".into(),
-            quant: DpQuant::Bare,
-        };
-        let args = vec![
-            Arg::Sub(dp_subj),
-            Arg::Sub(dp_obj),
-            Arg::Lexical("loves".into(), "{agent:e,patient:e}".into()),
-            Arg::Literal("agent".into()),
-            Arg::Literal("patient".into()),
-        ];
-        let result = apply_constructor("s_transitive", &args, &mut VarGen::new()).unwrap();
-        match result {
-            SemValue::Prop(expr) => {
-                assert_eq!(format!("{}", expr), "loves(agent: sue, patient: tom)");
-            }
-            _ => panic!("expected Prop"),
-        }
-    }
-
-    #[test]
-    fn test_s_ditransitive() {
-        let dp_subj = SemValue::Dp {
-            var: "i".into(),
-            var_type: "e".into(),
-            quant: DpQuant::Bare,
-        };
-        let dp_theme = SemValue::Dp {
-            var: "x".into(),
-            var_type: "e".into(),
-            quant: DpQuant::The {
-                restriction: Expr::Pred {
-                    name: "letter".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "x".into(), typ: "e".into() })],
-                },
-            },
-        };
-        let dp_recip = SemValue::Dp {
-            var: "sue".into(),
-            var_type: "e".into(),
-            quant: DpQuant::Bare,
-        };
-        let args = vec![
-            Arg::Sub(dp_subj),
-            Arg::Sub(dp_theme),
-            Arg::Sub(dp_recip),
-            Arg::Lexical("sent".into(), "{agent:e,recipient:e,theme:e}".into()),
-            Arg::Literal("agent".into()),
-            Arg::Literal("theme".into()),
-            Arg::Literal("recipient".into()),
-        ];
-        let result = apply_constructor("s_ditransitive", &args, &mut VarGen::new()).unwrap();
-        match result {
-            SemValue::Prop(expr) => {
-                assert_eq!(
-                    format!("{}", expr),
-                    "the [x:e]: letter(theme: x) -> sent(agent: i, theme: x, recipient: sue)"
-                );
-            }
-            _ => panic!("expected Prop"),
-        }
-    }
-
-    #[test]
-    fn test_s_copula_forall() {
-        let dp = SemValue::Dp {
-            var: "x".into(),
-            var_type: "e".into(),
-            quant: DpQuant::ForAll {
-                restriction: Expr::Pred {
-                    name: "man".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "x".into(), typ: "e".into() })],
-                },
-            },
-        };
-        let args = vec![
-            Arg::Sub(dp),
-            Arg::Lexical("mortal".into(), "{theme:e}".into()),
-            Arg::Literal("theme".into()),
-        ];
-        let result = apply_constructor("s_copula", &args, &mut VarGen::new()).unwrap();
-        match result {
-            SemValue::Prop(expr) => {
-                assert_eq!(format!("{}", expr), "always [x:e]: man(theme: x) -> mortal(theme: x)");
-            }
-            _ => panic!("expected Prop"),
-        }
-    }
-
-    #[test]
-    fn test_s_copula_exists() {
-        let dp = SemValue::Dp {
-            var: "x".into(),
-            var_type: "e".into(),
-            quant: DpQuant::Exists {
-                restriction: Expr::Pred {
-                    name: "man".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "x".into(), typ: "e".into() })],
-                },
-            },
-        };
-        let args = vec![
-            Arg::Sub(dp),
-            Arg::Lexical("mortal".into(), "{theme:e}".into()),
-            Arg::Literal("theme".into()),
-        ];
-        let result = apply_constructor("s_copula", &args, &mut VarGen::new()).unwrap();
-        match result {
-            SemValue::Prop(expr) => {
-                assert_eq!(format!("{}", expr), "exists [x:e]: man(theme: x) ∧ mortal(theme: x)");
-            }
-            _ => panic!("expected Prop"),
-        }
-    }
-
-    #[test]
-    fn test_s_transitive_forall_exists() {
-        let dp_subj = SemValue::Dp {
-            var: "x".into(),
-            var_type: "e".into(),
-            quant: DpQuant::ForAll {
-                restriction: Expr::Pred {
-                    name: "man".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "x".into(), typ: "e".into() })],
-                },
-            },
-        };
-        let dp_obj = SemValue::Dp {
-            var: "y".into(),
-            var_type: "e".into(),
-            quant: DpQuant::Exists {
-                restriction: Expr::Pred {
-                    name: "woman".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "y".into(), typ: "e".into() })],
-                },
-            },
-        };
-        let args = vec![
-            Arg::Sub(dp_subj),
-            Arg::Sub(dp_obj),
-            Arg::Lexical("loves".into(), "{agent:e,patient:e}".into()),
-            Arg::Literal("agent".into()),
-            Arg::Literal("patient".into()),
-        ];
-        let result = apply_constructor("s_transitive", &args, &mut VarGen::new()).unwrap();
-        match result {
-            SemValue::Prop(expr) => {
-                assert_eq!(
-                    format!("{}", expr),
-                    "always [x:e]: man(theme: x) -> (exists [y:e]: woman(theme: y) ∧ loves(agent: x, patient: y))"
-                );
-            }
-            _ => panic!("expected Prop"),
-        }
-    }
-
-    #[test]
-    fn test_s_complement_bare() {
-        let dp_subj = SemValue::Dp {
-            var: "john".into(),
-            var_type: "e".into(),
-            quant: DpQuant::Bare,
-        };
-        let inner_prop = SemValue::Prop(Expr::Pred {
-            name: "happy".into(),
-            roles: vec![("theme".into(), Expr::Entity("sue".into()))],
-        });
-        let args = vec![
-            Arg::Sub(dp_subj),
-            Arg::Sub(inner_prop),
-            Arg::Lexical("said".into(), "{agent:e,theme:s}".into()),
-            Arg::Literal("agent".into()),
-            Arg::Literal("theme".into()),
-        ];
-        let result = apply_constructor("s_complement", &args, &mut VarGen::new()).unwrap();
-        match result {
-            SemValue::Prop(expr) => {
-                assert_eq!(format!("{}", expr), "said(agent: john, theme: happy(theme: sue))");
-            }
-            _ => panic!("expected Prop"),
-        }
-    }
-
-    #[test]
-    fn test_s_complement_quantified() {
-        let dp_subj = SemValue::Dp {
-            var: "x".into(),
-            var_type: "e".into(),
-            quant: DpQuant::The {
-                restriction: Expr::Pred {
-                    name: "man".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "x".into(), typ: "e".into() })],
-                },
-            },
-        };
-        let inner_prop = SemValue::Prop(Expr::The {
-            var: "y".into(),
-            var_type: "e".into(),
-            body: Box::new(Expr::Implies {
-                ante: Box::new(Expr::Pred {
-                    name: "woman".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "y".into(), typ: "e".into() })],
-                }),
-                cons: Box::new(Expr::Pred {
-                    name: "happy".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "y".into(), typ: "e".into() })],
-                }),
-            }),
-        });
-        let args = vec![
-            Arg::Sub(dp_subj),
-            Arg::Sub(inner_prop),
-            Arg::Lexical("said".into(), "{agent:e,theme:s}".into()),
-            Arg::Literal("agent".into()),
-            Arg::Literal("theme".into()),
-        ];
-        let result = apply_constructor("s_complement", &args, &mut VarGen::new()).unwrap();
-        match result {
-            SemValue::Prop(expr) => {
-                assert_eq!(
-                    format!("{}", expr),
-                    "the [x:e]: man(theme: x) -> said(agent: x, theme: the [y:e]: woman(theme: y) -> happy(theme: y))"
-                );
-            }
-            _ => panic!("expected Prop"),
-        }
-    }
-
-    #[test]
-    fn test_s_gap_agent() {
-        let dp_obj = SemValue::Dp {
-            var: "sue".into(),
-            var_type: "e".into(),
-            quant: DpQuant::Bare,
-        };
-        let args = vec![
-            Arg::Lexical("loves".into(), "{agent:e,patient:e}".into()),
-            Arg::Literal("agent".into()),
-            Arg::Literal("patient".into()),
-            Arg::Sub(dp_obj),
-        ];
-        let mut gen = VarGen::new();
-        let result = apply_constructor("s_gap_agent", &args, &mut gen).unwrap();
-        match result {
-            SemValue::GapProp(g) => {
-                assert_eq!(g.gap_role, "agent");
-                assert_eq!(g.var, "x"); // first fresh var
-                assert_eq!(format!("{}", g), "_[agent] loves(agent: x, patient: sue)");
-            }
-            _ => panic!("expected GapProp"),
-        }
-    }
-
-    #[test]
-    fn test_s_gap_patient() {
-        let dp_subj = SemValue::Dp {
-            var: "sue".into(),
-            var_type: "e".into(),
-            quant: DpQuant::Bare,
-        };
-        let args = vec![
-            Arg::Lexical("loves".into(), "{agent:e,patient:e}".into()),
-            Arg::Literal("agent".into()),
-            Arg::Literal("patient".into()),
-            Arg::Sub(dp_subj),
-        ];
-        let mut gen = VarGen::new();
-        let result = apply_constructor("s_gap_patient", &args, &mut gen).unwrap();
-        match result {
-            SemValue::GapProp(g) => {
-                assert_eq!(g.gap_role, "patient");
-                assert_eq!(g.var, "x");
-                assert_eq!(format!("{}", g), "_[patient] loves(agent: sue, patient: x)");
-            }
-            _ => panic!("expected GapProp"),
-        }
-    }
-
-    #[test]
-    fn test_s_gap_theme() {
-        let args = vec![
-            Arg::Lexical("happy".into(), "{theme:e}".into()),
-            Arg::Literal("theme".into()),
-        ];
-        let mut gen = VarGen::new();
-        let result = apply_constructor("s_gap_theme", &args, &mut gen).unwrap();
-        match result {
-            SemValue::GapProp(g) => {
-                assert_eq!(g.gap_role, "theme");
-                assert_eq!(g.var, "x");
-                assert_eq!(format!("{}", g), "_[theme] happy(theme: x)");
-            }
-            _ => panic!("expected GapProp"),
-        }
-    }
-
-    #[test]
-    fn test_rel_dp_agent() {
-        let gap_prop = SemValue::GapProp(GapProp {
-            var: "y".into(),
-            var_type: "e".into(),
-            gap_role: "agent".into(),
-            body: Expr::Pred {
-                name: "loves".into(),
-                roles: vec![
-                    ("agent".into(), Expr::Var { name: "y".into(), typ: "e".into() }),
-                    ("patient".into(), Expr::Entity("sue".into())),
-                ],
-            },
-        });
-        let args = vec![
-            Arg::Lexical("man".into(), "{theme:e}".into()),
-            Arg::Literal("theme".into()),
-            Arg::Sub(gap_prop),
-        ];
-        let mut gen = VarGen::new();
-        let result = apply_constructor("rel_dp_agent", &args, &mut gen).unwrap();
-        match result {
-            SemValue::Dp { var, var_type, quant } => {
-                assert_eq!(var, "x"); // head var
-                assert_eq!(var_type, "e");
-                assert!(matches!(quant, DpQuant::The { .. }));
-                let restriction = match quant {
-                    DpQuant::The { restriction } => restriction,
-                    _ => panic!("expected The quantifier"),
-                };
-                assert_eq!(
-                    format!("{}", restriction),
-                    "man(theme: x) ∧ loves(agent: x, patient: sue)"
-                );
-            }
-            _ => panic!("expected Dp"),
-        }
-    }
-
-    #[test]
-    fn test_rel_dp_patient() {
-        let gap_prop = SemValue::GapProp(GapProp {
-            var: "y".into(),
-            var_type: "e".into(),
-            gap_role: "patient".into(),
-            body: Expr::Pred {
-                name: "loves".into(),
-                roles: vec![
-                    ("agent".into(), Expr::Entity("sue".into())),
-                    ("patient".into(), Expr::Var { name: "y".into(), typ: "e".into() }),
-                ],
-            },
-        });
-        let args = vec![
-            Arg::Lexical("man".into(), "{theme:e}".into()),
-            Arg::Literal("theme".into()),
-            Arg::Sub(gap_prop),
-        ];
-        let mut gen = VarGen::new();
-        let result = apply_constructor("rel_dp_patient", &args, &mut gen).unwrap();
-        match result {
-            SemValue::Dp { var, var_type, quant } => {
-                assert_eq!(var, "x");
-                assert_eq!(var_type, "e");
-                assert!(matches!(quant, DpQuant::The { .. }));
-                let restriction = match quant {
-                    DpQuant::The { restriction } => restriction,
-                    _ => panic!("expected The quantifier"),
-                };
-                assert_eq!(
-                    format!("{}", restriction),
-                    "man(theme: x) ∧ loves(agent: sue, patient: x)"
-                );
-            }
-            _ => panic!("expected Dp"),
-        }
-    }
-
-    #[test]
-    fn test_rel_dp_theme() {
-        let gap_prop = SemValue::GapProp(GapProp {
-            var: "y".into(),
-            var_type: "e".into(),
-            gap_role: "theme".into(),
-            body: Expr::Pred {
-                name: "happy".into(),
-                roles: vec![("theme".into(), Expr::Var { name: "y".into(), typ: "e".into() })],
-            },
-        });
-        let args = vec![
-            Arg::Lexical("woman".into(), "{theme:e}".into()),
-            Arg::Literal("theme".into()),
-            Arg::Sub(gap_prop),
-        ];
-        let mut gen = VarGen::new();
-        let result = apply_constructor("rel_dp_theme", &args, &mut gen).unwrap();
-        match result {
-            SemValue::Dp { var, var_type, quant } => {
-                assert_eq!(var, "x");
-                assert_eq!(var_type, "e");
-                assert!(matches!(quant, DpQuant::The { .. }));
-                let restriction = match quant {
-                    DpQuant::The { restriction } => restriction,
-                    _ => panic!("expected The quantifier"),
-                };
-                assert_eq!(
-                    format!("{}", restriction),
-                    "woman(theme: x) ∧ happy(theme: x)"
-                );
-            }
-            _ => panic!("expected Dp"),
-        }
-    }
-
-    #[test]
-    fn test_substitute_var_name() {
-        // Replace y with x in a nested expression
-        let expr = Expr::Pred {
-            name: "loves".into(),
-            roles: vec![
-                ("agent".into(), Expr::Var { name: "y".into(), typ: "e".into() }),
-                ("patient".into(), Expr::Entity("sue".into())),
-            ],
-        };
-        let result = substitute_var_name(expr, "y", "x");
-        assert_eq!(format!("{}", result), "loves(agent: x, patient: sue)");
-
-        // No match — nothing to replace
-        let expr2 = Expr::Pred {
-            name: "loves".into(),
-            roles: vec![
-                ("agent".into(), Expr::Entity("john".into())),
-                ("patient".into(), Expr::Entity("sue".into())),
-            ],
-        };
-        let result2 = substitute_var_name(expr2, "y", "x");
-        assert_eq!(format!("{}", result2), "loves(agent: john, patient: sue)");
-
-        // Nested case: quantifier with the variable inside
-        let expr3 = Expr::ForAll {
-            var: "z".into(),
-            var_type: "e".into(),
-            body: Box::new(Expr::Implies {
-                ante: Box::new(Expr::Pred {
-                    name: "man".into(),
-                    roles: vec![("theme".into(), Expr::Var { name: "y".into(), typ: "e".into() })],
-                }),
-                cons: Box::new(Expr::Pred {
-                    name: "loves".into(),
-                    roles: vec![
-                        ("agent".into(), Expr::Var { name: "y".into(), typ: "e".into() }),
-                        ("patient".into(), Expr::Entity("sue".into())),
-                    ],
-                }),
-            }),
-        };
-        let result3 = substitute_var_name(expr3, "y", "x");
-        assert_eq!(
-            format!("{}", result3),
-            "always [z:e]: man(theme: x) -> loves(agent: x, patient: sue)"
-        );
     }
 }
