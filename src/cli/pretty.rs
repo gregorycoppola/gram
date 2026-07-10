@@ -1,4 +1,5 @@
-use crate::core::matcher::types::{Constituent, Match, ParseResult, SyntaxNode, TokenAnnotation};
+use crate::core::matcher::{Constituent, Match, SyntaxNode, TokenAnnotation};
+use crate::server::{ParseResult, ParseStatus};
 
 pub fn print_pretty(results: &[ParseResult]) {
     for (i, r) in results.iter().enumerate() {
@@ -8,10 +9,10 @@ pub fn print_pretty(results: &[ParseResult]) {
         println!("════════════════════════════════════════════════════════\n");
 
         match r.status {
-            crate::core::matcher::types::ParseStatus::Failed => {
+            ParseStatus::Failed => {
                 println!("  ❌ no matching rule\n");
             }
-            crate::core::matcher::types::ParseStatus::Error(ref e) => {
+            ParseStatus::Error(ref e) => {
                 println!("  💥 error: {}\n", e);
             }
             _ => {
@@ -27,12 +28,10 @@ pub fn print_pretty(results: &[ParseResult]) {
 }
 
 fn print_match(m: &Match, tokens: &[String]) {
-    // Token chips
     println!("  🏷️  tokens:");
     print_token_chips(tokens, &m.token_annotations);
     println!();
 
-    // Output + rule
     println!("  📤 {}  [{}: {}]", m.output, m.rule_name, m.pattern);
     if let Some(ref syn) = m.syntax {
         println!("  📝 {}", syn);
@@ -42,21 +41,18 @@ fn print_match(m: &Match, tokens: &[String]) {
     }
     println!();
 
-    // Constituent table
     if !m.constituents.is_empty() {
         println!("  📋 constituents");
         print_constituent_table(&m.constituents, &m.output);
         println!();
     }
 
-    // Bracket tree
     if let Some(ref tree) = m.syntax_tree {
         println!("  🌳 bracket tree");
         print_bracket_tree(tree, 0, true, "");
         println!();
     }
 
-    // Rule trace
     println!("  🔍 rule derivation");
     print_rule_trace(m, tokens);
     println!();

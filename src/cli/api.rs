@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use clap::{Args, Subcommand};
 
 use crate::cli::pretty::print_pretty;
-use crate::server::types::ParseResult;
+use crate::server::ParseResult;
 
 #[derive(Subcommand)]
 pub enum ApiCommand {
@@ -90,7 +90,6 @@ async fn run_api_async(args: ApiArgs) -> Result<()> {
         anyhow::bail!("{} -> {}: {}", url, status, body);
     }
 
-    // If pretty mode and this is a parse endpoint, deserialize and pretty-print
     if args.pretty {
         match args.command {
             ApiCommand::Parse { .. } | ApiCommand::ParseOne { .. } => {
@@ -103,7 +102,6 @@ async fn run_api_async(args: ApiArgs) -> Result<()> {
         }
     }
 
-    // Default: pretty-print JSON
     let body: serde_json::Value = serde_json::from_str(&body_text)
         .with_context(|| format!("parsing JSON response from {}", url))?;
     println!("{}", serde_json::to_string_pretty(&body).context("serializing response")?);

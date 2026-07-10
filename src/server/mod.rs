@@ -1,6 +1,7 @@
+pub mod types;
+
 mod error;
 mod routes;
-mod types;
 
 use anyhow::Result;
 use axum::{routing::{get, post}, Router};
@@ -8,6 +9,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
+
+pub use types::{ParseResult, ParseStatus, FixtureSummary, ParseRequest};
 
 #[derive(Clone)]
 pub struct AppState {
