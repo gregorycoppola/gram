@@ -1,0 +1,12 @@
+{
+  "title": "Tall and man implies tall, and man",
+  "premises": [
+    "tall(theme: john) ∧ man(theme: john)"
+  ],
+  "conclusion": "man(theme: john)",
+  "proof": [
+    {"step": 1, "formula": "tall(theme: john) ∧ man(theme: john)", "justification": "premise"},
+    {"step": 2, "formula": "tall(theme: john)", "justification": "and_elim", "from": [1]},
+    {"step": 3, "formula": "man(theme: john)", "justification": "and_elim", "from": [1]}
+  ]
+}
