@@ -64,8 +64,8 @@ fn check_universal_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Res
     let source = prior.get(source_idx.saturating_sub(1))
         .ok_or(format!("step {} not yet derived", source_idx))?;
 
-    let (var, var_type, body) = match source {
-        Expr::ForAll { var, var_type, body } => (var, var_type, body),
+    let (var, body) = match source {
+        Expr::ForAll { var, body, .. } => (var, body),
         _ => return Err(format!("universal_elim source must be ForAll, got: {}", source)),
     };
 
@@ -113,8 +113,8 @@ fn check_existential_intro(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> 
     let source = prior.get(source_idx.saturating_sub(1))
         .ok_or(format!("step {} not yet derived", source_idx))?;
 
-    let (var, var_type, body, count) = match formula {
-        Expr::Exists { var, var_type, body, count } => (var, var_type, body, count),
+    let (var, body) = match formula {
+        Expr::Exists { var, body, .. } => (var, body),
         _ => return Err(format!("existential_intro target must be Exists, got: {}", formula)),
     };
 
@@ -184,11 +184,13 @@ fn check_and_elim_r(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<
     }
 }
 
-/// Substitute all occurrences of `Var { name: var }` with `Entity(term)`.
+/// Substitute all occurrences of `Var { name: var }` or `Entity(var)` with `Entity(term)`.
 fn substitute_var_to_entity(expr: Expr, var: &str, term: &str) -> Expr {
     match expr {
         Expr::Var { name, .. } if name == var => Expr::Entity(term.to_string()),
+        Expr::Entity(name) if name == var => Expr::Entity(term.to_string()),
         Expr::Var { name, typ } => Expr::Var { name, typ },
+        Expr::Entity(s) => Expr::Entity(s),
         Expr::Pred { name, roles } => Expr::Pred {
             name,
             roles: roles.into_iter().map(|(r, e)| (r, substitute_var_to_entity(e, var, term))).collect(),
@@ -223,7 +225,6 @@ fn substitute_var_to_entity(expr: Expr, var: &str, term: &str) -> Expr {
         Expr::Question { label, body } => Expr::Question {
             label, body: Box::new(substitute_var_to_entity(*body, var, term)),
         },
-        Expr::Entity(s) => Expr::Entity(s),
     }
 }
 
