@@ -1,0 +1,11 @@
+{
+  "title": "Mayor of New York decomposes",
+  "premises": [
+    "mayor_of(theme: john, location: new_york)"
+  ],
+  "conclusion": "mayor(theme: john) ∧ in(theme: john, location: new_york)",
+  "proof": [
+    {"step": 1, "formula": "mayor_of(theme: john, location: new_york)", "justification": "premise"},
+    {"step": 2, "formula": "mayor(theme: john) ∧ in(theme: john, location: new_york)", "justification": "of_elim", "from": [1]}
+  ]
+}
