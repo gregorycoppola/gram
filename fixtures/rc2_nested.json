@@ -20,6 +20,16 @@
         "name": "woman",
         "roles": {"theme": "e"},
         "forms": ["woman"]
+      },
+      {
+        "name": "know",
+        "roles": {"agent": "e", "theme": "s"},
+        "forms": ["know"]
+      },
+      {
+        "name": "want",
+        "roles": {"agent": "e", "patient": "e"},
+        "forms": ["want"]
       }
     ],
     "entities": [
@@ -32,6 +42,21 @@
         "name": "sue",
         "type": "e",
         "forms": ["Sue"]
+      },
+      {
+        "name": "i",
+        "type": "e",
+        "forms": ["i", "I"]
+      },
+      {
+        "name": "you",
+        "type": "e",
+        "forms": ["you"]
+      },
+      {
+        "name": "apples",
+        "type": "e",
+        "forms": ["apples"]
       }
     ]
   },
@@ -98,6 +123,16 @@
         ["dp", 0, 1],
         ["s", 2, 7],
         ["dp", 3, 5]
+      ]
+    },
+    {
+      "tokens": ["i", "know", "you", "want", "apples"],
+      "spans": [
+        ["dp", 0, 1],
+        ["s", 2, 5],
+        ["dp", 2, 3],
+        ["dp", 4, 5],
+        ["s", 0, 5]
       ]
     }
   ]
