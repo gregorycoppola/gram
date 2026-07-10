@@ -40,6 +40,7 @@ fn check_step(step: &ProofStep, premises: &[String], prior: &[Expr]) -> Result<E
         "and_intro" => check_and_intro(&formula, step, prior),
         "and_elim_l" => check_and_elim_l(&formula, step, prior),
         "and_elim_r" => check_and_elim_r(&formula, step, prior),
+        "belief_elim" => check_belief_elim(&formula, step, prior),
         other => Err(format!("unknown justification: {}", other)),
     }
 }
@@ -181,6 +182,45 @@ fn check_and_elim_r(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<
             }
         }
         _ => Err(format!("and_elim_r source must be And, got: {}", source)),
+    }
+}
+
+fn check_belief_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+    if step.from.len() != 2 {
+        return Err("belief_elim requires exactly 2 source steps".into());
+    }
+    let say_form = prior.get(step.from[0].saturating_sub(1))
+        .ok_or(format!("step {} not yet derived", step.from[0]))?;
+    let believable_form = prior.get(step.from[1].saturating_sub(1))
+        .ok_or(format!("step {} not yet derived", step.from[1]))?;
+
+    let (agent, content) = match say_form {
+        Expr::Pred { name, roles } if name == "say" => {
+            let agent = roles.iter().find(|(r, _)| r == "agent")
+                .ok_or("belief_elim: say predicate missing agent role")?.1.clone();
+            let content = roles.iter().find(|(r, _)| r == "content")
+                .ok_or("belief_elim: say predicate missing content role")?.1.clone();
+            (agent, content)
+        }
+        _ => return Err(format!("belief_elim: first source must be say(...), got: {}", say_form)),
+    };
+
+    let theme = match believable_form {
+        Expr::Pred { name, roles } if name == "believable" => {
+            roles.iter().find(|(r, _)| r == "theme")
+                .ok_or("belief_elim: believable predicate missing theme role")?.1.clone()
+        }
+        _ => return Err(format!("belief_elim: second source must be believable(...), got: {}", believable_form)),
+    };
+
+    if !expr_eq(&agent, &theme) {
+        return Err(format!("belief_elim: agent {} does not match believable theme {}", agent, theme));
+    }
+
+    if expr_eq(formula, &content) {
+        Ok(formula.clone())
+    } else {
+        Err(format!("belief_elim: expected content {}, got {}", content, formula))
     }
 }
 
