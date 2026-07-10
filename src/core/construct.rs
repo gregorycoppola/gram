@@ -19,7 +19,7 @@ pub fn apply_constructor(
         "forall_dp" => construct_quant_dp(DpQuantKind::ForAll, args, var_gen),
         "bare_dp" => construct_bare_dp(args),
         "bare_n" => construct_bare_n(args, var_gen),
-        "adj_n" => construct_adj_n(args, var_gen),
+        "adj_n" => construct_adj_n(args, _var_gen),
         "the_n_dp" => construct_the_n_dp(args),
         "a_n_dp" => construct_a_n_dp(args),
         "a_dp" => construct_a_dp(args, var_gen),
@@ -29,6 +29,7 @@ pub fn apply_constructor(
         "adj_of_n" => construct_adj_of_n(args, var_gen),
         "s_copula" => construct_s_copula(args),
         "s_copula_adj_n" => construct_s_copula_adj_n(args),
+        "s_copula_degree" => construct_s_copula_degree(args),
         "s_equative" => construct_s_equative(args),
         "s_as_copula" => construct_s_as_copula(args),
         "s_when" => construct_s_when(args),
@@ -453,6 +454,45 @@ fn construct_s_copula_adj_n(args: &[Arg]) -> Result<SemValue, String> {
 
     let body = substitute_var_name(n_restriction, &n_var, &subj_var);
     let expr = expand_quant(subj_var, subj_type, &subj_quant, body)?;
+    Ok(SemValue::Prop(expr))
+}
+
+fn construct_s_copula_degree(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 5 {
+        return Err(format!("s_copula_degree expects 5 args, got {}", args.len()));
+    }
+    let (var, var_type, quant) = match &args[0] {
+        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
+            (var.clone(), var_type.clone(), quant.clone())
+        }
+        _ => return Err("s_copula_degree: first arg must be a DP".into()),
+    };
+    let degree_name = match &args[1] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("s_copula_degree: second arg must be lexical".into()),
+    };
+    let pred_name = match &args[2] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("s_copula_degree: third arg must be lexical".into()),
+    };
+    let theme_role = match &args[3] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("s_copula_degree: fourth arg must be literal".into()),
+    };
+    let degree_role = match &args[4] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("s_copula_degree: fifth arg must be literal".into()),
+    };
+
+    let body = Expr::Pred {
+        name: pred_name,
+        roles: vec![
+            (theme_role, Expr::Var { name: var.clone(), typ: var_type.clone() }),
+            (degree_role, Expr::Entity(degree_name)),
+        ],
+    };
+
+    let expr = expand_quant(var, var_type, &quant, body)?;
     Ok(SemValue::Prop(expr))
 }
 
