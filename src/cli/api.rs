@@ -1,6 +1,9 @@
 use anyhow::{Context, Result};
 use clap::{Args, Subcommand};
 
+use crate::cli::pretty::print_pretty;
+use crate::server::types::ParseResult;
+
 #[derive(Subcommand)]
 pub enum ApiCommand {
     /// GET /health
@@ -31,6 +34,9 @@ pub struct ApiArgs {
     /// Server base URL.
     #[arg(long, default_value = "http://127.0.0.1:9101")]
     url: String,
+    /// Pretty-print the response (bracket tree, constituents, rule trace) instead of raw JSON.
+    #[arg(long)]
+    pretty: bool,
 }
 
 pub fn run_api(args: ApiArgs) -> Result<()> {
@@ -74,18 +80,32 @@ async fn run_api_async(args: ApiArgs) -> Result<()> {
     };
 
     let status = resp.status();
-    let body: serde_json::Value = resp
-        .json()
+    let body_text = resp
+        .text()
         .await
         .with_context(|| format!("reading response body from {}", url))?;
 
     if !status.is_success() {
+        let body: serde_json::Value = serde_json::from_str(&body_text).unwrap_or(serde_json::json!({}));
         anyhow::bail!("{} -> {}: {}", url, status, body);
     }
 
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&body).context("serializing response")?
-    );
+    // If pretty mode and this is a parse endpoint, deserialize and pretty-print
+    if args.pretty {
+        match args.command {
+            ApiCommand::Parse { .. } | ApiCommand::ParseOne { .. } => {
+                let results: Vec<ParseResult> = serde_json::from_str(&body_text)
+                    .with_context(|| "deserializing parse results for pretty-print")?;
+                print_pretty(&results);
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
+    // Default: pretty-print JSON
+    let body: serde_json::Value = serde_json::from_str(&body_text)
+        .with_context(|| format!("parsing JSON response from {}", url))?;
+    println!("{}", serde_json::to_string_pretty(&body).context("serializing response")?);
     Ok(())
 }
