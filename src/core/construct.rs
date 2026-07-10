@@ -31,6 +31,7 @@ pub fn apply_constructor(
         "s_copula_adj_n" => construct_s_copula_adj_n(args),
         "s_copula_degree" => construct_s_copula_degree(args),
         "s_equative" => construct_s_equative(args),
+        "s_identity" => construct_s_identity(args),
         "s_as_copula" => construct_s_as_copula(args),
         "s_when" => construct_s_when(args),
         "s_transitive" => construct_s_transitive(args),
@@ -516,6 +517,41 @@ fn construct_s_equative(args: &[Arg]) -> Result<SemValue, String> {
 
     let body = substitute_var_name(obj_restriction, &obj_var, &subj_var);
     let expr = expand_quant(subj_var, subj_type, &subj_quant, body)?;
+    Ok(SemValue::Prop(expr))
+}
+
+fn construct_s_identity(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 2 {
+        return Err(format!("s_identity expects 2 args, got {}", args.len()));
+    }
+    let subj_name = match &args[0] {
+        Arg::Sub(SemValue::Dp { var, quant: DpQuant::Bare, .. }) => var.clone(),
+        _ => return Err("s_identity: first arg must be a bare DP".into()),
+    };
+    let (obj_var, obj_restriction) = match &args[1] {
+        Arg::Sub(SemValue::Dp { var, quant: DpQuant::The { restriction }, .. }) => {
+            (var.clone(), restriction.clone())
+        }
+        _ => return Err("s_identity: second arg must be a The DP".into()),
+    };
+
+    let body = Expr::Pred {
+        name: "equals".to_string(),
+        roles: vec![
+            ("left".to_string(), Expr::Entity(subj_name)),
+            ("right".to_string(), Expr::Var { name: obj_var.clone(), typ: "e".to_string() }),
+        ],
+    };
+
+    let expr = Expr::The {
+        var: obj_var,
+        var_type: "e".to_string(),
+        body: Box::new(Expr::Implies {
+            ante: Box::new(obj_restriction),
+            cons: Box::new(body),
+        }),
+    };
+
     Ok(SemValue::Prop(expr))
 }
 
