@@ -1,0 +1,20 @@
+{
+  "lexicon": {
+    "predicates": [
+      {"name": "happier", "roles": {"theme": "e", "than": "e"}, "forms": ["happier"]}
+    ],
+    "entities": [
+      {"name": "sue", "type": "e", "forms": ["Sue"]},
+      {"name": "jane", "type": "e", "forms": ["Jane"]},
+      {"name": "tom", "type": "e", "forms": ["Tom"]}
+    ]
+  },
+  "grammar": [
+    {"name": "bare_dp", "pattern": "$x:e", "sem": "bare_dp($x)", "kind": "dp"},
+    {"name": "s_comparative", "pattern": "SUB:dp[$x:e] COP $A:{theme:e,than:e} LIT:than SUB:dp", "sem": "s_transitive($SUB, $SUB1, $A, theme, than)", "kind": "s"}
+  ],
+  "sentences": [
+    {"tokens": ["Sue", "is", "happier", "than", "Jane"], "spans": [["dp", 0, 1], ["dp", 4, 5], ["s", 0, 5]]},
+    {"tokens": ["Tom", "is", "happier", "than", "Sue"], "spans": [["dp", 0, 1], ["dp", 4, 5], ["s", 0, 5]]}
+  ]
+}
