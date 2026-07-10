@@ -1,3 +1,4 @@
+// gram/src/core/matcher/engine.rs
 use std::collections::{BTreeMap, HashMap};
 
 use crate::core::construct::{Arg, apply_constructor};
@@ -391,6 +392,7 @@ pub fn annotate_tokens(tokens: &[String], log: &[Consumption]) -> Vec<TokenAnnot
 fn sub_filter_for_label(label: &str) -> KindFilter {
     match label {
         "dp" => KindFilter::Only("dp".to_string()),
+        "n" => KindFilter::Only("n".to_string()),
         "s\\agent" => KindFilter::Only("s\\agent".to_string()),
         "s\\patient" => KindFilter::Only("s\\patient".to_string()),
         "s\\theme" => KindFilter::Only("s\\theme".to_string()),

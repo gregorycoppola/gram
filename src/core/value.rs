@@ -1,13 +1,14 @@
+use crate::core::logic::Expr;
 
 /// The quantifier component of a DP.
 #[derive(Debug, Clone)]
 pub enum DpQuant {
     /// always [x]: restriction(x) -> body(x)
-    ForAll { restriction: crate::core::logic::Expr },
+    ForAll { restriction: Expr },
     /// exists [x]: restriction(x) ∧ body(x)
-    Exists { restriction: crate::core::logic::Expr },
+    Exists { restriction: Expr },
     /// the [x]: restriction(x) -> body(x)
-    The { restriction: crate::core::logic::Expr },
+    The { restriction: Expr },
     /// Bare entity — no quantifier shell, variable is a constant name.
     Bare,
 }
@@ -19,19 +20,25 @@ pub struct GapProp {
     pub var: String,
     pub var_type: String,
     pub gap_role: String,
-    pub body: crate::core::logic::Expr,
+    pub body: Expr,
 }
 
 /// Semantic value produced by a phrase during bottom-up parsing.
 #[derive(Debug, Clone)]
 pub enum SemValue {
     /// A complete proposition (output of S-level rules).
-    Prop(crate::core::logic::Expr),
+    Prop(Expr),
     /// A determiner phrase that introduces an entity variable.
     Dp {
         var: String,
         var_type: String,
         quant: DpQuant,
+    },
+    /// A noun phrase: a predicate restriction with a free variable.
+    /// The determiner will bind this variable.
+    N {
+        var: String,
+        restriction: Expr,
     },
     /// A gapped proposition: a predicate with one free variable and a designated hole.
     GapProp(GapProp),
@@ -59,6 +66,9 @@ impl std::fmt::Display for SemValue {
                         write!(f, "{}:{}", var, var_type)
                     }
                 }
+            }
+            SemValue::N { var, restriction } => {
+                write!(f, "N[{}] {}", var, restriction)
             }
             SemValue::GapProp(g) => {
                 write!(f, "_[{}] {}", g.gap_role, g.body)
