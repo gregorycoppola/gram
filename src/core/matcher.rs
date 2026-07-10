@@ -2,7 +2,7 @@ mod types;
 mod tree;
 mod engine;
 
-pub use types::*;
+pub use types::{DebugTrace, Match, Constituent, SyntaxNode, TokenAnnotation, TokenKind};
 pub use tree::build_syntax_tree_for_result;
 
 use std::collections::HashMap;
@@ -12,7 +12,7 @@ use crate::core::grammar::Rule;
 use crate::core::lexicon::Lexicon;
 use crate::core::value::VarGen;
 
-use types::{DebugTrace, SpanKey, SpanResult, Match};
+use types::{SpanKey, SpanResult};
 use tree::span_result_to_match;
 use engine::{try_pattern_match, try_assembly, try_assemble_top_level};
 
