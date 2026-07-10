@@ -19,6 +19,7 @@ pub enum Slot {
 pub struct Rule {
     pub name: String,
     pub pattern: Vec<Slot>,
+    pub pattern_str: String,
     pub template: String,
     pub kind: String,
     pub sem: Option<SemSpec>,
@@ -41,6 +42,7 @@ fn compile_rule(r: &FixtureRule) -> Result<Rule> {
     Ok(Rule {
         name: r.name.clone(),
         pattern,
+        pattern_str: r.pattern.clone(),
         template: r.template.clone(),
         kind: r.kind.clone(),
         sem,

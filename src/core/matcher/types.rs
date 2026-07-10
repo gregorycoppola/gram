@@ -60,11 +60,14 @@ pub struct Constituent {
     pub sem_value: Option<SemValue>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<Constituent>,
+    pub rule_name: String,
+    pub pattern: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Match {
     pub rule_name: String,
+    pub pattern: String,
     pub kind: String,
     pub output: String,
     pub bindings: BTreeMap<String, (String, String)>,
@@ -166,6 +169,7 @@ pub struct SpanResult {
     pub sem_value: SemValue,
     pub output: String,
     pub rule_name: String,
+    pub pattern: String,
     pub kind: String,
     pub bindings: BTreeMap<String, (String, String)>,
     pub token_annotations: Vec<TokenAnnotation>,
@@ -182,15 +186,5 @@ pub fn kind_to_syntax_label(kind: &str) -> String {
         "s\\patient" => "S\\patient".to_string(),
         "s\\theme" => "S\\theme".to_string(),
         _ => kind.to_uppercase(),
-    }
-}
-
-pub fn parse_sub_index(key: &str) -> Option<usize> {
-    if key == "SUB" {
-        Some(0)
-    } else if let Some(rest) = key.strip_prefix("SUB") {
-        rest.parse::<usize>().ok()
-    } else {
-        None
     }
 }

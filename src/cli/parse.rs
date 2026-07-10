@@ -146,7 +146,7 @@ fn emit_pretty(results: &[ParsedSentence]) {
                 println!("     {}", syn);
             }
             emit_constituents(&m.constituents, 2);
-            println!("     → {}  [{}]", m.output, m.rule_name);
+            println!("     → {}  [{}: {}]", m.output, m.rule_name, m.pattern);
             if let Some(e) = &m.semantics_check {
                 println!("     ⚠️  semantics: {}", e);
             }
@@ -159,7 +159,7 @@ fn emit_pretty(results: &[ParsedSentence]) {
                     println!("     {}", syn);
                 }
                 emit_constituents(&m.constituents, 2);
-                println!("     → {}  [{}]", m.output, m.rule_name);
+                println!("     → {}  [{}: {}]", m.output, m.rule_name, m.pattern);
                 if let Some(e) = &m.semantics_check {
                     println!("       ⚠️  semantics: {}", e);
                 }
@@ -180,6 +180,9 @@ fn emit_constituents(constituents: &[crate::core::matcher::Constituent], indent:
             _ => String::new(),
         };
         println!("{}[{}] {}", pad, c.label, c.semantics);
+        if !c.rule_name.is_empty() {
+            println!("{}     [{}: {}]", pad, c.rule_name, c.pattern);
+        }
         if !span_str.is_empty() {
             println!("{}     {}", pad, span_str);
         }

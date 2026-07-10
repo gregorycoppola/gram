@@ -130,7 +130,7 @@ fn parse_bottom_up(
         )?;
 
         if let Some(t) = &mut trace {
-            t.push(&format!("→ {} [{}]", result.output, result.rule_name));
+            t.push(&format!("→ {} [{}: {}]", result.output, result.rule_name, result.pattern));
             t.leave();
         }
 

@@ -1,4 +1,3 @@
-// gram/src/core/matcher/engine.rs
 use std::collections::{BTreeMap, HashMap};
 
 use crate::core::construct::{Arg, apply_constructor};
@@ -37,7 +36,7 @@ pub fn try_pattern_match(
             KindFilter::Only(_) => {}
         }
         if let Some(t) = &mut trace {
-            t.push(&format!("try: {} (kind: {})", rule.name, rule.kind));
+            t.push(&format!("try: {} (kind: {}): {}", rule.name, rule.kind, rule.pattern_str));
         }
         let bindings = BTreeMap::new();
         let log: Vec<Consumption> = Vec::new();
@@ -72,6 +71,7 @@ pub fn try_pattern_match(
                 sem_value: sem_value.unwrap_or_else(|| SemValue::Prop(crate::core::logic::Expr::Entity("_no_sem".into()))),
                 output,
                 rule_name: rule.name.clone(),
+                pattern: rule.pattern_str.clone(),
                 kind: rule.kind.clone(),
                 bindings: b,
                 token_annotations: local_annotations,
@@ -232,6 +232,8 @@ fn match_pattern(
                         syntax_tree,
                         sem_value: Some(cached.sem_value.clone()),
                         children: vec![],
+                        rule_name: cached.rule_name.clone(),
+                        pattern: cached.pattern.clone(),
                     };
                     let mut trial_constituents = constituents;
                     trial_constituents.push(constituent);
@@ -269,6 +271,8 @@ fn match_pattern(
                             syntax_tree,
                             sem_value: Some(cached.sem_value.clone()),
                             children: vec![],
+                            rule_name: cached.rule_name.clone(),
+                            pattern: cached.pattern.clone(),
                         });
                         if let Some(result) = match_pattern(
                             pattern, pi + 1, tokens, end,
