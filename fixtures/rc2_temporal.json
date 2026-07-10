@@ -1,0 +1,25 @@
+{
+  "lexicon": {
+    "predicates": [
+      {"name": "got", "roles": {"agent": "e", "theme": "e"}, "forms": ["got"]},
+      {"name": "baked", "roles": {"agent": "e", "patient": "e"}, "forms": ["baked"]},
+      {"name": "cake", "roles": {"theme": "e"}, "forms": ["cake"]}
+    ],
+    "entities": [
+      {"name": "sophie", "type": "e", "forms": ["Sophie"]},
+      {"name": "tom", "type": "e", "forms": ["Tom"]},
+      {"name": "home", "type": "e", "forms": ["home"]}
+    ]
+  },
+  "grammar": [
+    {"name": "bare_dp", "pattern": "$x:e", "sem": "bare_dp($x)", "kind": "dp"},
+    {"name": "a_dp", "pattern": "A $N:{theme:e}", "sem": "a_dp($N, theme)", "kind": "dp"},
+    {"name": "s_intransitive", "pattern": "SUB:dp[$x:e] $V:{agent:e,theme:e} SUB:dp", "sem": "s_transitive($SUB, $SUB1, $V, agent, theme)", "kind": "s"},
+    {"name": "s_transitive", "pattern": "SUB:dp[$x:e] $V:{agent:e,patient:e} SUB:dp", "sem": "s_transitive($SUB, $SUB1, $V, agent, patient)", "kind": "s"},
+    {"name": "s_when", "pattern": "LIT:when SUB:s SUB:s", "sem": "s_when($SUB, $SUB1)", "kind": "s"}
+  ],
+  "sentences": [
+    {"tokens": ["when", "Sophie", "got", "home", "Tom", "baked", "a", "cake"], "spans": [["dp", 1, 2], ["dp", 3, 4], ["s", 1, 4], ["dp", 4, 5], ["dp", 6, 8], ["s", 4, 8], ["s", 0, 8]]},
+    {"tokens": ["when", "Sophie", "got", "home", "Sophie", "baked", "a", "cake"], "spans": [["dp", 1, 2], ["dp", 3, 4], ["s", 1, 4], ["dp", 4, 5], ["dp", 6, 8], ["s", 4, 8], ["s", 0, 8]]}
+  ]
+}

@@ -1,3 +1,4 @@
+// gram/src/core/construct.rs
 use crate::core::logic::Expr;
 use crate::core::value::{DpQuant, GapProp, SemValue, VarGen};
 
@@ -22,11 +23,13 @@ pub fn apply_constructor(
         "adj_n" => construct_adj_n(args, var_gen),
         "the_n_dp" => construct_the_n_dp(args),
         "a_n_dp" => construct_a_n_dp(args),
+        "a_dp" => construct_a_dp(args, var_gen),
         "the_of_dp" => construct_the_of_dp(args, var_gen),
         "adj_of_n" => construct_adj_of_n(args, var_gen),
         "s_copula" => construct_s_copula(args),
         "s_copula_adj_n" => construct_s_copula_adj_n(args),
         "s_equative" => construct_s_equative(args),
+        "s_when" => construct_s_when(args),
         "s_transitive" => construct_s_transitive(args),
         "s_ditransitive" => construct_s_ditransitive(args),
         "s_complement" => construct_s_complement(args),
@@ -187,6 +190,35 @@ fn construct_a_n_dp(args: &[Arg]) -> Result<SemValue, String> {
         var: n_var,
         var_type: "e".to_string(),
         quant: DpQuant::Exists { restriction: n_restriction },
+    })
+}
+
+fn construct_a_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, String> {
+    if args.len() != 2 {
+        return Err(format!("a_dp expects 2 args, got {}", args.len()));
+    }
+    let pred_name = match &args[0] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("a_dp: first arg must be a lexical binding".into()),
+    };
+    let role = match &args[1] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("a_dp: second arg must be a literal role name".into()),
+    };
+
+    let var = var_gen.fresh();
+    let restriction = Expr::Pred {
+        name: pred_name,
+        roles: vec![(role, Expr::Var {
+            name: var.clone(),
+            typ: "e".to_string(),
+        })],
+    };
+
+    Ok(SemValue::Dp {
+        var,
+        var_type: "e".to_string(),
+        quant: DpQuant::Exists { restriction },
     })
 }
 
@@ -354,6 +386,29 @@ fn construct_s_equative(args: &[Arg]) -> Result<SemValue, String> {
 
     let body = substitute_var_name(obj_restriction, &obj_var, &subj_var);
     let expr = expand_quant(subj_var, subj_type, &subj_quant, body)?;
+    Ok(SemValue::Prop(expr))
+}
+
+fn construct_s_when(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 2 {
+        return Err(format!("s_when expects 2 args, got {}", args.len()));
+    }
+    let event = match &args[0] {
+        Arg::Sub(SemValue::Prop(expr)) => expr.clone(),
+        _ => return Err("s_when: first arg must be a Prop".into()),
+    };
+    let main = match &args[1] {
+        Arg::Sub(SemValue::Prop(expr)) => expr.clone(),
+        _ => return Err("s_when: second arg must be a Prop".into()),
+    };
+
+    let expr = Expr::Pred {
+        name: "when".to_string(),
+        roles: vec![
+            ("event".to_string(), event),
+            ("main".to_string(), main),
+        ],
+    };
     Ok(SemValue::Prop(expr))
 }
 
