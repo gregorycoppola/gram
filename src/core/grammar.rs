@@ -1,4 +1,3 @@
-
 use anyhow::{anyhow, Result};
 
 use crate::core::fixture::FixtureRule;
@@ -6,7 +5,6 @@ use crate::core::sem_dsl::SemSpec;
 
 #[derive(Debug, Clone)]
 pub enum Slot {
-    Ignore,
     Literal(String),
     Keyword(String),
     Var { name: String, type_constraint: Option<String> },
@@ -23,7 +21,6 @@ pub struct Rule {
     pub pattern: Vec<Slot>,
     pub template: String,
     pub kind: String,
-    /// Parsed semantic constructor spec. If present, used instead of template.
     pub sem: Option<SemSpec>,
 }
 
@@ -51,9 +48,6 @@ fn compile_rule(r: &FixtureRule) -> Result<Rule> {
 }
 
 fn parse_slot(spec: &str) -> Result<Slot> {
-    if spec == "_" {
-        return Ok(Slot::Ignore);
-    }
     if let Some(rest) = spec.strip_prefix("LIT:") {
         return Ok(Slot::Literal(rest.to_lowercase()));
     }
