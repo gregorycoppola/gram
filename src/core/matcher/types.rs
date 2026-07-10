@@ -82,6 +82,8 @@ pub struct Match {
     pub semantics_check: Option<String>,
     #[serde(skip)]
     pub sem_value: Option<SemValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub span: Option<(usize, usize)>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
