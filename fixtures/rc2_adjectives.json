@@ -1,0 +1,23 @@
+{
+  "lexicon": {
+    "predicates": [
+      {"name": "happy", "roles": {"theme": "e"}, "forms": ["happy"]},
+      {"name": "woman", "roles": {"theme": "e"}, "forms": ["woman"]},
+      {"name": "person", "roles": {"theme": "e"}, "forms": ["person"]}
+    ],
+    "entities": [
+      {"name": "sue", "type": "e", "forms": ["Sue"]}
+    ]
+  },
+  "grammar": [
+    {"name": "the_dp", "pattern": "THE $N:{theme:e}", "sem": "the_dp($N, theme)", "kind": "dp"},
+    {"name": "a_dp", "pattern": "A $N:{theme:e}", "sem": "a_dp($N, theme)", "kind": "dp"},
+    {"name": "bare_dp", "pattern": "$x:e", "sem": "bare_dp($x)", "kind": "dp"},
+    {"name": "a_adj_dp", "pattern": "A $A:{theme:e} $N:{theme:e}", "sem": "a_adj_dp($A, $N, theme)", "kind": "dp"},
+    {"name": "s_copula", "pattern": "SUB:dp[$x:e] COP $P:{theme:e}", "sem": "s_copula($SUB, $P, theme)", "kind": "s"}
+  ],
+  "sentences": [
+    {"tokens": ["Sue", "is", "a", "happy", "woman"], "spans": [["dp", 0, 1], ["dp", 2, 5], ["s", 0, 5]]},
+    {"tokens": ["the", "woman", "is", "a", "happy", "person"], "spans": [["dp", 0, 2], ["dp", 3, 6], ["s", 0, 6]]}
+  ]
+}
