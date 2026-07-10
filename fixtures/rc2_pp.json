@@ -1,0 +1,23 @@
+{
+  "lexicon": {
+    "predicates": [
+      {"name": "man", "roles": {"theme": "e"}, "forms": ["man"]},
+      {"name": "girl", "roles": {"theme": "e"}, "forms": ["girl"]},
+      {"name": "happy", "roles": {"theme": "e"}, "forms": ["happy"]}
+    ],
+    "entities": [
+      {"name": "nantucket", "type": "e", "forms": ["Nantucket"]},
+      {"name": "doll", "type": "e", "forms": ["doll"]}
+    ]
+  },
+  "grammar": [
+    {"name": "bare_dp", "pattern": "$x:e", "sem": "bare_dp($x)", "kind": "dp"},
+    {"name": "the_from_dp", "pattern": "THE $N:{theme:e} LIT:from SUB:dp", "sem": "the_pp_dp($N, from, $SUB, theme, complement)", "kind": "dp"},
+    {"name": "the_with_dp", "pattern": "THE $N:{theme:e} LIT:with SUB:dp", "sem": "the_pp_dp($N, with, $SUB, theme, complement)", "kind": "dp"},
+    {"name": "s_copula", "pattern": "SUB:dp[$x:e] COP $P:{theme:e}", "sem": "s_copula($SUB, $P, theme)", "kind": "s"}
+  ],
+  "sentences": [
+    {"tokens": ["the", "man", "from", "Nantucket", "is", "happy"], "spans": [["dp", 3, 4], ["dp", 0, 4], ["s", 0, 6]]},
+    {"tokens": ["the", "girl", "with", "doll", "is", "happy"], "spans": [["dp", 3, 4], ["dp", 0, 4], ["s", 0, 6]]}
+  ]
+}
