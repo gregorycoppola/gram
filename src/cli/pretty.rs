@@ -78,7 +78,7 @@ fn print_token_chips(tokens: &[String], annotations: &[TokenAnnotation]) {
             {
                 j += 1;
             }
-            let text = tokens[i..j].join(" ");
+            let _text = tokens[i..j].join(" ");
             let var = a.variable.as_deref().unwrap_or("");
             let kind = format!("{:?}", a.kind).to_lowercase();
             print!("  ┌─{}─{}─┐ ", kind, var);
