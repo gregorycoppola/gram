@@ -1,0 +1,14 @@
+{
+  "title": "Socrates is mortal",
+  "premises": [
+    "always [x:e]: man(theme: x) -> mortal(theme: x)",
+    "man(theme: socrates)"
+  ],
+  "conclusion": "mortal(theme: socrates)",
+  "proof": [
+    {"step": 1, "formula": "always [x:e]: man(theme: x) -> mortal(theme: x)", "justification": "premise"},
+    {"step": 2, "formula": "man(theme: socrates)", "justification": "premise"},
+    {"step": 3, "formula": "man(theme: socrates) -> mortal(theme: socrates)", "justification": "universal_elim", "from": [1], "substitution": {"x": "socrates"}},
+    {"step": 4, "formula": "mortal(theme: socrates)", "justification": "modus_ponens", "from": [2, 3]}
+  ]
+}
