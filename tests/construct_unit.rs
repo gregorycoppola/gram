@@ -1,4 +1,4 @@
-use gram::core::construct::{apply_constructor, Arg};
+use gram::core::construct::{apply_constructor, Arg, substitute_var_name};
 use gram::core::logic::Expr;
 use gram::core::value::{DpQuant, GapProp, SemValue, VarGen};
 
