@@ -1,3 +1,4 @@
+// gram/src/core/matcher/engine.rs
 use std::collections::{BTreeMap, HashMap};
 
 use crate::core::construct::{Arg, apply_constructor};
@@ -218,7 +219,7 @@ fn match_pattern(
                     let mut new_bindings = bindings.clone();
                     let mut new_log = log.clone();
                     new_log.push(Consumption::SubClause { start: sub_start, end });
-                    let sub_key = if sub_count == 0 { "SUB".into() } else { format!("SUB{}", sub_count + 1) };
+                    let sub_key = if sub_count == 0 { "SUB".into() } else { format!("SUB{}", sub_count) };
                     new_bindings.insert(sub_key, (cached.output.clone(), label.clone()));
                     let sub_tokens_slice = &tokens[sub_start..end];
                     let syntax_tree = Some(build_syntax_tree_for_result(cached, sub_tokens_slice, global_offset + sub_start));
@@ -255,7 +256,7 @@ fn match_pattern(
                         let mut new_bindings = bindings.clone();
                         let mut new_log = log.clone();
                         new_log.push(Consumption::SubClause { start: sub_start, end });
-                        let sub_key = if sub_count == 0 { "SUB".into() } else { format!("SUB{}", sub_count + 1) };
+                        let sub_key = if sub_count == 0 { "SUB".into() } else { format!("SUB{}", sub_count) };
                         new_bindings.insert(sub_key, (cached.output.clone(), label.clone()));
                         let sub_tokens_slice = &tokens[sub_start..end];
                         let syntax_tree = Some(build_syntax_tree_for_result(cached, sub_tokens_slice, global_offset + sub_start));
@@ -292,7 +293,7 @@ fn resolve_and_construct(
 ) -> Result<(SemValue, String), String> {
     let mut sub_values: BTreeMap<String, SemValue> = BTreeMap::new();
     for (i, constituent) in constituents.iter().enumerate() {
-        let key = if i == 0 { "SUB".into() } else { format!("SUB{}", i + 1) };
+        let key = if i == 0 { "SUB".into() } else { format!("SUB{}", i) };
         if let Some(ref sv) = constituent.sem_value {
             sub_values.insert(key, sv.clone());
         }
