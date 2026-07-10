@@ -1,4 +1,5 @@
 pub mod api;
+pub mod check;
 pub mod inspect;
 pub mod parse;
 pub mod pretty;
@@ -23,6 +24,8 @@ pub enum Command {
     /// Run the HTTP server on localhost. Serves fixtures from a directory;
     /// the gloss frontend is a separate Vite app that talks to this API.
     Serve(serve::ServeArgs),
+    /// Check a proof file for valid inference steps.
+    Check(check::CheckArgs),
 }
 
 pub fn run(command: Command) -> Result<()> {
@@ -33,5 +36,6 @@ pub fn run(command: Command) -> Result<()> {
         Command::Tree(args) => tree::run_tree(args),
         Command::Api(args) => api::run_api(args),
         Command::Serve(args) => serve::run_serve(args),
+        Command::Check(args) => check::run_check(args),
     }
 }
