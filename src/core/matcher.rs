@@ -122,7 +122,6 @@ fn parse_bottom_up(
             span_tokens,
             span.start,
             span,
-            &direct_children,
             lexicon,
             rules,
             &mut var_gen,
@@ -159,12 +158,11 @@ fn match_span(
     span_tokens: &[String],
     global_start: usize,
     span: &Span,
-    direct_children: &[SpanKey],
     lexicon: &Lexicon,
     rules: &[Rule],
     var_gen: &mut VarGen,
     cache: &HashMap<SpanKey, SpanResult>,
-    mut trace: Option<&mut DebugTrace>,
+    trace: Option<&mut DebugTrace>,
 ) -> Result<SpanResult, String> {
     try_pattern_match(span_tokens, global_start, span, lexicon, rules, var_gen, cache, trace)
         .ok_or_else(|| format!(

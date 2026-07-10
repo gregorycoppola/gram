@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 use crate::core::construct::{Arg, apply_constructor};
 use crate::core::fixture::Span;
@@ -9,7 +9,7 @@ use crate::core::template::apply_template;
 use crate::core::value::{SemValue, VarGen};
 
 use super::types::*;
-use super::tree::{build_syntax_tree_for_result, build_syntax_tree, build_syntax_tree_from_constituent, build_syntax, offset_constituents};
+use super::tree::{build_syntax_tree_for_result, offset_constituents};
 
 // --- Pattern matching (cache-aware) ---
 

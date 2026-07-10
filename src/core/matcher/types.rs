@@ -149,7 +149,6 @@ pub enum Consumption {
     Var { variable: String, canonical: String, typ: String, start: usize, end: usize },
     Keyword { class: String, position: usize },
     Literal { position: usize },
-    Ignore { position: usize },
     Skipped { position: usize },
     SubClause { start: usize, end: usize },
 }
