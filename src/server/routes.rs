@@ -89,14 +89,13 @@ pub async fn handle_fixture(
     State(state): State<AppState>,
     Path(path): Path<String>,
 ) -> AppResult<Json<Value>> {
-    let path = path.trim_start_matches('/');
     if let Some(name) = path.strip_suffix("/parse") {
         let results = do_parse_fixture(state, name).await?;
         let value = serde_json::to_value(results)
             .map_err(|e| anyhow::anyhow!("serializing parse results: {}", e))?;
         Ok(Json(value))
     } else {
-        let raw = do_get_fixture(state, path).await?;
+        let raw = do_get_fixture(state, &path).await?;
         let value: Value = serde_json::from_str(&raw)
             .map_err(|e| anyhow::anyhow!("parsing fixture JSON: {}", e))?;
         Ok(Json(value))

@@ -26,7 +26,7 @@ pub async fn run_server(port: u16, fixtures_dir: PathBuf) -> Result<()> {
     let app = Router::new()
         .route("/health", get(routes::health))
         .route("/fixtures", get(routes::list_fixtures))
-        .route("/fixtures/{*path}", get(routes::handle_fixture))
+        .route("/fixtures/*path", get(routes::handle_fixture))
         .route("/parse/one", post(routes::parse_one))
         .with_state(state)
         .layer(cors)
