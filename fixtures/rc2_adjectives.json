@@ -11,7 +11,7 @@
   },
   "grammar": [
     {"name": "bare_n", "pattern": "$N:{theme:e}", "sem": "bare_n($N, theme)", "kind": "n"},
-    {"name": "adj_n", "pattern": "$A:{theme:e} SUB:n", "sem": "adj_n($A, $SUB, theme)", "kind": "n"},
+    {"name": "adj_n", "pattern": "$A:{theme:e} SUB:n", "sem": "adj_n($A, theme, $SUB)", "kind": "n"},
     {"name": "the_n_dp", "pattern": "THE SUB:n", "sem": "the_n_dp($SUB)", "kind": "dp"},
     {"name": "a_n_dp", "pattern": "A SUB:n", "sem": "a_n_dp($SUB)", "kind": "dp"},
     {"name": "bare_dp", "pattern": "$x:e", "sem": "bare_dp($x)", "kind": "dp"},
