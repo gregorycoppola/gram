@@ -20,6 +20,11 @@
         "name": "happy",
         "roles": {"theme": "e"},
         "forms": ["happy"]
+      },
+      {
+        "name": "want",
+        "roles": {"agent": "e", "patient": "e"},
+        "forms": ["want"]
       }
     ],
     "entities": [
@@ -32,6 +37,16 @@
         "name": "tom",
         "type": "e",
         "forms": ["Tom"]
+      },
+      {
+        "name": "you",
+        "type": "e",
+        "forms": ["you"]
+      },
+      {
+        "name": "apples",
+        "type": "e",
+        "forms": ["apples"]
       }
     ]
   },
@@ -135,6 +150,14 @@
       "spans": [
         ["dp", 0, 1],
         ["dp", 2, 4]
+      ]
+    },
+    {
+      "tokens": ["you", "want", "apples"],
+      "spans": [
+        ["dp", 0, 1],
+        ["dp", 2, 3],
+        ["s", 0, 3]
       ]
     }
   ]

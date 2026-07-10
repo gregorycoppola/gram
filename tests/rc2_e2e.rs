@@ -28,7 +28,7 @@ fn transitive_all_parse() {
     for (sentence, result) in &results {
         assert!(result.is_ok(), "transitive failed on \"{}\": {}", sentence, result.as_ref().unwrap_err());
     }
-    assert_eq!(results.len(), 9);
+    assert_eq!(results.len(), 10);
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn nested_all_parse() {
     for (sentence, result) in &results {
         assert!(result.is_ok(), "nested failed on \"{}\": {}", sentence, result.as_ref().unwrap_err());
     }
-    assert_eq!(results.len(), 5);
+    assert_eq!(results.len(), 6);
 }
 
 #[test]
@@ -47,4 +47,13 @@ fn relative_all_parse() {
         assert!(result.is_ok(), "relative failed on \"{}\": {}", sentence, result.as_ref().unwrap_err());
     }
     assert_eq!(results.len(), 5);
+}
+
+#[test]
+fn wh_all_parse() {
+    let results = parse_fixture("rc2_wh");
+    for (sentence, result) in &results {
+        assert!(result.is_ok(), "wh failed on \"{}\": {}", sentence, result.as_ref().unwrap_err());
+    }
+    assert_eq!(results.len(), 1);
 }
