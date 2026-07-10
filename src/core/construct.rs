@@ -18,7 +18,12 @@ pub fn apply_constructor(
         "exists_dp" => construct_quant_dp(DpQuantKind::Exists, args, var_gen),
         "forall_dp" => construct_quant_dp(DpQuantKind::ForAll, args, var_gen),
         "bare_dp" => construct_bare_dp(args),
+        "bare_n" => construct_bare_n(args, var_gen),
+        "adj_n" => construct_adj_n(args, var_gen),
+        "the_n_dp" => construct_the_n_dp(args),
+        "a_n_dp" => construct_a_n_dp(args),
         "s_copula" => construct_s_copula(args),
+        "s_copula_adj_n" => construct_s_copula_adj_n(args),
         "s_transitive" => construct_s_transitive(args),
         "s_ditransitive" => construct_s_ditransitive(args),
         "s_complement" => construct_s_complement(args),
@@ -86,6 +91,102 @@ fn construct_bare_dp(args: &[Arg]) -> Result<SemValue, String> {
     })
 }
 
+fn construct_bare_n(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, String> {
+    if args.len() != 2 {
+        return Err(format!("bare_n expects 2 args, got {}", args.len()));
+    }
+    let pred_name = match &args[0] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("bare_n: first arg must be a lexical binding".into()),
+    };
+    let role = match &args[1] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("bare_n: second arg must be a literal role name".into()),
+    };
+
+    let var = var_gen.fresh();
+    let restriction = Expr::Pred {
+        name: pred_name,
+        roles: vec![(role, Expr::Var {
+            name: var.clone(),
+            typ: "e".to_string(),
+        })],
+    };
+
+    Ok(SemValue::N { var, restriction })
+}
+
+fn construct_adj_n(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, String> {
+    if args.len() != 3 {
+        return Err(format!("adj_n expects 3 args, got {}", args.len()));
+    }
+    let adj_name = match &args[0] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("adj_n: first arg must be a lexical binding".into()),
+    };
+    let role = match &args[1] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("adj_n: second arg must be a literal role name".into()),
+    };
+    let (n_var, n_restriction) = match &args[2] {
+        Arg::Sub(SemValue::N { var, restriction }) => {
+            (var.clone(), restriction.clone())
+        }
+        _ => return Err("adj_n: third arg must be an N".into()),
+    };
+
+    let adj_restriction = Expr::Pred {
+        name: adj_name,
+        roles: vec![(role, Expr::Var {
+            name: n_var.clone(),
+            typ: "e".to_string(),
+        })],
+    };
+
+    let restriction = Expr::And(
+        Box::new(adj_restriction),
+        Box::new(n_restriction),
+    );
+
+    Ok(SemValue::N { var: n_var, restriction })
+}
+
+fn construct_the_n_dp(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 1 {
+        return Err(format!("the_n_dp expects 1 arg, got {}", args.len()));
+    }
+    let (n_var, n_restriction) = match &args[0] {
+        Arg::Sub(SemValue::N { var, restriction }) => {
+            (var.clone(), restriction.clone())
+        }
+        _ => return Err("the_n_dp: arg must be an N".into()),
+    };
+
+    Ok(SemValue::Dp {
+        var: n_var,
+        var_type: "e".to_string(),
+        quant: DpQuant::The { restriction: n_restriction },
+    })
+}
+
+fn construct_a_n_dp(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 1 {
+        return Err(format!("a_n_dp expects 1 arg, got {}", args.len()));
+    }
+    let (n_var, n_restriction) = match &args[0] {
+        Arg::Sub(SemValue::N { var, restriction }) => {
+            (var.clone(), restriction.clone())
+        }
+        _ => return Err("a_n_dp: arg must be an N".into()),
+    };
+
+    Ok(SemValue::Dp {
+        var: n_var,
+        var_type: "e".to_string(),
+        quant: DpQuant::Exists { restriction: n_restriction },
+    })
+}
+
 fn construct_s_copula(args: &[Arg]) -> Result<SemValue, String> {
     if args.len() != 3 {
         return Err(format!("s_copula expects 3 args, got {}", args.len()));
@@ -114,6 +215,32 @@ fn construct_s_copula(args: &[Arg]) -> Result<SemValue, String> {
     };
 
     let expr = expand_quant(var, var_type, &quant, body)?;
+    Ok(SemValue::Prop(expr))
+}
+
+fn construct_s_copula_adj_n(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 3 {
+        return Err(format!("s_copula_adj_n expects 3 args, got {}", args.len()));
+    }
+    let (subj_var, subj_type, subj_quant) = match &args[0] {
+        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
+            (var.clone(), var_type.clone(), quant.clone())
+        }
+        _ => return Err("s_copula_adj_n: first arg must be a DP".into()),
+    };
+    let (n_var, n_restriction) = match &args[1] {
+        Arg::Sub(SemValue::N { var, restriction }) => {
+            (var.clone(), restriction.clone())
+        }
+        _ => return Err("s_copula_adj_n: second arg must be an N".into()),
+    };
+    let _role = match &args[2] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("s_copula_adj_n: third arg must be a literal role name".into()),
+    };
+
+    let body = substitute_var_name(n_restriction, &n_var, &subj_var);
+    let expr = expand_quant(subj_var, subj_type, &subj_quant, body)?;
     Ok(SemValue::Prop(expr))
 }
 
