@@ -1,10 +1,9 @@
-
 use serde::{Deserialize, Serialize};
 
 use crate::core::matcher::Match;
 
 /// One parsed sentence — the unit gloss renders.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ParseResult {
     pub sentence: String,
     pub tokens: Vec<String>,
@@ -12,7 +11,7 @@ pub struct ParseResult {
     pub status: ParseStatus,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ParseStatus {
     Parsed,

@@ -1,6 +1,9 @@
 use anyhow::{Context, Result};
 use clap::{Args, Subcommand};
 
+use crate::cli::pretty::print_pretty;
+use crate::server::ParseResult;
+
 #[derive(Subcommand)]
 pub enum ApiCommand {
     /// GET /health
@@ -14,6 +17,9 @@ pub enum ApiCommand {
     /// GET /fixtures/:name/parse — parse all sentences in a fixture
     Parse {
         name: String,
+        /// Pretty-print the response (bracket tree, constituents, rule trace) instead of raw JSON.
+        #[arg(long)]
+        pretty: bool,
     },
     /// POST /parse/one — parse a single sentence
     ParseOne {
@@ -21,6 +27,9 @@ pub enum ApiCommand {
         fixture: String,
         #[arg(long)]
         sentence: String,
+        /// Pretty-print the response (bracket tree, constituents, rule trace) instead of raw JSON.
+        #[arg(long)]
+        pretty: bool,
     },
 }
 
@@ -43,21 +52,21 @@ pub fn run_api(args: ApiArgs) -> Result<()> {
 async fn run_api_async(args: ApiArgs) -> Result<()> {
     let base = args.url.trim_end_matches('/');
 
-    let url = match args.command {
-        ApiCommand::Health => format!("{}/health", base),
-        ApiCommand::Fixtures => format!("{}/fixtures", base),
-        ApiCommand::Fixture { ref name } => format!("{}/fixtures/{}", base, name),
-        ApiCommand::Parse { ref name } => format!("{}/fixtures/{}/parse", base, name),
-        ApiCommand::ParseOne { .. } => format!("{}/parse/one", base),
+    let (url, pretty) = match &args.command {
+        ApiCommand::Health => (format!("{}/health", base), false),
+        ApiCommand::Fixtures => (format!("{}/fixtures", base), false),
+        ApiCommand::Fixture { name } => (format!("{}/fixtures/{}", base, name), false),
+        ApiCommand::Parse { name, pretty } => (format!("{}/fixtures/{}/parse", base, name), *pretty),
+        ApiCommand::ParseOne { fixture, sentence, pretty } => {
+            let _ = (fixture, sentence); // used in POST body below
+            (format!("{}/parse/one", base), *pretty)
+        }
     };
 
     let client = reqwest::Client::new();
 
-    let resp = match args.command {
-        ApiCommand::ParseOne {
-            ref fixture,
-            ref sentence,
-        } => client
+    let resp = match &args.command {
+        ApiCommand::ParseOne { fixture, sentence, .. } => client
             .post(&url)
             .json(&serde_json::json!({
                 "fixture": fixture,
@@ -74,18 +83,25 @@ async fn run_api_async(args: ApiArgs) -> Result<()> {
     };
 
     let status = resp.status();
-    let body: serde_json::Value = resp
-        .json()
+    let body_text = resp
+        .text()
         .await
         .with_context(|| format!("reading response body from {}", url))?;
 
     if !status.is_success() {
+        let body: serde_json::Value = serde_json::from_str(&body_text).unwrap_or(serde_json::json!({}));
         anyhow::bail!("{} -> {}: {}", url, status, body);
     }
 
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&body).context("serializing response")?
-    );
+    if pretty {
+        let results: Vec<ParseResult> = serde_json::from_str(&body_text)
+            .with_context(|| "deserializing parse results for pretty-print")?;
+        print_pretty(&results);
+        return Ok(());
+    }
+
+    let body: serde_json::Value = serde_json::from_str(&body_text)
+        .with_context(|| format!("parsing JSON response from {}", url))?;
+    println!("{}", serde_json::to_string_pretty(&body).context("serializing response")?);
     Ok(())
 }

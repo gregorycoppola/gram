@@ -1,6 +1,7 @@
 pub mod api;
 pub mod inspect;
 pub mod parse;
+pub mod pretty;
 pub mod serve;
 pub mod tree;
 
