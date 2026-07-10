@@ -1,0 +1,13 @@
+{
+  "title": "John is believable, so Sue is here",
+  "premises": [
+    "say(agent: john, content: here(theme: sue))",
+    "believable(theme: john)"
+  ],
+  "conclusion": "here(theme: sue)",
+  "proof": [
+    {"step": 1, "formula": "say(agent: john, content: here(theme: sue))", "justification": "premise"},
+    {"step": 2, "formula": "believable(theme: john)", "justification": "premise"},
+    {"step": 3, "formula": "here(theme: sue)", "justification": "belief_elim", "from": [1, 2]}
+  ]
+}
