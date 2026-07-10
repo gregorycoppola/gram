@@ -22,8 +22,10 @@ pub fn apply_constructor(
         "adj_n" => construct_adj_n(args, var_gen),
         "the_n_dp" => construct_the_n_dp(args),
         "a_n_dp" => construct_a_n_dp(args),
+        "the_of_dp" => construct_the_of_dp(args, var_gen),
         "s_copula" => construct_s_copula(args),
         "s_copula_adj_n" => construct_s_copula_adj_n(args),
+        "s_equative" => construct_s_equative(args),
         "s_transitive" => construct_s_transitive(args),
         "s_ditransitive" => construct_s_ditransitive(args),
         "s_complement" => construct_s_complement(args),
@@ -116,7 +118,7 @@ fn construct_bare_n(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, Stri
     Ok(SemValue::N { var, restriction })
 }
 
-fn construct_adj_n(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, String> {
+fn construct_adj_n(args: &[Arg], _var_gen: &mut VarGen) -> Result<SemValue, String> {
     if args.len() != 3 {
         return Err(format!("adj_n expects 3 args, got {}", args.len()));
     }
@@ -187,6 +189,45 @@ fn construct_a_n_dp(args: &[Arg]) -> Result<SemValue, String> {
     })
 }
 
+fn construct_the_of_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, String> {
+    if args.len() != 4 {
+        return Err(format!("the_of_dp expects 4 args, got {}", args.len()));
+    }
+    let pred_name = match &args[0] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("the_of_dp: first arg must be lexical".into()),
+    };
+    let theme_role = match &args[2] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("the_of_dp: third arg must be literal".into()),
+    };
+    let loc_role = match &args[3] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("the_of_dp: fourth arg must be literal".into()),
+    };
+    let (obj_var, obj_type) = match &args[1] {
+        Arg::Sub(SemValue::Dp { var, var_type, quant: DpQuant::Bare }) => {
+            (var.clone(), var_type.clone())
+        }
+        _ => return Err("the_of_dp: second arg must be a bare DP".into()),
+    };
+
+    let var = var_gen.fresh();
+    let restriction = Expr::Pred {
+        name: pred_name,
+        roles: vec![
+            (theme_role, Expr::Var { name: var.clone(), typ: "e".to_string() }),
+            (loc_role, Expr::Var { name: obj_var, typ: obj_type }),
+        ],
+    };
+
+    Ok(SemValue::Dp {
+        var,
+        var_type: "e".to_string(),
+        quant: DpQuant::The { restriction },
+    })
+}
+
 fn construct_s_copula(args: &[Arg]) -> Result<SemValue, String> {
     if args.len() != 3 {
         return Err(format!("s_copula expects 3 args, got {}", args.len()));
@@ -240,6 +281,29 @@ fn construct_s_copula_adj_n(args: &[Arg]) -> Result<SemValue, String> {
     };
 
     let body = substitute_var_name(n_restriction, &n_var, &subj_var);
+    let expr = expand_quant(subj_var, subj_type, &subj_quant, body)?;
+    Ok(SemValue::Prop(expr))
+}
+
+fn construct_s_equative(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 2 {
+        return Err(format!("s_equative expects 2 args, got {}", args.len()));
+    }
+    let (subj_var, subj_type, subj_quant) = match &args[0] {
+        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
+            (var.clone(), var_type.clone(), quant.clone())
+        }
+        _ => return Err("s_equative: first arg must be a DP".into()),
+    };
+    let (obj_var, obj_restriction) = match &args[1] {
+        Arg::Sub(SemValue::Dp { var, quant: DpQuant::The { restriction }, .. }) |
+        Arg::Sub(SemValue::Dp { var, quant: DpQuant::Exists { restriction }, .. }) => {
+            (var.clone(), restriction.clone())
+        }
+        _ => return Err("s_equative: second arg must be a quantified DP".into()),
+    };
+
+    let body = substitute_var_name(obj_restriction, &obj_var, &subj_var);
     let expr = expand_quant(subj_var, subj_type, &subj_quant, body)?;
     Ok(SemValue::Prop(expr))
 }

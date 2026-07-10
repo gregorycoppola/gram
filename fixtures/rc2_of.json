@@ -1,0 +1,21 @@
+{
+  "lexicon": {
+    "predicates": [
+      {"name": "mayor_of", "roles": {"theme": "e", "location": "e"}, "forms": ["mayor"]}
+    ],
+    "entities": [
+      {"name": "john", "type": "e", "forms": ["John"]},
+      {"name": "london", "type": "e", "forms": ["London"]},
+      {"name": "new_york", "type": "e", "forms": ["New York"]}
+    ]
+  },
+  "grammar": [
+    {"name": "bare_dp", "pattern": "$x:e", "sem": "bare_dp($x)", "kind": "dp"},
+    {"name": "the_of_dp", "pattern": "THE $N:{theme:e,location:e} LIT:of SUB:dp", "sem": "the_of_dp($N, $SUB, theme, location)", "kind": "dp"},
+    {"name": "s_equative", "pattern": "SUB:dp[$x:e] COP SUB:dp", "sem": "s_equative($SUB, $SUB1)", "kind": "s"}
+  ],
+  "sentences": [
+    {"tokens": ["John", "is", "the", "mayor", "of", "London"], "spans": [["dp", 0, 1], ["dp", 5, 6], ["dp", 2, 6], ["s", 0, 6]]},
+    {"tokens": ["John", "is", "the", "mayor", "of", "New", "York"], "spans": [["dp", 0, 1], ["dp", 5, 7], ["dp", 2, 7], ["s", 0, 7]]}
+  ]
+}
