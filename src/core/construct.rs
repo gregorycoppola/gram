@@ -19,7 +19,7 @@ pub fn apply_constructor(
         "forall_dp" => construct_quant_dp(DpQuantKind::ForAll, args, var_gen),
         "bare_dp" => construct_bare_dp(args),
         "bare_n" => construct_bare_n(args, var_gen),
-        "adj_n" => construct_adj_n(args, _var_gen),
+        "adj_n" => construct_adj_n(args, var_gen),
         "the_n_dp" => construct_the_n_dp(args),
         "a_n_dp" => construct_a_n_dp(args),
         "a_dp" => construct_a_dp(args, var_gen),
