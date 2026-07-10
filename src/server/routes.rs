@@ -85,22 +85,32 @@ fn walk_dir(dir: &std::path::Path, prefix: &str, summaries: &mut Vec<FixtureSumm
     }
 }
 
-pub async fn get_fixture(
+pub async fn handle_fixture(
     State(state): State<AppState>,
-    Path(name): Path<String>,
+    Path(path): Path<String>,
 ) -> AppResult<Json<Value>> {
-    let path = fixture_path(state.fixtures_dir.as_ref(), &name)?;
-    let raw = std::fs::read_to_string(&path)
-        .map_err(|e| anyhow::anyhow!("reading {}: {}", path.display(), e))?;
-    let value: Value = serde_json::from_str(&raw)?;
-    Ok(Json(value))
+    let path = path.trim_start_matches('/');
+    if let Some(name) = path.strip_suffix("/parse") {
+        let results = do_parse_fixture(state, name).await?;
+        let value = serde_json::to_value(results)
+            .map_err(|e| anyhow::anyhow!("serializing parse results: {}", e))?;
+        Ok(Json(value))
+    } else {
+        let raw = do_get_fixture(state, path).await?;
+        let value: Value = serde_json::from_str(&raw)
+            .map_err(|e| anyhow::anyhow!("parsing fixture JSON: {}", e))?;
+        Ok(Json(value))
+    }
 }
 
-pub async fn parse_fixture(
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-) -> AppResult<Json<Vec<ParseResult>>> {
-    let path = fixture_path(state.fixtures_dir.as_ref(), &name)?;
+async fn do_get_fixture(state: AppState, name: &str) -> Result<String, anyhow::Error> {
+    let path = fixture_path(state.fixtures_dir.as_ref(), name)?;
+    std::fs::read_to_string(&path)
+        .map_err(|e| anyhow::anyhow!("reading {}: {}", path.display(), e))
+}
+
+async fn do_parse_fixture(state: AppState, name: &str) -> Result<Vec<ParseResult>, anyhow::Error> {
+    let path = fixture_path(state.fixtures_dir.as_ref(), name)?;
     let fixture = Fixture::from_path(&path)?;
     let lexicon = Lexicon::from_fixture(&fixture);
     let rules = compile_rules(&fixture.grammar)?;
@@ -134,7 +144,7 @@ pub async fn parse_fixture(
             }
         }
     }
-    Ok(Json(results))
+    Ok(results)
 }
 
 pub async fn parse_one(
