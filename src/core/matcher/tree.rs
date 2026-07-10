@@ -267,5 +267,6 @@ pub fn span_result_to_match(result: &SpanResult, span: &crate::core::fixture::Sp
         syntax_tree: Some(syntax_tree),
         semantics_check: None,
         sem_value: Some(result.sem_value.clone()),
+        span: Some((span.start, span.end)),
     }
 }
