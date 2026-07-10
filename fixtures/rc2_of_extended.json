@@ -22,6 +22,6 @@
   ],
   "sentences": [
     {"tokens": ["the", "mayor", "of", "New", "York", "is", "charming"], "spans": [["dp", 3, 5], ["dp", 0, 5], ["s", 0, 7]]},
-    {"tokens": ["the", "American", "edition", "of", "the", "show", "is", "good"], "spans": [["n", 5, 6], ["dp", 4, 6], ["n", 1, 6], ["dp", 0, 6], ["s", 0, 8]]}
+    {"tokens": ["the", "American", "edition", "of", "show", "is", "good"], "spans": [["dp", 4, 5], ["n", 1, 5], ["dp", 0, 5], ["s", 0, 7]]}
   ]
 }
