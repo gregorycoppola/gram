@@ -23,6 +23,7 @@ pub fn apply_constructor(
         "the_n_dp" => construct_the_n_dp(args),
         "a_n_dp" => construct_a_n_dp(args),
         "the_of_dp" => construct_the_of_dp(args, var_gen),
+        "adj_of_n" => construct_adj_of_n(args, var_gen),
         "s_copula" => construct_s_copula(args),
         "s_copula_adj_n" => construct_s_copula_adj_n(args),
         "s_equative" => construct_s_equative(args),
@@ -226,6 +227,54 @@ fn construct_the_of_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, S
         var_type: "e".to_string(),
         quant: DpQuant::The { restriction },
     })
+}
+
+fn construct_adj_of_n(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, String> {
+    if args.len() != 5 {
+        return Err(format!("adj_of_n expects 5 args, got {}", args.len()));
+    }
+    let adj_name = match &args[0] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("adj_of_n: first arg must be lexical".into()),
+    };
+    let pred_name = match &args[1] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("adj_of_n: second arg must be lexical".into()),
+    };
+    let (obj_var, obj_type) = match &args[2] {
+        Arg::Sub(SemValue::Dp { var, var_type, .. }) => {
+            (var.clone(), var_type.clone())
+        }
+        _ => return Err("adj_of_n: third arg must be DP".into()),
+    };
+    let theme_role = match &args[3] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("adj_of_n: fourth arg must be literal".into()),
+    };
+    let loc_role = match &args[4] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("adj_of_n: fifth arg must be literal".into()),
+    };
+
+    let var = var_gen.fresh();
+    let noun_restriction = Expr::Pred {
+        name: pred_name,
+        roles: vec![
+            (theme_role.clone(), Expr::Var { name: var.clone(), typ: "e".to_string() }),
+            (loc_role, Expr::Var { name: obj_var, typ: obj_type }),
+        ],
+    };
+    let adj_restriction = Expr::Pred {
+        name: adj_name,
+        roles: vec![(theme_role, Expr::Var { name: var.clone(), typ: "e".to_string() })],
+    };
+
+    let restriction = Expr::And(
+        Box::new(adj_restriction),
+        Box::new(noun_restriction),
+    );
+
+    Ok(SemValue::N { var, restriction })
 }
 
 fn construct_s_copula(args: &[Arg]) -> Result<SemValue, String> {

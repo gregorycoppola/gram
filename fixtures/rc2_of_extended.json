@@ -1,0 +1,27 @@
+{
+  "lexicon": {
+    "predicates": [
+      {"name": "mayor_of", "roles": {"theme": "e", "location": "e"}, "forms": ["mayor"]},
+      {"name": "edition_of", "roles": {"theme": "e", "location": "e"}, "forms": ["edition"]},
+      {"name": "charming", "roles": {"theme": "e"}, "forms": ["charming"]},
+      {"name": "good", "roles": {"theme": "e"}, "forms": ["good"]},
+      {"name": "american", "roles": {"theme": "e"}, "forms": ["American"]}
+    ],
+    "entities": [
+      {"name": "new_york", "type": "e", "forms": ["New York"]},
+      {"name": "show", "type": "e", "forms": ["show"]}
+    ]
+  },
+  "grammar": [
+    {"name": "bare_dp", "pattern": "$x:e", "sem": "bare_dp($x)", "kind": "dp"},
+    {"name": "the_of_dp", "pattern": "THE $N:{theme:e,location:e} LIT:of SUB:dp", "sem": "the_of_dp($N, $SUB, theme, location)", "kind": "dp"},
+    {"name": "bare_n", "pattern": "$N:{theme:e}", "sem": "bare_n($N, theme)", "kind": "n"},
+    {"name": "adj_of_n", "pattern": "$A:{theme:e} $N:{theme:e,location:e} LIT:of SUB:dp", "sem": "adj_of_n($A, $N, $SUB, theme, location)", "kind": "n"},
+    {"name": "the_n_dp", "pattern": "THE SUB:n", "sem": "the_n_dp($SUB)", "kind": "dp"},
+    {"name": "s_copula", "pattern": "SUB:dp[$x:e] COP $P:{theme:e}", "sem": "s_copula($SUB, $P, theme)", "kind": "s"}
+  ],
+  "sentences": [
+    {"tokens": ["the", "mayor", "of", "New", "York", "is", "charming"], "spans": [["dp", 3, 5], ["dp", 0, 5], ["s", 0, 7]]},
+    {"tokens": ["the", "American", "edition", "of", "show", "is", "good"], "spans": [["dp", 4, 5], ["n", 1, 5], ["dp", 0, 5], ["s", 0, 7]]}
+  ]
+}
