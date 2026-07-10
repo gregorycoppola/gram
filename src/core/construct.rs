@@ -470,7 +470,7 @@ fn substitute_var_to_entity(expr: Expr, target: &str) -> Expr {
     }
 }
 
-fn substitute_var_name(expr: Expr, old_name: &str, new_name: &str) -> Expr {
+pub fn substitute_var_name(expr: Expr, old_name: &str, new_name: &str) -> Expr {
     match expr {
         Expr::Var { name, .. } if name == old_name => Expr::Var { name: new_name.to_string(), typ: "e".to_string() },
         Expr::Var { name, typ } => Expr::Var { name, typ },

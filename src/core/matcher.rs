@@ -12,9 +12,9 @@ use crate::core::grammar::Rule;
 use crate::core::lexicon::Lexicon;
 use crate::core::value::VarGen;
 
-use super::types::{DebugTrace, SpanKey, SpanResult, Match};
-use super::tree::span_result_to_match;
-use super::engine::{try_pattern_match, try_assembly, try_assemble_top_level};
+use types::{DebugTrace, SpanKey, SpanResult, Match};
+use tree::span_result_to_match;
+use engine::{try_pattern_match, try_assembly, try_assemble_top_level};
 
 // --- Public API ---
 
