@@ -1,71 +1,22 @@
 {
   "lexicon": {
     "predicates": [
-      {
-        "name": "know",
-        "roles": {"agent": "e", "patient": "e"},
-        "forms": ["know"]
-      },
-      {
-        "name": "want",
-        "roles": {"agent": "e", "patient": "e"},
-        "forms": ["want"]
-      },
-      {
-        "name": "what",
-        "roles": {"theme": "e"},
-        "forms": ["what"]
-      }
+      {"name": "know", "roles": {"agent": "e", "patient": "e"}, "forms": ["know"]},
+      {"name": "want", "roles": {"agent": "e", "patient": "e"}, "forms": ["want"]},
+      {"name": "what", "roles": {"theme": "e"}, "forms": ["what"]}
     ],
     "entities": [
-      {
-        "name": "i",
-        "type": "e",
-        "forms": ["i", "I"]
-      },
-      {
-        "name": "you",
-        "type": "e",
-        "forms": ["you"]
-      }
+      {"name": "i", "type": "e", "forms": ["i", "I"]},
+      {"name": "you", "type": "e", "forms": ["you"]}
     ]
   },
   "grammar": [
-    {
-      "name": "bare_dp",
-      "pattern": "$x:e",
-      "sem": "bare_dp($x)",
-      "kind": "dp"
-    },
-    {
-      "name": "s_transitive",
-      "pattern": "IGNORE",
-      "sem": "s_transitive($SUB, $SUB1, $V, agent, patient)",
-      "kind": "s"
-    },
-    {
-      "name": "s_gap_patient",
-      "pattern": "SUB:dp[$x:e] $V:{agent:e,patient:e}",
-      "sem": "s_gap_patient($V, agent, patient, $SUB)",
-      "kind": "s\\patient"
-    },
-    {
-      "name": "wh_dp_patient",
-      "pattern": "$N:{theme:e} SUB:s\\patient",
-      "sem": "rel_dp_patient($N, theme, $SUB)",
-      "kind": "dp"
-    }
+    {"name": "bare_dp", "pattern": "$x:e", "sem": "bare_dp($x)", "kind": "dp"},
+    {"name": "s_transitive", "pattern": "SUB:dp[$x:e] $V:{agent:e,patient:e} SUB:dp", "sem": "s_transitive($SUB, $SUB1, $V, agent, patient)", "kind": "s"},
+    {"name": "s_gap_patient", "pattern": "SUB:dp[$x:e] $V:{agent:e,patient:e}", "sem": "s_gap_patient($V, agent, patient, $SUB)", "kind": "s\\patient"},
+    {"name": "wh_dp_patient", "pattern": "$N:{theme:e} SUB:s\\patient", "sem": "rel_dp_patient($N, theme, $SUB)", "kind": "dp"}
   ],
   "sentences": [
-    {
-      "tokens": ["i", "know", "what", "you", "want"],
-      "spans": [
-        ["dp", 0, 1],
-        ["dp", 2, 5],
-        ["s\\patient", 3, 5],
-        ["dp", 3, 4],
-        ["s", 0, 5]
-      ]
-    }
+    {"tokens": ["i", "know", "what", "you", "want"], "spans": [["dp", 0, 1], ["dp", 2, 5], ["s\\patient", 3, 5], ["dp", 3, 4], ["s", 0, 5]]}
   ]
 }

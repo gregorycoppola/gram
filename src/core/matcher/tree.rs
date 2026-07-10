@@ -256,9 +256,16 @@ pub fn span_result_to_match(result: &SpanResult, span: &crate::core::fixture::Sp
     syntax_tree.semantics = Some(result.output.clone());
 
     Match {
-        rule_name: result.rule_name.clone(), kind: result.kind.clone(), output: result.output.clone(),
-        bindings: result.bindings.clone(), token_annotations: full_annotations, constituents: result.constituents.clone(),
-        syntax: Some(syntax), syntax_tree: Some(syntax_tree),
-        semantics_check: None, sem_value: Some(result.sem_value.clone()),
+        rule_name: result.rule_name.clone(),
+        pattern: result.pattern.clone(),
+        kind: result.kind.clone(),
+        output: result.output.clone(),
+        bindings: result.bindings.clone(),
+        token_annotations: full_annotations,
+        constituents: result.constituents.clone(),
+        syntax: Some(syntax),
+        syntax_tree: Some(syntax_tree),
+        semantics_check: None,
+        sem_value: Some(result.sem_value.clone()),
     }
 }
