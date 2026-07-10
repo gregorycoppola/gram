@@ -1,0 +1,21 @@
+{
+  "lexicon": {
+    "predicates": [
+      {"name": "new", "roles": {"theme": "e"}, "forms": ["new"]},
+      {"name": "moat", "roles": {"theme": "e"}, "forms": ["moat"]}
+    ],
+    "entities": [
+      {"name": "taste", "type": "e", "forms": ["taste"]}
+    ]
+  },
+  "grammar": [
+    {"name": "bare_n", "pattern": "$N:{theme:e}", "sem": "bare_n($N, theme)", "kind": "n"},
+    {"name": "adj_n", "pattern": "$A:{theme:e} SUB:n", "sem": "adj_n($A, theme, $SUB)", "kind": "n"},
+    {"name": "the_n_dp", "pattern": "THE SUB:n", "sem": "the_n_dp($SUB)", "kind": "dp"},
+    {"name": "bare_dp", "pattern": "$x:e", "sem": "bare_dp($x)", "kind": "dp"},
+    {"name": "s_identity", "pattern": "SUB:dp[$x:e] COP SUB:dp", "sem": "s_identity($SUB, $SUB1)", "kind": "s"}
+  ],
+  "sentences": [
+    {"tokens": ["taste", "is", "the", "new", "moat"], "spans": [["dp", 0, 1], ["n", 4, 5], ["n", 3, 5], ["dp", 2, 5], ["s", 0, 5]]}
+  ]
+}
