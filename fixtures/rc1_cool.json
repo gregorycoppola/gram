@@ -1,0 +1,17 @@
+{
+  "lexicon": {
+    "predicates": [
+      {"name": "statistical_parser", "roles": {"theme": "e"}, "forms": ["statistical parser"]},
+      {"name": "cool", "roles": {"theme": "e", "degree": "e"}, "forms": ["cool"]},
+      {"name": "really", "roles": {"degree": "e"}, "forms": ["really"]}
+    ],
+    "entities": []
+  },
+  "grammar": [
+    {"name": "this_dp", "pattern": "THIS $N:{theme:e}", "sem": "the_dp($N, theme)", "kind": "dp"},
+    {"name": "s_copula_degree", "pattern": "SUB:dp[$x:e] COP $D:{degree:e} $P:{theme:e,degree:e}", "sem": "s_copula_degree($SUB, $D, $P, theme, degree)", "kind": "s"}
+  ],
+  "sentences": [
+    {"tokens": ["this", "statistical", "parser", "is", "really", "cool"], "spans": [["dp", 0, 3], ["s", 0, 6]]}
+  ]
+}
