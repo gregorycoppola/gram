@@ -1,4 +1,3 @@
-
 use crate::core::logic::Expr;
 use crate::core::value::{DpQuant, GapProp, SemValue, VarGen};
 
@@ -29,6 +28,7 @@ pub fn apply_constructor(
         // S constructors
         "s_copula" => construct_s_copula(args),
         "s_transitive" => construct_s_transitive(args),
+        "s_ditransitive" => construct_s_ditransitive(args),
         "s_complement" => construct_s_complement(args),
 
         // Gap clause constructors
@@ -184,6 +184,66 @@ fn construct_s_transitive(args: &[Arg]) -> Result<SemValue, String> {
     let dps: Vec<(String, String, DpQuant)> = vec![
         (subj_var, subj_type, subj_quant),
         (obj_var, obj_type, obj_quant),
+    ];
+    let expr = expand_quants(&dps, body)?;
+    Ok(SemValue::Prop(expr))
+}
+
+/// S constructor for ditransitive sentences: "i sent a letter to sue"
+/// Args: [Sub(Dp_agent), Sub(Dp_theme), Sub(Dp_recipient), Lexical(verb_name, verb_type),
+///        Literal(role1), Literal(role2), Literal(role3)]
+fn construct_s_ditransitive(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 7 {
+        return Err(format!("s_ditransitive expects 7 args, got {}", args.len()));
+    }
+    let (subj_var, subj_type, subj_quant) = match &args[0] {
+        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
+            (var.clone(), var_type.clone(), quant.clone())
+        }
+        _ => return Err("s_ditransitive: first arg must be a DP".into()),
+    };
+    let (obj1_var, obj1_type, obj1_quant) = match &args[1] {
+        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
+            (var.clone(), var_type.clone(), quant.clone())
+        }
+        _ => return Err("s_ditransitive: second arg must be a DP".into()),
+    };
+    let (obj2_var, obj2_type, obj2_quant) = match &args[2] {
+        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
+            (var.clone(), var_type.clone(), quant.clone())
+        }
+        _ => return Err("s_ditransitive: third arg must be a DP".into()),
+    };
+    let verb_name = match &args[3] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("s_ditransitive: fourth arg must be a lexical binding".into()),
+    };
+    let role1 = match &args[4] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("s_ditransitive: fifth arg must be a literal role name".into()),
+    };
+    let role2 = match &args[5] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("s_ditransitive: sixth arg must be a literal role name".into()),
+    };
+    let role3 = match &args[6] {
+        Arg::Literal(s) => s.clone(),
+        _ => return Err("s_ditransitive: seventh arg must be a literal role name".into()),
+    };
+
+    let body = Expr::Pred {
+        name: verb_name,
+        roles: vec![
+            (role1, Expr::Var { name: subj_var.clone(), typ: subj_type.clone() }),
+            (role2, Expr::Var { name: obj1_var.clone(), typ: obj1_type.clone() }),
+            (role3, Expr::Var { name: obj2_var.clone(), typ: obj2_type.clone() }),
+        ],
+    };
+
+    let dps: Vec<(String, String, DpQuant)> = vec![
+        (subj_var, subj_type, subj_quant),
+        (obj1_var, obj1_type, obj1_quant),
+        (obj2_var, obj2_type, obj2_quant),
     ];
     let expr = expand_quants(&dps, body)?;
     Ok(SemValue::Prop(expr))
@@ -697,6 +757,49 @@ mod tests {
         match result {
             SemValue::Prop(expr) => {
                 assert_eq!(format!("{}", expr), "loves(agent: sue, patient: tom)");
+            }
+            _ => panic!("expected Prop"),
+        }
+    }
+
+    #[test]
+    fn test_s_ditransitive() {
+        let dp_subj = SemValue::Dp {
+            var: "i".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        };
+        let dp_theme = SemValue::Dp {
+            var: "x".into(),
+            var_type: "e".into(),
+            quant: DpQuant::The {
+                restriction: Expr::Pred {
+                    name: "letter".into(),
+                    roles: vec![("theme".into(), Expr::Var { name: "x".into(), typ: "e".into() })],
+                },
+            },
+        };
+        let dp_recip = SemValue::Dp {
+            var: "sue".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        };
+        let args = vec![
+            Arg::Sub(dp_subj),
+            Arg::Sub(dp_theme),
+            Arg::Sub(dp_recip),
+            Arg::Lexical("sent".into(), "{agent:e,recipient:e,theme:e}".into()),
+            Arg::Literal("agent".into()),
+            Arg::Literal("theme".into()),
+            Arg::Literal("recipient".into()),
+        ];
+        let result = apply_constructor("s_ditransitive", &args, &mut VarGen::new()).unwrap();
+        match result {
+            SemValue::Prop(expr) => {
+                assert_eq!(
+                    format!("{}", expr),
+                    "the [x:e]: letter(theme: x) -> sent(agent: i, theme: x, recipient: sue)"
+                );
             }
             _ => panic!("expected Prop"),
         }
