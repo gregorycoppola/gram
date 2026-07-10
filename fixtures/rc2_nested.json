@@ -80,6 +80,12 @@
       "kind": "s"
     },
     {
+      "name": "s_transitive",
+      "pattern": "IGNORE",
+      "sem": "s_transitive($SUB, $SUB1, $V, agent, patient)",
+      "kind": "s"
+    },
+    {
       "name": "s_complement",
       "pattern": "IGNORE",
       "sem": "s_complement($SUB, $SUB1, $V, agent, theme)",
