@@ -27,7 +27,7 @@ pub fn run_check(args: CheckArgs) -> Result<()> {
             crate::core::proof::StepResult::Ok => {
                 println!("  ✅ {:<14} {}", step.justification, step.formula);
                 if !step.from.is_empty() {
-                    let from_str = step.from.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(", ");
+                    let from_str: String = step.from.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(", ");
                     println!("     (from steps: {})", from_str);
                 }
             }

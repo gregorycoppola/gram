@@ -1,8 +1,10 @@
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
+pub mod checker;
+
 /// A proof file declares premises, a conclusion, and a step-by-step proof.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ProofFile {
     pub title: String,
     pub premises: Vec<String>,
@@ -10,7 +12,7 @@ pub struct ProofFile {
     pub proof: Vec<ProofStep>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ProofStep {
     pub step: usize,
     pub formula: String,
