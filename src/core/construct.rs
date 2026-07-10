@@ -19,7 +19,7 @@ pub fn apply_constructor(
         "forall_dp" => construct_quant_dp(DpQuantKind::ForAll, args, var_gen),
         "bare_dp" => construct_bare_dp(args),
         "bare_n" => construct_bare_n(args, var_gen),
-        "adj_n" => construct_adj_n(args, var_gen),
+        "adj_n" => construct_adj_n(args, _var_gen),
         "the_n_dp" => construct_the_n_dp(args),
         "a_n_dp" => construct_a_n_dp(args),
         "the_of_dp" => construct_the_of_dp(args, var_gen),
@@ -27,6 +27,7 @@ pub fn apply_constructor(
         "s_copula" => construct_s_copula(args),
         "s_copula_adj_n" => construct_s_copula_adj_n(args),
         "s_equative" => construct_s_equative(args),
+        "s_when" => construct_s_when(args),
         "s_transitive" => construct_s_transitive(args),
         "s_ditransitive" => construct_s_ditransitive(args),
         "s_complement" => construct_s_complement(args),
@@ -354,6 +355,29 @@ fn construct_s_equative(args: &[Arg]) -> Result<SemValue, String> {
 
     let body = substitute_var_name(obj_restriction, &obj_var, &subj_var);
     let expr = expand_quant(subj_var, subj_type, &subj_quant, body)?;
+    Ok(SemValue::Prop(expr))
+}
+
+fn construct_s_when(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 2 {
+        return Err(format!("s_when expects 2 args, got {}", args.len()));
+    }
+    let event = match &args[0] {
+        Arg::Sub(SemValue::Prop(expr)) => expr.clone(),
+        _ => return Err("s_when: first arg must be a Prop".into()),
+    };
+    let main = match &args[1] {
+        Arg::Sub(SemValue::Prop(expr)) => expr.clone(),
+        _ => return Err("s_when: second arg must be a Prop".into()),
+    };
+
+    let expr = Expr::Pred {
+        name: "when".to_string(),
+        roles: vec![
+            ("event".to_string(), event),
+            ("main".to_string(), main),
+        ],
+    };
     Ok(SemValue::Prop(expr))
 }
 
