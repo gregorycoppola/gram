@@ -11,7 +11,7 @@ use crate::core::lexicon::Lexicon;
 use crate::core::matcher::parse_hinted_sentence;
 use crate::core::tokenize::tokenize;
 
-use super::error::AppResult;
+use super::error::{AppError, AppResult};
 use super::types::{FixtureSummary, ParseRequest, ParseResult, ParseStatus};
 use super::AppState;
 
@@ -24,54 +24,92 @@ pub async fn list_fixtures(
 ) -> AppResult<Json<Vec<FixtureSummary>>> {
     let dir = state.fixtures_dir.as_ref();
     let mut summaries = Vec::new();
-
-    let entries = std::fs::read_dir(dir)
-        .map_err(|e| anyhow::anyhow!("reading fixtures dir {}: {}", dir.display(), e))?;
-
-    for entry in entries {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().and_then(|s| s.to_str()) != Some("json") {
-            continue;
-        }
-        let name = path.file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_string();
-        match Fixture::from_path(&path) {
-            Ok(fixture) => {
-                summaries.push(FixtureSummary {
-                    name,
-                    predicates: fixture.lexicon.predicates.len(),
-                    entities: fixture.lexicon.entities.len(),
-                    rules: fixture.grammar.len(),
-                    sentences: fixture.sentences.len(),
-                });
-            }
-            Err(_) => continue,
-        }
-    }
-
+    walk_dir(dir, "", &mut summaries, 0);
     summaries.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(Json(summaries))
 }
 
-pub async fn get_fixture(
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-) -> AppResult<Json<Value>> {
-    let path = fixture_path(state.fixtures_dir.as_ref(), &name);
-    let raw = std::fs::read_to_string(&path)
-        .map_err(|e| anyhow::anyhow!("reading {}: {}", path.display(), e))?;
-    let value: Value = serde_json::from_str(&raw)?;
-    Ok(Json(value))
+fn walk_dir(dir: &std::path::Path, prefix: &str, summaries: &mut Vec<FixtureSummary>, depth: usize) {
+    if depth > 10 {
+        return;
+    }
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        let path = entry.path();
+        if path.is_dir() {
+            let dir_name = path.file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
+            if dir_name.starts_with('.') {
+                continue;
+            }
+            let new_prefix = if prefix.is_empty() {
+                dir_name.to_string()
+            } else {
+                format!("{}/{}", prefix, dir_name)
+            };
+            walk_dir(&path, &new_prefix, summaries, depth + 1);
+        } else if path.extension().and_then(|s| s.to_str()) == Some("json") {
+            let file_name = path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
+            if file_name.starts_with('.') {
+                continue;
+            }
+            let name = if prefix.is_empty() {
+                file_name.to_string()
+            } else {
+                format!("{}/{}", prefix, file_name)
+            };
+            match Fixture::from_path(&path) {
+                Ok(fixture) => {
+                    summaries.push(FixtureSummary {
+                        name,
+                        predicates: fixture.lexicon.predicates.len(),
+                        entities: fixture.lexicon.entities.len(),
+                        rules: fixture.grammar.len(),
+                        sentences: fixture.sentences.len(),
+                    });
+                }
+                Err(_) => continue,
+            }
+        }
+    }
 }
 
-pub async fn parse_fixture(
+pub async fn handle_fixture(
     State(state): State<AppState>,
-    Path(name): Path<String>,
-) -> AppResult<Json<Vec<ParseResult>>> {
-    let path = fixture_path(state.fixtures_dir.as_ref(), &name);
+    Path(path): Path<String>,
+) -> AppResult<Json<Value>> {
+    if let Some(name) = path.strip_suffix("/parse") {
+        let results = do_parse_fixture(state, name).await?;
+        let value = serde_json::to_value(results)
+            .map_err(|e| anyhow::anyhow!("serializing parse results: {}", e))?;
+        Ok(Json(value))
+    } else {
+        let raw = do_get_fixture(state, &path).await?;
+        let value: Value = serde_json::from_str(&raw)
+            .map_err(|e| anyhow::anyhow!("parsing fixture JSON: {}", e))?;
+        Ok(Json(value))
+    }
+}
+
+async fn do_get_fixture(state: AppState, name: &str) -> Result<String, anyhow::Error> {
+    let path = fixture_path(state.fixtures_dir.as_ref(), name)?;
+    std::fs::read_to_string(&path)
+        .map_err(|e| anyhow::anyhow!("reading {}: {}", path.display(), e))
+}
+
+async fn do_parse_fixture(state: AppState, name: &str) -> Result<Vec<ParseResult>, anyhow::Error> {
+    let path = fixture_path(state.fixtures_dir.as_ref(), name)?;
     let fixture = Fixture::from_path(&path)?;
     let lexicon = Lexicon::from_fixture(&fixture);
     let rules = compile_rules(&fixture.grammar)?;
@@ -105,19 +143,27 @@ pub async fn parse_fixture(
             }
         }
     }
-    Ok(Json(results))
+    Ok(results)
 }
 
 pub async fn parse_one(
     _state: State<AppState>,
     _req: Json<ParseRequest>,
 ) -> AppResult<Json<Vec<ParseResult>>> {
-    use super::error::AppError;
     Err(AppError::from(anyhow::anyhow!("parse-one requires hinted sentences (tokens + spans); POST a JSON body with tokens and spans fields")))
 }
 
-fn fixture_path(dir: &PathBuf, name: &str) -> PathBuf {
+fn fixture_path(dir: &PathBuf, name: &str) -> Result<PathBuf, anyhow::Error> {
     let mut p = dir.clone();
-    p.push(format!("{}.json", name));
-    p
+    for segment in name.split('/') {
+        if segment.is_empty() || segment == "." || segment == ".." {
+            anyhow::bail!("invalid fixture name segment: {:?}", segment);
+        }
+        if segment.contains('\\') || segment.contains('\0') {
+            anyhow::bail!("invalid fixture name segment: {:?}", segment);
+        }
+        p.push(segment);
+    }
+    p.set_extension("json");
+    Ok(p)
 }
