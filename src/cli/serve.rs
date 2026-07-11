@@ -12,11 +12,14 @@ pub struct ServeArgs {
     /// Fixtures directory (relative or absolute).
     #[arg(long, default_value = "fixtures")]
     pub fixtures_dir: PathBuf,
+    /// Proofs directory (relative or absolute).
+    #[arg(long, default_value = "proofs")]
+    pub proofs_dir: PathBuf,
 }
 
 pub fn run_serve(args: ServeArgs) -> Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    rt.block_on(run_server(args.port, args.fixtures_dir))
+    rt.block_on(run_server(args.port, args.fixtures_dir, args.proofs_dir))
 }
