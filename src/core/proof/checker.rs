@@ -43,6 +43,7 @@ fn check_step(step: &ProofStep, premises: &[String], prior: &[Expr]) -> Result<E
         "and_elim_r" => check_and_elim_r(&formula, step, prior),
         "belief_elim" => check_belief_elim(&formula, step, prior),
         "of_elim" => check_of_elim(&formula, step, prior),
+        "apply_elim" => check_apply_elim(&formula, step, prior),
         other => Err(format!("unknown justification: {}", other)),
     }
 }
@@ -282,6 +283,39 @@ fn check_of_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Exp
         Ok(formula.clone())
     } else {
         Err(format!("of_elim: expected {} ∧ in(...), got {}", base_name, formula))
+    }
+}
+
+fn check_apply_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+    let source_idx = step.from.get(0).copied()
+        .ok_or("apply_elim requires a source step")?;
+    let source = prior.get(source_idx.saturating_sub(1))
+        .ok_or(format!("step {} not yet derived", source_idx))?;
+
+    let (pred_name, entity) = match source {
+        Expr::Pred { name, roles } if name == "apply" => {
+            let pred_expr = roles.iter().find(|(r, _)| r == "predicate")
+                .ok_or("apply_elim: apply missing predicate role")?.1.clone();
+            let ent_expr = roles.iter().find(|(r, _)| r == "entity")
+                .ok_or("apply_elim: apply missing entity role")?.1.clone();
+            let pred_name = match pred_expr {
+                Expr::Entity(s) => s,
+                other => return Err(format!("apply_elim: predicate must be an entity name, got: {}", other)),
+            };
+            (pred_name, ent_expr)
+        }
+        _ => return Err(format!("apply_elim source must be apply(...), got: {}", source)),
+    };
+
+    let expected = Expr::Pred {
+        name: pred_name,
+        roles: vec![("theme".to_string(), entity)],
+    };
+
+    if expr_eq(formula, &expected) {
+        Ok(formula.clone())
+    } else {
+        Err(format!("apply_elim: expected {}, got {}", expected, formula))
     }
 }
 

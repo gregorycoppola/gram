@@ -12,6 +12,7 @@
 ///              | 'that' binding impl_expr
 ///              | 'exists' binding and_expr [count]
 ///              | 'exists_many' counted_binding and_expr
+///              | '(' expr ')'                  -- grouped expression
 ///              | ident '(' role_list ')'       -- predicate
 ///              | ident ':' ident               -- variable ref
 ///              | ident                         -- entity
@@ -230,6 +231,12 @@ impl Parser {
 
     fn parse_primary(&mut self) -> Result<Expr, String> {
         match self.peek().cloned() {
+            Some(Tok::LParen) => {
+                self.advance();
+                let expr = self.parse_expr()?;
+                self.expect(&Tok::RParen)?;
+                Ok(expr)
+            }
             Some(Tok::Ident(ref s)) if s == "not" => {
                 self.advance();
                 let inner = self.parse_primary()?;
@@ -507,6 +514,13 @@ mod tests {
         let s = "exists_many [x:e, 3]: man(theme: x) ∧ tall(theme: x)";
         let e = parse(s).expect("parse");
         assert_eq!(s, format!("{}", e));
+    }
+
+    #[test]
+    fn parse_grouped_expression() {
+        let s = "(apply(predicate: boy, entity: x) ∧ always [y:e]: apply(predicate: boy, entity: y) -> equals(left: y, right: x))";
+        let e = parse(s).expect("parse");
+        assert!(matches!(e, Expr::And(_, _)));
     }
 }
 
