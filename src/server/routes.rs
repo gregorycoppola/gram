@@ -33,7 +33,7 @@ pub async fn check_proof(Json(req): Json<CheckProofRequest>) -> AppResult<Json<C
         proof: req.proof,
     };
 
-    let result = proof_check(&file).map_err(AppError::from)?;
+    let result = proof_check(&file).map_err(|e| AppError(anyhow::anyhow!(e)))?;
 
     let steps = result
         .steps
