@@ -1,0 +1,19 @@
+{
+  "title": "Maybe implies both possible and possibly not",
+  "premises": [
+    "maybe(content: happy(theme: john))",
+    "always [P:s]: maybe(content: P) -> possible(content: P)",
+    "always [P:s]: maybe(content: P) -> possible(content: not P)"
+  ],
+  "conclusion": "possible(content: happy(theme: john)) ∧ possible(content: not happy(theme: john))",
+  "proof": [
+    {"step": 1, "formula": "maybe(content: happy(theme: john))", "justification": "premise"},
+    {"step": 2, "formula": "always [P:s]: maybe(content: P) -> possible(content: P)", "justification": "premise"},
+    {"step": 3, "formula": "always [P:s]: maybe(content: P) -> possible(content: not P)", "justification": "premise"},
+    {"step": 4, "formula": "maybe(content: happy(theme: john)) -> possible(content: happy(theme: john))", "justification": "universal_elim", "from": [2], "substitution": {"P": "happy(theme: john)"}},
+    {"step": 5, "formula": "possible(content: happy(theme: john))", "justification": "modus_ponens", "from": [1, 4]},
+    {"step": 6, "formula": "maybe(content: happy(theme: john)) -> possible(content: not happy(theme: john))", "justification": "universal_elim", "from": [3], "substitution": {"P": "happy(theme: john)"}},
+    {"step": 7, "formula": "possible(content: not happy(theme: john))", "justification": "modus_ponens", "from": [1, 6]},
+    {"step": 8, "formula": "possible(content: happy(theme: john)) ∧ possible(content: not happy(theme: john))", "justification": "and_intro", "from": [5, 7]}
+  ]
+}
