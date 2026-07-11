@@ -68,8 +68,8 @@ fn check_universal_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Res
     let source = prior.get(source_idx.saturating_sub(1))
         .ok_or(format!("step {} not yet derived", source_idx))?;
 
-    let (var, body) = match source {
-        Expr::ForAll { var, body, .. } => (var, body),
+    let (var, var_type, body) = match source {
+        Expr::ForAll { var, var_type, body, .. } => (var, var_type, body),
         _ => return Err(format!("universal_elim source must be ForAll, got: {}", source)),
     };
 
@@ -78,7 +78,13 @@ fn check_universal_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Res
     let term = subst.get(var)
         .ok_or(format!("substitution must map variable '{}'", var))?;
 
-    let substituted = substitute_var_to_entity(*body.clone(), var, term);
+    let substituted = if var_type == "s" {
+        let parsed = parse_formula(term)?;
+        substitute_var(*body.clone(), var, parsed)
+    } else {
+        substitute_var_to_entity(*body.clone(), var, term)
+    };
+
     if expr_eq(formula, &substituted) {
         Ok(formula.clone())
     } else {
@@ -363,6 +369,51 @@ fn substitute_var_to_entity(expr: Expr, var: &str, term: &str) -> Expr {
     }
 }
 
+/// Substitute all occurrences of `Var { name: var }` or `Entity(var)` with `replacement` Expr.
+/// Used for s-typed (sentence-level) universal elimination.
+fn substitute_var(expr: Expr, var: &str, replacement: Expr) -> Expr {
+    match expr {
+        Expr::Var { name, .. } if name == var => replacement.clone(),
+        Expr::Entity(name) if name == var => replacement,
+        Expr::Var { name, typ } => Expr::Var { name, typ },
+        Expr::Entity(s) => Expr::Entity(s),
+        Expr::Pred { name, roles } => Expr::Pred {
+            name,
+            roles: roles.into_iter().map(|(r, e)| (r, substitute_var(e, var, replacement.clone()))).collect(),
+        },
+        Expr::Not(e) => Expr::Not(Box::new(substitute_var(*e, var, replacement))),
+        Expr::And(l, r) => Expr::And(
+            Box::new(substitute_var(*l, var, replacement.clone())),
+            Box::new(substitute_var(*r, var, replacement)),
+        ),
+        Expr::Implies { ante, cons } => Expr::Implies {
+            ante: Box::new(substitute_var(*ante, var, replacement.clone())),
+            cons: Box::new(substitute_var(*cons, var, replacement)),
+        },
+        Expr::ForAll { var: v, var_type, body } => Expr::ForAll {
+            var: v, var_type, body: Box::new(substitute_var(*body, var, replacement)),
+        },
+        Expr::The { var: v, var_type, body } => Expr::The {
+            var: v, var_type, body: Box::new(substitute_var(*body, var, replacement)),
+        },
+        Expr::This { var: v, var_type, body } => Expr::This {
+            var: v, var_type, body: Box::new(substitute_var(*body, var, replacement)),
+        },
+        Expr::That { var: v, var_type, body } => Expr::That {
+            var: v, var_type, body: Box::new(substitute_var(*body, var, replacement)),
+        },
+        Expr::Exists { var: v, var_type, body, count } => Expr::Exists {
+            var: v, var_type, body: Box::new(substitute_var(*body, var, replacement)), count,
+        },
+        Expr::ExistsMany { var: v, var_type, count, body } => Expr::ExistsMany {
+            var: v, var_type, count, body: Box::new(substitute_var(*body, var, replacement)),
+        },
+        Expr::Question { label, body } => Expr::Question {
+            label, body: Box::new(substitute_var(*body, var, replacement)),
+        },
+    }
+}
+
 /// Structural equality on Expr.
 fn expr_eq(a: &Expr, b: &Expr) -> bool {
     match (a, b) {
@@ -382,5 +433,51 @@ fn expr_eq(a: &Expr, b: &Expr) -> bool {
         (Expr::Entity(s1), Expr::Entity(s2)) => s1 == s2,
         (Expr::Question { label: l1, body: b1 }, Expr::Question { label: l2, body: b2 }) => l1 == l2 && expr_eq(b1, b2),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn substitute_var_replaces_entity_with_expr() {
+        let body = Expr::Pred {
+            name: "certain".to_string(),
+            roles: vec![("content".to_string(), Expr::Entity("P".to_string()))],
+        };
+        let replacement = Expr::Pred {
+            name: "happy".to_string(),
+            roles: vec![("theme".to_string(), Expr::Entity("john".to_string()))],
+        };
+        let result = substitute_var(body, "P", replacement);
+        match result {
+            Expr::Pred { name, roles } => {
+                assert_eq!(name, "certain");
+                assert_eq!(roles.len(), 1);
+                match &roles[0].1 {
+                    Expr::Pred { name, .. } => assert_eq!(name, "happy"),
+                    other => panic!("expected Pred, got {:?}", other),
+                }
+            }
+            other => panic!("expected Pred, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn substitute_var_replaces_in_not() {
+        let body = Expr::Not(Box::new(Expr::Entity("P".to_string())));
+        let replacement = Expr::Pred {
+            name: "happy".to_string(),
+            roles: vec![("theme".to_string(), Expr::Entity("john".to_string()))],
+        };
+        let result = substitute_var(body, "P", replacement);
+        match result {
+            Expr::Not(inner) => match *inner {
+                Expr::Pred { name, .. } => assert_eq!(name, "happy"),
+                other => panic!("expected Pred inside Not, got {:?}", other),
+            },
+            other => panic!("expected Not, got {:?}", other),
+        }
     }
 }

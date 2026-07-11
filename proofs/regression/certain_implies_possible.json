@@ -1,0 +1,18 @@
+{
+  "title": "Certainty implies possibility",
+  "premises": [
+    "certain(content: happy(theme: john))",
+    "always [P:s]: certain(content: P) -> P",
+    "always [P:s]: P -> possible(content: P)"
+  ],
+  "conclusion": "possible(content: happy(theme: john))",
+  "proof": [
+    {"step": 1, "formula": "certain(content: happy(theme: john))", "justification": "premise"},
+    {"step": 2, "formula": "always [P:s]: certain(content: P) -> P", "justification": "premise"},
+    {"step": 3, "formula": "always [P:s]: P -> possible(content: P)", "justification": "premise"},
+    {"step": 4, "formula": "certain(content: happy(theme: john)) -> happy(theme: john)", "justification": "universal_elim", "from": [2], "substitution": {"P": "happy(theme: john)"}},
+    {"step": 5, "formula": "happy(theme: john)", "justification": "modus_ponens", "from": [1, 4]},
+    {"step": 6, "formula": "happy(theme: john) -> possible(content: happy(theme: john))", "justification": "universal_elim", "from": [3], "substitution": {"P": "happy(theme: john)"}},
+    {"step": 7, "formula": "possible(content: happy(theme: john))", "justification": "modus_ponens", "from": [5, 6]}
+  ]
+}
