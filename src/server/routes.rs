@@ -9,7 +9,7 @@ use crate::core::fixture::{Fixture, SentenceInput};
 use crate::core::grammar::compile_rules;
 use crate::core::lexicon::Lexicon;
 use crate::core::matcher::parse_hinted_sentence;
-use crate::core::proof::checker::check_proof;
+use crate::core::proof::checker::check_proof as proof_check;
 use crate::core::proof::ProofFile;
 use crate::core::proof::StepResult;
 use crate::core::tokenize::tokenize;
@@ -33,7 +33,7 @@ pub async fn check_proof(Json(req): Json<CheckProofRequest>) -> AppResult<Json<C
         proof: req.proof,
     };
 
-    let result = check_proof(&file).map_err(AppError::from)?;
+    let result = proof_check(&file).map_err(AppError::from)?;
 
     let steps = result
         .steps
