@@ -1,0 +1,20 @@
+{
+  "title": "Best musician implies John beats Sue",
+  "premises": [
+    "best(predicate: musician, entity: john)",
+    "apply(predicate: musician, entity: sue)",
+    "always [P:p]: always [x:e]: best(predicate: P, entity: x) -> (apply(predicate: P, entity: x) ∧ always [y:e]: apply(predicate: P, entity: y) -> better(left: x, right: y))"
+  ],
+  "conclusion": "better(left: john, right: sue)",
+  "proof": [
+    {"step": 1, "formula": "best(predicate: musician, entity: john)", "justification": "premise"},
+    {"step": 2, "formula": "apply(predicate: musician, entity: sue)", "justification": "premise"},
+    {"step": 3, "formula": "always [P:p]: always [x:e]: best(predicate: P, entity: x) -> (apply(predicate: P, entity: x) ∧ always [y:e]: apply(predicate: P, entity: y) -> better(left: x, right: y))", "justification": "premise"},
+    {"step": 4, "formula": "always [x:e]: best(predicate: musician, entity: x) -> (apply(predicate: musician, entity: x) ∧ always [y:e]: apply(predicate: musician, entity: y) -> better(left: x, right: y))", "justification": "universal_elim", "from": [3], "substitution": {"P": "musician"}},
+    {"step": 5, "formula": "best(predicate: musician, entity: john) -> (apply(predicate: musician, entity: john) ∧ always [y:e]: apply(predicate: musician, entity: y) -> better(left: john, right: y))", "justification": "universal_elim", "from": [4], "substitution": {"x": "john"}},
+    {"step": 6, "formula": "apply(predicate: musician, entity: john) ∧ always [y:e]: apply(predicate: musician, entity: y) -> better(left: john, right: y)", "justification": "modus_ponens", "from": [1, 5]},
+    {"step": 7, "formula": "always [y:e]: apply(predicate: musician, entity: y) -> better(left: john, right: y)", "justification": "and_elim_r", "from": [6]},
+    {"step": 8, "formula": "apply(predicate: musician, entity: sue) -> better(left: john, right: sue)", "justification": "universal_elim", "from": [7], "substitution": {"y": "sue"}},
+    {"step": 9, "formula": "better(left: john, right: sue)", "justification": "modus_ponens", "from": [2, 8]}
+  ]
+}
