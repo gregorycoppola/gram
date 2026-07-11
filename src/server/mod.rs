@@ -15,16 +15,20 @@ pub use types::{ParseResult, ParseStatus, FixtureSummary, ParseRequest, CheckPro
 #[derive(Clone)]
 pub struct AppState {
     pub fixtures_dir: Arc<PathBuf>,
+    pub proofs_dir: Arc<PathBuf>,
 }
 
-pub async fn run_server(port: u16, fixtures_dir: PathBuf) -> Result<()> {
+pub async fn run_server(port: u16, fixtures_dir: PathBuf, proofs_dir: PathBuf) -> Result<()> {
     let state = AppState {
         fixtures_dir: Arc::new(fixtures_dir),
+        proofs_dir: Arc::new(proofs_dir),
     };
     let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any);
 
     let app = Router::new()
         .route("/health", get(routes::health))
+        .route("/proofs", get(routes::list_proofs))
+        .route("/proofs/:name", get(routes::get_proof))
         .route("/proof/check", post(routes::check_proof))
         .route("/fixtures", get(routes::list_fixtures))
         .route("/fixtures/*path", get(routes::handle_fixture))

@@ -25,6 +25,31 @@ pub async fn health() -> Json<Value> {
     Json(serde_json::json!({ "status": "ok" }))
 }
 
+pub async fn list_proofs(State(state): State<AppState>) -> AppResult<Json<Vec<String>>> {
+    let dir = state.proofs_dir.join("regression");
+    let mut names = Vec::new();
+    if dir.is_dir() {
+        for entry in std::fs::read_dir(&dir).map_err(|e| AppError(anyhow::anyhow!("reading proofs dir: {}", e)))? {
+            if let Ok(e) = entry {
+                if let Some(name) = e.path().file_stem().and_then(|s| s.to_str()) {
+                    names.push(name.to_string());
+                }
+            }
+        }
+    }
+    names.sort();
+    Ok(Json(names))
+}
+
+pub async fn get_proof(State(state): State<AppState>, Path(name): Path<String>) -> AppResult<Json<Value>> {
+    let path = state.proofs_dir.join("regression").join(format!("{}.json", name));
+    let raw = std::fs::read_to_string(&path)
+        .map_err(|e| AppError(anyhow::anyhow!("reading proof {}: {}", path.display(), e)))?;
+    let value: Value = serde_json::from_str(&raw)
+        .map_err(|e| AppError(anyhow::anyhow!("parsing proof JSON: {}", e)))?;
+    Ok(Json(value))
+}
+
 pub async fn check_proof(Json(req): Json<CheckProofRequest>) -> AppResult<Json<CheckProofResponse>> {
     let file = ProofFile {
         title: req.title,
