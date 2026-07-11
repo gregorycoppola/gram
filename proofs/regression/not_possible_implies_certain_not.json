@@ -1,0 +1,14 @@
+{
+  "title": "Not possible implies certain not",
+  "premises": [
+    "not possible(content: happy(theme: john))",
+    "always [P:s]: not possible(content: P) -> certain(content: not P)"
+  ],
+  "conclusion": "certain(content: not happy(theme: john))",
+  "proof": [
+    {"step": 1, "formula": "not possible(content: happy(theme: john))", "justification": "premise"},
+    {"step": 2, "formula": "always [P:s]: not possible(content: P) -> certain(content: not P)", "justification": "premise"},
+    {"step": 3, "formula": "not possible(content: happy(theme: john)) -> certain(content: not happy(theme: john))", "justification": "universal_elim", "from": [2], "substitution": {"P": "happy(theme: john)"}},
+    {"step": 4, "formula": "certain(content: not happy(theme: john))", "justification": "modus_ponens", "from": [1, 3]}
+  ]
+}
