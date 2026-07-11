@@ -38,6 +38,7 @@ fn check_step(step: &ProofStep, premises: &[String], prior: &[Expr]) -> Result<E
         "modus_ponens" => check_modus_ponens(&formula, step, prior),
         "existential_intro" => check_existential_intro(&formula, step, prior),
         "and_intro" => check_and_intro(&formula, step, prior),
+        "and_elim" => check_and_elim(&formula, step, prior),
         "and_elim_l" => check_and_elim_l(&formula, step, prior),
         "and_elim_r" => check_and_elim_r(&formula, step, prior),
         "belief_elim" => check_belief_elim(&formula, step, prior),
@@ -147,6 +148,26 @@ fn check_and_intro(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<E
         Ok(formula.clone())
     } else {
         Err(format!("and_intro: expected {} ∧ {} = {}, got {}", a, b, expected, formula))
+    }
+}
+
+fn check_and_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+    let source_idx = step.from.get(0).copied()
+        .ok_or("and_elim requires a source step")?;
+    let source = prior.get(source_idx.saturating_sub(1))
+        .ok_or(format!("step {} not yet derived", source_idx))?;
+
+    match source {
+        Expr::And(left, right) => {
+            if expr_eq(formula, left) {
+                Ok(formula.clone())
+            } else if expr_eq(formula, right) {
+                Ok(formula.clone())
+            } else {
+                Err(format!("and_elim: formula {} matches neither {} nor {}", formula, left, right))
+            }
+        }
+        _ => Err(format!("and_elim source must be And, got: {}", source)),
     }
 }
 
