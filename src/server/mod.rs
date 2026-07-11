@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
-pub use types::{ParseResult, ParseStatus, FixtureSummary, ParseRequest};
+pub use types::{ParseResult, ParseStatus, FixtureSummary, ParseRequest, CheckProofRequest, CheckProofResponse};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -25,6 +25,7 @@ pub async fn run_server(port: u16, fixtures_dir: PathBuf) -> Result<()> {
 
     let app = Router::new()
         .route("/health", get(routes::health))
+        .route("/proof/check", post(routes::check_proof))
         .route("/fixtures", get(routes::list_fixtures))
         .route("/fixtures/*path", get(routes::handle_fixture))
         .route("/parse/one", post(routes::parse_one))

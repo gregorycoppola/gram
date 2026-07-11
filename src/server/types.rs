@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::core::matcher::Match;
+use crate::core::proof::ProofStep;
 
 /// One parsed sentence — the unit gloss renders.
 #[derive(Debug, Serialize, Deserialize)]
@@ -45,4 +46,32 @@ pub struct FixtureSummary {
     pub entities: usize,
     pub rules: usize,
     pub sentences: usize,
+}
+
+/// POST /proof/check request body.
+#[derive(Debug, Deserialize)]
+pub struct CheckProofRequest {
+    pub title: String,
+    pub premises: Vec<String>,
+    pub conclusion: String,
+    pub proof: Vec<ProofStep>,
+}
+
+/// POST /proof/check response body.
+#[derive(Debug, Serialize)]
+pub struct CheckProofResponse {
+    pub title: String,
+    pub conclusion: String,
+    pub conclusion_reached: bool,
+    pub steps: Vec<CheckProofStep>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CheckProofStep {
+    pub step: usize,
+    pub formula: String,
+    pub justification: String,
+    pub from: Vec<usize>,
+    pub ok: bool,
+    pub error: Option<String>,
 }

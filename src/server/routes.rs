@@ -9,14 +9,57 @@ use crate::core::fixture::{Fixture, SentenceInput};
 use crate::core::grammar::compile_rules;
 use crate::core::lexicon::Lexicon;
 use crate::core::matcher::parse_hinted_sentence;
+use crate::core::proof::checker::check_proof;
+use crate::core::proof::ProofFile;
+use crate::core::proof::StepResult;
 use crate::core::tokenize::tokenize;
 
 use super::error::{AppError, AppResult};
-use super::types::{FixtureSummary, ParseRequest, ParseResult, ParseStatus};
+use super::types::{
+    CheckProofRequest, CheckProofResponse, CheckProofStep, FixtureSummary, ParseRequest,
+    ParseResult, ParseStatus,
+};
 use super::AppState;
 
 pub async fn health() -> Json<Value> {
     Json(serde_json::json!({ "status": "ok" }))
+}
+
+pub async fn check_proof(Json(req): Json<CheckProofRequest>) -> AppResult<Json<CheckProofResponse>> {
+    let file = ProofFile {
+        title: req.title,
+        premises: req.premises,
+        conclusion: req.conclusion,
+        proof: req.proof,
+    };
+
+    let result = check_proof(&file).map_err(AppError::from)?;
+
+    let steps = result
+        .steps
+        .into_iter()
+        .map(|(step, status)| {
+            let (ok, error) = match status {
+                StepResult::Ok => (true, None),
+                StepResult::Err(e) => (false, Some(e)),
+            };
+            CheckProofStep {
+                step: step.step,
+                formula: step.formula,
+                justification: step.justification,
+                from: step.from,
+                ok,
+                error,
+            }
+        })
+        .collect();
+
+    Ok(Json(CheckProofResponse {
+        title: result.title,
+        conclusion: result.conclusion,
+        conclusion_reached: result.conclusion_reached,
+        steps,
+    }))
 }
 
 pub async fn list_fixtures(

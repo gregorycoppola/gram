@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{Args, Subcommand};
+use std::path::PathBuf;
 
 use crate::cli::pretty::print_pretty;
 use crate::server::ParseResult;
@@ -31,6 +32,12 @@ pub enum ApiCommand {
         #[arg(long)]
         pretty: bool,
     },
+    /// POST /proof/check — check a proof file for valid inference steps
+    CheckProof {
+        /// Path to a proof JSON file.
+        #[arg(long)]
+        proof: PathBuf,
+    },
 }
 
 #[derive(Args)]
@@ -52,34 +59,37 @@ pub fn run_api(args: ApiArgs) -> Result<()> {
 async fn run_api_async(args: ApiArgs) -> Result<()> {
     let base = args.url.trim_end_matches('/');
 
-    let (url, pretty) = match &args.command {
-        ApiCommand::Health => (format!("{}/health", base), false),
-        ApiCommand::Fixtures => (format!("{}/fixtures", base), false),
-        ApiCommand::Fixture { name } => (format!("{}/fixtures/{}", base, name), false),
-        ApiCommand::Parse { name, pretty } => (format!("{}/fixtures/{}/parse", base, name), *pretty),
+    let (url, pretty, is_post, body) = match &args.command {
+        ApiCommand::Health => (format!("{}/health", base), false, false, None),
+        ApiCommand::Fixtures => (format!("{}/fixtures", base), false, false, None),
+        ApiCommand::Fixture { name } => (format!("{}/fixtures/{}", base, name), false, false, None),
+        ApiCommand::Parse { name, pretty } => (format!("{}/fixtures/{}/parse", base, name), *pretty, false, None),
         ApiCommand::ParseOne { fixture, sentence, pretty } => {
-            let _ = (fixture, sentence); // used in POST body below
-            (format!("{}/parse/one", base), *pretty)
+            let body = serde_json::json!({
+                "fixture": fixture,
+                "sentence": sentence,
+            });
+            (format!("{}/parse/one", base), *pretty, true, Some(body))
+        }
+        ApiCommand::CheckProof { proof } => {
+            let raw = std::fs::read_to_string(proof)
+                .with_context(|| format!("reading proof file {}", proof.display()))?;
+            let body: serde_json::Value = serde_json::from_str(&raw)
+                .with_context(|| format!("parsing proof JSON {}", proof.display()))?;
+            (format!("{}/proof/check", base), false, true, Some(body))
         }
     };
 
     let client = reqwest::Client::new();
 
-    let resp = match &args.command {
-        ApiCommand::ParseOne { fixture, sentence, .. } => client
-            .post(&url)
-            .json(&serde_json::json!({
-                "fixture": fixture,
-                "sentence": sentence,
-            }))
-            .send()
-            .await
-            .with_context(|| format!("POST {}", url))?,
-        _ => client
-            .get(&url)
-            .send()
-            .await
-            .with_context(|| format!("GET {}", url))?,
+    let resp = if is_post {
+        let mut req = client.post(&url);
+        if let Some(b) = body {
+            req = req.json(&b);
+        }
+        req.send().await.with_context(|| format!("POST {}", url))?
+    } else {
+        client.get(&url).send().await.with_context(|| format!("GET {}", url))?
     };
 
     let status = resp.status();
