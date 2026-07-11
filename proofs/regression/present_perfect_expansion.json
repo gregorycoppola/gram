@@ -1,0 +1,15 @@
+{
+  "title": "Present perfect expands to exists earlier time with present simple",
+  "premises": [
+    "happy(theme: john, tense: present, aspect: perfect, at_time: now)",
+    "always [x:e]: always [t:n]: happy(theme: x, tense: present, aspect: perfect, at_time: t) -> exists [t2:n]: before(left: t2, right: t) ∧ happy(theme: x, tense: present, aspect: simple, at_time: t2)"
+  ],
+  "conclusion": "exists [t2:n]: before(left: t2, right: now) ∧ happy(theme: john, tense: present, aspect: simple, at_time: t2)",
+  "proof": [
+    {"step": 1, "formula": "happy(theme: john, tense: present, aspect: perfect, at_time: now)", "justification": "premise"},
+    {"step": 2, "formula": "always [x:e]: always [t:n]: happy(theme: x, tense: present, aspect: perfect, at_time: t) -> exists [t2:n]: before(left: t2, right: t) ∧ happy(theme: x, tense: present, aspect: simple, at_time: t2)", "justification": "premise"},
+    {"step": 3, "formula": "always [t:n]: happy(theme: john, tense: present, aspect: perfect, at_time: t) -> exists [t2:n]: before(left: t2, right: t) ∧ happy(theme: john, tense: present, aspect: simple, at_time: t2)", "justification": "universal_elim", "from": [2], "substitution": {"x": "john"}},
+    {"step": 4, "formula": "happy(theme: john, tense: present, aspect: perfect, at_time: now) -> exists [t2:n]: before(left: t2, right: now) ∧ happy(theme: john, tense: present, aspect: simple, at_time: t2)", "justification": "universal_elim", "from": [3], "substitution": {"t": "now"}},
+    {"step": 5, "formula": "exists [t2:n]: before(left: t2, right: now) ∧ happy(theme: john, tense: present, aspect: simple, at_time: t2)", "justification": "modus_ponens", "from": [1, 4]}
+  ]
+}

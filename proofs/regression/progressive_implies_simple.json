@@ -1,0 +1,15 @@
+{
+  "title": "Progressive aspect implies simple aspect at same time",
+  "premises": [
+    "happy(theme: john, tense: present, aspect: progressive, at_time: now)",
+    "always [x:e]: always [t:n]: happy(theme: x, tense: present, aspect: progressive, at_time: t) -> happy(theme: x, tense: present, aspect: simple, at_time: t)"
+  ],
+  "conclusion": "happy(theme: john, tense: present, aspect: simple, at_time: now)",
+  "proof": [
+    {"step": 1, "formula": "happy(theme: john, tense: present, aspect: progressive, at_time: now)", "justification": "premise"},
+    {"step": 2, "formula": "always [x:e]: always [t:n]: happy(theme: x, tense: present, aspect: progressive, at_time: t) -> happy(theme: x, tense: present, aspect: simple, at_time: t)", "justification": "premise"},
+    {"step": 3, "formula": "always [t:n]: happy(theme: john, tense: present, aspect: progressive, at_time: t) -> happy(theme: john, tense: present, aspect: simple, at_time: t)", "justification": "universal_elim", "from": [2], "substitution": {"x": "john"}},
+    {"step": 4, "formula": "happy(theme: john, tense: present, aspect: progressive, at_time: now) -> happy(theme: john, tense: present, aspect: simple, at_time: now)", "justification": "universal_elim", "from": [3], "substitution": {"t": "now"}},
+    {"step": 5, "formula": "happy(theme: john, tense: present, aspect: simple, at_time: now)", "justification": "modus_ponens", "from": [1, 4]}
+  ]
+}
