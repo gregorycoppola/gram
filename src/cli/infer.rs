@@ -2,13 +2,16 @@ use anyhow::{Context, Result};
 use clap::Args;
 use std::path::PathBuf;
 
-use crate::core::qbbn::inference::{run_inference_fixture, InferenceFixture};
+use crate::core::qbbn::inference::{run_inference_fixture_debug, InferenceFixture};
 
 #[derive(Args)]
 pub struct InferArgs {
     /// Path to an inference fixture JSON file.
     #[arg(long)]
     pub fixture: PathBuf,
+    /// Print full CPT tables and all intermediate calculations.
+    #[arg(long)]
+    pub debug: bool,
 }
 
 pub fn run_infer(args: InferArgs) -> Result<()> {
@@ -17,7 +20,7 @@ pub fn run_infer(args: InferArgs) -> Result<()> {
     let fixture: InferenceFixture = serde_json::from_str(&raw)
         .with_context(|| format!("parsing inference JSON {}", args.fixture.display()))?;
 
-    let result = run_inference_fixture(&fixture)
+    let result = run_inference_fixture_debug(&fixture, args.debug)
         .map_err(|e| anyhow::anyhow!("inference failed: {}", e))?;
 
     println!("📊 {}\n", result.title);

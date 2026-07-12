@@ -94,8 +94,6 @@ fn flatten_and(expr: &Expr) -> Vec<Expr> {
     }
 }
 
-/// Convert entities that match bound variable names into proper Var nodes.
-/// The parser produces Entity("x") instead of Var{..} inside ForAll/Exists bodies.
 fn convert_bound_entities(expr: &Expr, vars: &[(String, String)]) -> Expr {
     match expr {
         Expr::Entity(name) => {
