@@ -1,5 +1,6 @@
 pub mod api;
 pub mod check;
+pub mod infer;
 pub mod inspect;
 pub mod parse;
 pub mod pretty;
@@ -11,21 +12,14 @@ use clap::Subcommand;
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Parse all sentences in a fixture file.
     Parse(parse::ParseArgs),
-    /// Parse a single sentence using the lexicon/grammar from a fixture.
     ParseOne(parse::ParseOneArgs),
-    /// Dump fixture internals — lexicon form index, tokenization, compiled rules.
     Inspect(inspect::InspectArgs),
-    /// Pretty-print syntax trees for all sentences in a fixture.
     Tree(tree::TreeArgs),
-    /// HTTP client — hit server endpoints and print JSON.
     Api(api::ApiArgs),
-    /// Run the HTTP server on localhost. Serves fixtures from a directory;
-    /// the gloss frontend is a separate Vite app that talks to this API.
     Serve(serve::ServeArgs),
-    /// Check a proof file for valid inference steps.
     Check(check::CheckArgs),
+    Infer(infer::InferArgs),
 }
 
 pub fn run(command: Command) -> Result<()> {
@@ -37,5 +31,6 @@ pub fn run(command: Command) -> Result<()> {
         Command::Api(args) => api::run_api(args),
         Command::Serve(args) => serve::run_serve(args),
         Command::Check(args) => check::run_check(args),
+        Command::Infer(args) => infer::run_infer(args),
     }
 }

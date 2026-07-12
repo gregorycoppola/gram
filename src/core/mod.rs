@@ -5,6 +5,7 @@ pub mod lexicon;
 pub mod logic;
 pub mod matcher;
 pub mod proof;
+pub mod qbbn;
 pub mod sem_dsl;
 pub mod semantics;
 pub mod template;

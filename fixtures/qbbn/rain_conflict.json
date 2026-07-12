@@ -1,0 +1,23 @@
+{
+  "title": "Rain with conflicting evidence",
+  "entities": [
+    {"name": "today", "type": "e"}
+  ],
+  "rules": [
+    {
+      "formula": "always [x:e]: weather_said(theme: rain) -> rain(theme: x)",
+      "weight": 0.7
+    },
+    {
+      "formula": "always [x:e]: no_clouds() -> not rain(theme: x)",
+      "weight": 0.7
+    }
+  ],
+  "evidence": [
+    {"formula": "weather_said(theme: rain)", "value": true},
+    {"formula": "no_clouds()", "value": true}
+  ],
+  "queries": [
+    {"formula": "rain(theme: today)", "expected_prob": 0.5, "tolerance": 0.1}
+  ]
+}
