@@ -34,7 +34,7 @@ fn run_fixture_debug(name: &str, debug: bool) {
 
 #[test]
 fn test_socrates_mortal() {
-    run_fixture_debug("socrates_mortal.json", true);
+    run_fixture("socrates_mortal.json");
 }
 
 #[test]
