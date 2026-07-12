@@ -1,0 +1,11 @@
+{
+  "title": "Most implies many",
+  "premises": [
+    "exists_many [x:e, most]: man(theme: x) ∧ mortal(theme: x)"
+  ],
+  "conclusion": "exists_many [x:e, many]: man(theme: x) ∧ mortal(theme: x)",
+  "proof": [
+    {"step": 1, "formula": "exists_many [x:e, most]: man(theme: x) ∧ mortal(theme: x)", "justification": "premise"},
+    {"step": 2, "formula": "exists_many [x:e, many]: man(theme: x) ∧ mortal(theme: x)", "justification": "quantifier_weaken", "from": [1]}
+  ]
+}
