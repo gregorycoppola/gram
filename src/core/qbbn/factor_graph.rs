@@ -45,6 +45,7 @@ pub struct Factor {
     pub id: String,
     pub factor_type: FactorType,
     pub input_ids: Vec<String>,
+    pub input_negated: Vec<bool>,
     pub output_id: String,
 }
 
@@ -146,13 +147,19 @@ impl QBBNGraph {
         id
     }
 
-    pub fn add_and_factor(&mut self, premise_ids: Vec<String>, group_id: String) -> String {
+    pub fn add_and_factor(
+        &mut self,
+        premise_ids: Vec<String>,
+        premise_negated: Vec<bool>,
+        group_id: String,
+    ) -> String {
         self.and_count += 1;
         let id = format!("and{}", self.and_count);
         let factor = Factor {
             id: id.clone(),
             factor_type: FactorType::And,
             input_ids: premise_ids.clone(),
+            input_negated: premise_negated,
             output_id: group_id.clone(),
         };
         self.factors.insert(id.clone(), factor);
@@ -176,6 +183,7 @@ impl QBBNGraph {
             id: id.clone(),
             factor_type: FactorType::Or,
             input_ids: group_ids.clone(),
+            input_negated: vec![false; group_ids.len()],
             output_id: conclusion_id.clone(),
         };
         self.factors.insert(id.clone(), factor);
@@ -220,13 +228,22 @@ impl QBBNGraph {
     ) -> String {
         let is_negated = is_negated_formula(&conclusion_formula);
         let pos_formula = get_positive_formula(&conclusion_formula);
-        let premise_ids: Vec<String> = premise_formulas
-            .iter()
-            .map(|f| self.add_proposition(f))
-            .collect();
+        
+        let mut premise_ids = Vec::new();
+        let mut premise_negated = Vec::new();
+        for f in &premise_formulas {
+            if is_negated_formula(f) {
+                premise_ids.push(self.add_proposition(&get_positive_formula(f)));
+                premise_negated.push(true);
+            } else {
+                premise_ids.push(self.add_proposition(f));
+                premise_negated.push(false);
+            }
+        }
+        
         let conc_id = self.add_proposition(&pos_formula);
         let group_id = self.add_group(premise_ids.clone(), conc_id.clone(), rule_id, is_negated);
-        self.add_and_factor(premise_ids, group_id.clone());
+        self.add_and_factor(premise_ids, premise_negated, group_id.clone());
         group_id
     }
 

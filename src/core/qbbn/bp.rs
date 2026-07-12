@@ -30,7 +30,12 @@ fn print_graph(graph: &QBBNGraph) {
     }
     println!("  Factors ({}):", graph.factors.len());
     for (id, f) in &graph.factors {
-        println!("    {}: {:?}  inputs={:?} -> output={}", id, f.factor_type, f.input_ids, f.output_id);
+        let neg_str = if f.input_negated.iter().any(|&n| n) {
+            format!(" negated={:?}", f.input_negated)
+        } else {
+            String::new()
+        };
+        println!("    {}: {:?}  inputs={:?}{} -> output={}", id, f.factor_type, f.input_ids, neg_str, f.output_id);
     }
     println!("  Formula map:");
     for (formula, id) in &graph.formula_to_id {
@@ -140,7 +145,14 @@ pub fn belief_propagation(
 
         // AND factors: propositions → groups
         for factor in graph.factors.values().filter(|f| f.factor_type == FactorType::And) {
-            let prob_all_true: f64 = factor.input_ids.iter().map(|p_id| pi[p_id][1]).product();
+            let mut prob_all_true = 1.0;
+            for (i, p_id) in factor.input_ids.iter().enumerate() {
+                if factor.input_negated[i] {
+                    prob_all_true *= pi[p_id][0];
+                } else {
+                    prob_all_true *= pi[p_id][1];
+                }
+            }
             let g_id = &factor.output_id;
             if !graph.variables[g_id].is_evidence {
                 if debug {
@@ -294,7 +306,14 @@ pub fn belief_propagation(
                     .iter()
                     .enumerate()
                     .filter(|(j, _)| *j != i)
-                    .map(|(_, j_id)| pi[j_id][1])
+                    .map(|(_, j_id)| {
+                        let j = factor.input_ids.iter().position(|x| x == j_id).unwrap();
+                        if factor.input_negated[j] {
+                            pi[j_id][0]
+                        } else {
+                            pi[j_id][1]
+                        }
+                    })
                     .product();
                 let lam_p_1 = other_prob_true * lam_g[1] + (1.0 - other_prob_true) * lam_g[0];
                 let lam_p_0 = lam_g[0];
