@@ -41,3 +41,8 @@ fn test_socrates_mortal() {
 fn test_rain_conflict() {
     run_fixture("rain_conflict.json");
 }
+
+#[test]
+fn test_socrates_chain() {
+    run_fixture("socrates_chain.json");
+}

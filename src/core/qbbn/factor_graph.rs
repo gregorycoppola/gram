@@ -12,7 +12,6 @@ pub enum NodeType {
 pub enum FactorType {
     And,
     Or,
-    Neg,
 }
 
 #[derive(Debug, Clone)]
@@ -23,6 +22,7 @@ pub struct Variable {
     pub conjunct_ids: Vec<String>,
     pub conclusion_id: Option<String>,
     pub rule_id: Option<String>,
+    pub negated: bool,
     pub belief: [f64; 2],
     pub is_evidence: bool,
     pub evidence_value: Option<bool>,
@@ -65,13 +65,11 @@ pub struct QBBNGraph {
     pub var_to_factors: HashMap<String, Vec<String>>,
     pub prop_to_groups: HashMap<String, Vec<String>>,
     pub formula_to_id: HashMap<String, String>,
-    neg_pairs: Vec<(String, String)>,
     pub query_id: Option<String>,
     p_count: usize,
     g_count: usize,
     and_count: usize,
     or_count: usize,
-    neg_count: usize,
     r_count: usize,
 }
 
@@ -84,13 +82,11 @@ impl QBBNGraph {
             var_to_factors: HashMap::new(),
             prop_to_groups: HashMap::new(),
             formula_to_id: HashMap::new(),
-            neg_pairs: Vec::new(),
             query_id: None,
             p_count: 0,
             g_count: 0,
             and_count: 0,
             or_count: 0,
-            neg_count: 0,
             r_count: 0,
         }
     }
@@ -108,6 +104,7 @@ impl QBBNGraph {
             conjunct_ids: Vec::new(),
             conclusion_id: None,
             rule_id: None,
+            negated: false,
             belief: [0.5, 0.5],
             is_evidence: false,
             evidence_value: None,
@@ -124,6 +121,7 @@ impl QBBNGraph {
         premise_ids: Vec<String>,
         conclusion_id: String,
         rule_id: String,
+        negated: bool,
     ) -> String {
         self.g_count += 1;
         let id = format!("g{}", self.g_count);
@@ -134,6 +132,7 @@ impl QBBNGraph {
             conjunct_ids: premise_ids.clone(),
             conclusion_id: Some(conclusion_id.clone()),
             rule_id: Some(rule_id),
+            negated,
             belief: [0.5, 0.5],
             is_evidence: false,
             evidence_value: None,
@@ -193,35 +192,6 @@ impl QBBNGraph {
         id
     }
 
-    pub fn add_neg_factor(&mut self, pos_id: String, neg_id: String) -> Option<String> {
-        let pair = (
-            pos_id.clone().min(neg_id.clone()),
-            pos_id.clone().max(neg_id.clone()),
-        );
-        if self.neg_pairs.iter().any(|(a, b)| a == &pair.0 && b == &pair.1) {
-            return None;
-        }
-        self.neg_pairs.push(pair);
-        self.neg_count += 1;
-        let id = format!("neg{}", self.neg_count);
-        let factor = Factor {
-            id: id.clone(),
-            factor_type: FactorType::Neg,
-            input_ids: vec![pos_id.clone()],
-            output_id: neg_id.clone(),
-        };
-        self.factors.insert(id.clone(), factor);
-        self.var_to_factors
-            .entry(pos_id)
-            .or_default()
-            .push(id.clone());
-        self.var_to_factors
-            .entry(neg_id)
-            .or_default()
-            .push(id.clone());
-        Some(id)
-    }
-
     pub fn add_rule(
         &mut self,
         premise_patterns: Vec<String>,
@@ -248,12 +218,14 @@ impl QBBNGraph {
         conclusion_formula: String,
         rule_id: String,
     ) -> String {
+        let is_negated = is_negated_formula(&conclusion_formula);
+        let pos_formula = get_positive_formula(&conclusion_formula);
         let premise_ids: Vec<String> = premise_formulas
             .iter()
             .map(|f| self.add_proposition(f))
             .collect();
-        let conc_id = self.add_proposition(&conclusion_formula);
-        let group_id = self.add_group(premise_ids.clone(), conc_id.clone(), rule_id);
+        let conc_id = self.add_proposition(&pos_formula);
+        let group_id = self.add_group(premise_ids.clone(), conc_id.clone(), rule_id, is_negated);
         self.add_and_factor(premise_ids, group_id.clone());
         group_id
     }
@@ -271,26 +243,10 @@ impl QBBNGraph {
         }
     }
 
-    pub fn build_neg_factors(&mut self) {
-        let formulas: Vec<String> = self.formula_to_id.keys().cloned().collect();
-        for formula in formulas {
-            if is_negated_formula(&formula) {
-                let pos_formula = get_positive_formula(&formula);
-                if let Some(pos_id) = self.formula_to_id.get(&pos_formula).cloned() {
-                    if let Some(neg_id) = self.formula_to_id.get(&formula).cloned() {
-                        self.add_neg_factor(pos_id, neg_id);
-                    }
-                }
-            }
-        }
-    }
-
-    /// Set evidence for a formula. Returns true if the formula was found (or added), false on error.
     pub fn set_evidence(&mut self, formula: &str, value: bool) -> bool {
         let id = if let Some(id) = self.formula_to_id.get(formula).cloned() {
             id
         } else {
-            // Auto-add as a standalone proposition if not in graph
             self.add_proposition(formula)
         };
         if let Some(var) = self.variables.get_mut(&id) {
@@ -308,11 +264,20 @@ impl QBBNGraph {
     }
 
     pub fn prob(&self, formula: &str) -> f64 {
-        self.formula_to_id
-            .get(formula)
-            .and_then(|id| self.variables.get(id))
-            .map(|v| v.prob())
-            .unwrap_or(0.0)
+        if is_negated_formula(formula) {
+            let pos_formula = get_positive_formula(formula);
+            self.formula_to_id
+                .get(&pos_formula)
+                .and_then(|id| self.variables.get(id))
+                .map(|v| 1.0 - v.prob())
+                .unwrap_or(0.0)
+        } else {
+            self.formula_to_id
+                .get(formula)
+                .and_then(|id| self.variables.get(id))
+                .map(|v| v.prob())
+                .unwrap_or(0.0)
+        }
     }
 
     pub fn stats(&self) -> (usize, usize, usize, usize, usize, usize) {
@@ -336,13 +301,8 @@ impl QBBNGraph {
             .values()
             .filter(|f| f.factor_type == FactorType::Or)
             .count();
-        let n_neg = self
-            .factors
-            .values()
-            .filter(|f| f.factor_type == FactorType::Neg)
-            .count();
         let n_evidence = self.variables.values().filter(|v| v.is_evidence).count();
-        (n_props, n_groups, n_and, n_or, n_neg, n_evidence)
+        (n_props, n_groups, n_and, n_or, 0, n_evidence)
     }
 
     pub fn from_kb(kb: &KnowledgeBase) -> Self {
@@ -383,7 +343,6 @@ impl QBBNGraph {
         }
 
         graph.build_or_factors();
-        graph.build_neg_factors();
         graph
     }
 }

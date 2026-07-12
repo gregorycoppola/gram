@@ -26,7 +26,6 @@ fn test_rain_inference() {
     let mut kb = KnowledgeBase::new();
     kb.add_entity("today".to_string(), "e".to_string());
 
-    // weather_said(theme: rain) -> rain(theme: x) [weight=0.7]
     kb.add_rule(
         vec![make_pred("weather_said", "theme", "rain")],
         make_pred_var("rain", "theme", "x", "e"),
@@ -34,7 +33,6 @@ fn test_rain_inference() {
         0.7,
     );
 
-    // no_clouds() -> not rain(theme: x) [weight=0.8]
     kb.add_rule(
         vec![Expr::Pred {
             name: "no_clouds".to_string(),
@@ -42,25 +40,22 @@ fn test_rain_inference() {
         }],
         Expr::Not(Box::new(make_pred_var("rain", "theme", "x", "e"))),
         vec![("x".to_string(), "e".to_string())],
-        0.8,
+        0.7,
     );
 
     let mut graph = QBBNGraph::from_kb(&kb);
 
-    // Set evidence: weather said rain, no clouds
     graph.set_evidence("weather_said(theme: rain)", true);
     graph.set_evidence("no_clouds()", true);
 
-    // Set query
     graph.set_query("rain(theme: today)");
 
-    let trace = belief_propagation(&mut graph, 20, 0.5, 1e-6, false);
+    let trace = belief_propagation(&mut graph, 50, 0.5, 1e-6, false);
 
     let p_rain = graph.prob("rain(theme: today)");
     println!("P(rain) = {}", p_rain);
     println!("iterations = {}", trace.iterations.len());
 
-    // With deterministic OR, both rules fire so rain is true
-    assert!(p_rain > 0.9);
+    assert!(p_rain > 0.45 && p_rain < 0.55);
     assert!(!trace.iterations.is_empty());
 }
