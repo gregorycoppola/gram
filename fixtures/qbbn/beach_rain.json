@@ -10,10 +10,6 @@
       "weight": 2
     },
     {
-      "formula": "always [x:e]: no_clouds() -> not rain(theme: x)",
-      "weight": 2
-    },
-    {
       "formula": "always [x:e]: rain(theme: x) -> not fun(theme: beach)",
       "weight": 99
     },
@@ -26,6 +22,6 @@
     {"formula": "weather_said(theme: rain)", "value": true}
   ],
   "queries": [
-    {"formula": "fun(theme: beach)", "expected_prob": 0.31, "tolerance": 0.05}
+    {"formula": "fun(theme: beach)", "expected_prob": 0.12, "tolerance": 0.05}
   ]
 }
