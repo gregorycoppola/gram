@@ -210,7 +210,7 @@ pub fn belief_propagation(
                 }
                 let mut prob_all_false_without: f64 = 1.0;
                 let mut w_i: f64 = 0.0;
-                for (j, other_g_id) in factor.input_ids.iter().enumerate() {
+                for (_j, other_g_id) in factor.input_ids.iter().enumerate() {
                     if other_g_id == g_id {
                         if let Some(rule_id) = graph.variables[other_g_id].rule_id.clone() {
                             if let Some(rule) = graph.rules.get(&rule_id) {
