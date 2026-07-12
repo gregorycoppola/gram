@@ -53,6 +53,22 @@ fn print_beliefs(pi: &HashMap<String, [f64; 2]>, lam: &HashMap<String, [f64; 2]>
     println!();
 }
 
+/// Compute P(p=1 | assignment) using log-linear model.
+fn cpt_prob_true(score_pos: f64, score_neg: f64) -> f64 {
+    let psi_1 = score_pos.exp();
+    let psi_0 = score_neg.exp();
+    if psi_1.is_infinite() && psi_0.is_infinite() {
+        0.5
+    } else if psi_1.is_infinite() {
+        1.0
+    } else if psi_0.is_infinite() {
+        0.0
+    } else {
+        psi_1 / (psi_1 + psi_0)
+    }
+}
+
+/// Run loopy belief propagation with CPT enumeration for OR factors.
 pub fn belief_propagation(
     graph: &mut QBBNGraph,
     iterations: usize,
@@ -61,7 +77,7 @@ pub fn belief_propagation(
     debug: bool,
 ) -> BPTrace {
     if debug {
-        println!("=== Belief Propagation Debug (log-linear OR) ===");
+        println!("=== Belief Propagation Debug (CPT enumeration) ===");
         print_graph(graph);
     }
 
@@ -124,6 +140,7 @@ pub fn belief_propagation(
             println!("-- Forward (π) --");
         }
 
+        // AND factors: propositions → groups
         for factor in graph.factors.values().filter(|f| f.factor_type == FactorType::And) {
             let prob_all_true: f64 = factor.input_ids.iter().map(|p_id| pi[p_id][1]).product();
             let g_id = &factor.output_id;
@@ -136,33 +153,48 @@ pub fn belief_propagation(
             }
         }
 
+        // OR factors: groups → propositions (CPT enumeration)
         for factor in graph.factors.values().filter(|f| f.factor_type == FactorType::Or) {
             let p_id = &factor.output_id;
             if graph.variables[p_id].is_evidence {
                 continue;
             }
-            let mut total_pos: f64 = 0.0;
-            let mut total_neg: f64 = 0.0;
-            for g_id in &factor.input_ids {
-                let g = &graph.variables[g_id];
-                let pi_g = pi[g_id][1];
-                if let Some(rule_id) = &g.rule_id {
-                    if let Some(rule) = graph.rules.get(rule_id) {
-                        let w = rule.weight;
-                        if g.negated {
-                            total_neg += w * pi_g;
-                        } else {
-                            total_pos += w * pi_g;
+            let n = factor.input_ids.len();
+            let mut prob_true = 0.0;
+
+            for assignment in 0..(1 << n) {
+                let mut prob_assignment = 1.0;
+                let mut score_pos = 0.0;
+                let mut score_neg = 0.0;
+
+                for i in 0..n {
+                    let g_id = &factor.input_ids[i];
+                    let g = &graph.variables[g_id];
+                    let is_active = (assignment >> i) & 1 == 1;
+
+                    if is_active {
+                        prob_assignment *= pi[g_id][1];
+                        if let Some(rule_id) = &g.rule_id {
+                            if let Some(rule) = graph.rules.get(rule_id) {
+                                if g.negated {
+                                    score_neg += rule.weight;
+                                } else {
+                                    score_pos += rule.weight;
+                                }
+                            }
                         }
+                    } else {
+                        prob_assignment *= pi[g_id][0];
                     }
                 }
+
+                let prob_true_given_assignment = cpt_prob_true(score_pos, score_neg);
+                prob_true += prob_true_given_assignment * prob_assignment;
             }
-            let psi_1 = total_pos.exp();
-            let psi_0 = total_neg.exp();
-            let prob_true = psi_1 / (psi_1 + psi_0);
+
             if debug {
-                println!("  OR {}: pos_sum={:.4} neg_sum={:.4}  Ψ(1)={:.4} Ψ(0)={:.4}  π(p=1)={:.4}",
-                    factor.id, total_pos, total_neg, psi_1, psi_0, prob_true);
+                println!("  OR {}: inputs={:?} -> {}  π(p=1)={:.4} (CPT over {} assignments)",
+                    factor.id, factor.input_ids, p_id, prob_true, 1 << n);
             }
             pi.insert(p_id.clone(), [1.0 - prob_true, prob_true]);
         }
@@ -171,65 +203,93 @@ pub fn belief_propagation(
             println!("-- Backward (λ) --");
         }
 
+        // OR factors backward: propositions → groups (CPT enumeration)
         for factor in graph.factors.values().filter(|f| f.factor_type == FactorType::Or) {
             let p_id = &factor.output_id;
             let lam_p = lam[p_id];
+            let n = factor.input_ids.len();
 
-            let mut total_pos: f64 = 0.0;
-            let mut total_neg: f64 = 0.0;
-            for g_id in &factor.input_ids {
-                let g = &graph.variables[g_id];
-                let pi_g = pi[g_id][1];
-                if let Some(rule_id) = &g.rule_id {
-                    if let Some(rule) = graph.rules.get(rule_id) {
-                        let w = rule.weight;
-                        if g.negated {
-                            total_neg += w * pi_g;
-                        } else {
-                            total_pos += w * pi_g;
-                        }
-                    }
-                }
-            }
-
-            for g_id in &factor.input_ids {
+            for k in 0..n {
+                let g_id = &factor.input_ids[k];
                 if graph.variables[g_id].is_evidence {
                     continue;
                 }
-                let g = &graph.variables[g_id];
-                let pi_g = pi[g_id][1];
-                let w = if let Some(rule_id) = &g.rule_id {
-                    graph.rules.get(rule_id).map(|r| r.weight).unwrap_or(0.0)
-                } else {
-                    0.0
-                };
 
-                let (p1_given_0, p1_given_1): (f64, f64);
-                if g.negated {
-                    let psi_1 = total_pos.exp();
-                    let psi_0_h0 = (total_neg - w * pi_g).exp();
-                    let psi_0_h1 = (total_neg + w * (1.0 - pi_g)).exp();
-                    p1_given_0 = psi_1 / (psi_1 + psi_0_h0);
-                    p1_given_1 = psi_1 / (psi_1 + psi_0_h1);
-                } else {
-                    let psi_1_g0 = (total_pos - w * pi_g).exp();
-                    let psi_1_g1 = (total_pos + w * (1.0 - pi_g)).exp();
-                    let psi_0 = total_neg.exp();
-                    p1_given_0 = psi_1_g0 / (psi_1_g0 + psi_0);
-                    p1_given_1 = psi_1_g1 / (psi_1_g1 + psi_0);
+                let mut prob_true_given_g0 = 0.0;
+                let mut prob_true_given_g1 = 0.0;
+                let mut prob_g0 = 0.0;
+                let mut prob_g1 = 0.0;
+
+                for assignment in 0..(1 << n) {
+                    let is_gk_active = (assignment >> k) & 1 == 1;
+
+                    let mut prob_assignment = 1.0;
+                    let mut score_pos = 0.0;
+                    let mut score_neg = 0.0;
+
+                    for i in 0..n {
+                        if i == k { continue; }
+                        let g_id_i = &factor.input_ids[i];
+                        let g_i = &graph.variables[g_id_i];
+                        let is_active = (assignment >> i) & 1 == 1;
+
+                        if is_active {
+                            prob_assignment *= pi[g_id_i][1];
+                            if let Some(rule_id) = &g_i.rule_id {
+                                if let Some(rule) = graph.rules.get(rule_id) {
+                                    if g_i.negated {
+                                        score_neg += rule.weight;
+                                    } else {
+                                        score_pos += rule.weight;
+                                    }
+                                }
+                            }
+                        } else {
+                            prob_assignment *= pi[g_id_i][0];
+                        }
+                    }
+
+                    let g = &graph.variables[g_id];
+                    let w = if let Some(rule_id) = &g.rule_id {
+                        graph.rules.get(rule_id).map(|r| r.weight).unwrap_or(0.0)
+                    } else {
+                        0.0
+                    };
+
+                    let prob_true_g0 = cpt_prob_true(score_pos, score_neg);
+                    let prob_true_g1 = cpt_prob_true(
+                        score_pos + if g.negated { 0.0 } else { w },
+                        score_neg + if g.negated { w } else { 0.0 },
+                    );
+
+                    if is_gk_active {
+                        prob_g1 += prob_assignment;
+                        prob_true_given_g1 += prob_true_g1 * prob_assignment;
+                    } else {
+                        prob_g0 += prob_assignment;
+                        prob_true_given_g0 += prob_true_g0 * prob_assignment;
+                    }
                 }
 
-                let lam_g_0 = lam_p[0] * (1.0 - p1_given_0) + lam_p[1] * p1_given_0;
-                let lam_g_1 = lam_p[0] * (1.0 - p1_given_1) + lam_p[1] * p1_given_1;
+                if prob_g0 > 0.0 {
+                    prob_true_given_g0 /= prob_g0;
+                }
+                if prob_g1 > 0.0 {
+                    prob_true_given_g1 /= prob_g1;
+                }
+
+                let lam_g_0 = lam_p[0] * (1.0 - prob_true_given_g0) + lam_p[1] * prob_true_given_g0;
+                let lam_g_1 = lam_p[0] * (1.0 - prob_true_given_g1) + lam_p[1] * prob_true_given_g1;
 
                 if debug {
                     println!("  OR {} backward: {} -> {}  λ({}) = [{:.4}, {:.4}]  (p1|0={:.4}, p1|1={:.4})",
-                        factor.id, g_id, p_id, g_id, lam_g_0, lam_g_1, p1_given_0, p1_given_1);
+                        factor.id, g_id, p_id, g_id, lam_g_0, lam_g_1, prob_true_given_g0, prob_true_given_g1);
                 }
                 lam.insert(g_id.clone(), [lam_g_0, lam_g_1]);
             }
         }
 
+        // AND factors backward: groups → propositions
         for factor in graph.factors.values().filter(|f| f.factor_type == FactorType::And) {
             let g_id = &factor.output_id;
             let lam_g = lam[g_id];
