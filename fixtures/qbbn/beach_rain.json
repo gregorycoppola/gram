@@ -10,11 +10,11 @@
       "weight": 2
     },
     {
-      "formula": "always [x:e]: rain(theme: x) -> not fun(theme: beach)",
+      "formula": "rain(theme: today) -> not fun(theme: beach)",
       "weight": 99
     },
     {
-      "formula": "always [x:e]: not rain(theme: x) -> fun(theme: beach)",
+      "formula": "not rain(theme: today) -> fun(theme: beach)",
       "weight": 99
     }
   ],
