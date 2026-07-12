@@ -57,10 +57,6 @@ fn default_tolerance() -> f64 {
 }
 
 /// Extract (premises, conclusion, variables) from a parsed rule expression.
-/// Rules can be:
-///   - always [x:e]: man(theme: x) -> mortal(theme: x)
-///   - man(theme: socrates) -> mortal(theme: socrates)
-///   - man(theme: socrates)  (fact)
 fn extract_horn_clause(expr: &Expr) -> Result<(Vec<Expr>, Expr, Vec<(String, String)>), String> {
     match expr {
         Expr::ForAll { var, var_type, body } => {
@@ -73,7 +69,6 @@ fn extract_horn_clause(expr: &Expr) -> Result<(Vec<Expr>, Expr, Vec<(String, Str
             Ok((premises, *cons.clone(), Vec::new()))
         }
         _ => {
-            // Fact
             Ok((Vec::new(), expr.clone(), Vec::new()))
         }
     }
@@ -120,12 +115,10 @@ pub struct InferenceResult {
 pub fn run_inference_fixture(fixture: &InferenceFixture) -> Result<InferenceResult, String> {
     let mut kb = KnowledgeBase::new();
 
-    // Add entities
     for ent in &fixture.entities {
         kb.add_entity(ent.name.clone(), ent.typ.clone());
     }
 
-    // Parse and add rules
     for rule in &fixture.rules {
         let expr = semantics::parse(&rule.formula)
             .map_err(|e| format!("parse error in '{}': {}", rule.formula, e))?;
@@ -133,23 +126,27 @@ pub fn run_inference_fixture(fixture: &InferenceFixture) -> Result<InferenceResu
         kb.add_rule(premises, conclusion, variables, rule.weight);
     }
 
-    // Build graph
     let mut graph = QBBNGraph::from_kb(&kb);
 
-    // Set evidence
+    // Set evidence: parse formula first to get canonical string representation
     for ev in &fixture.evidence {
-        if !graph.set_evidence(&ev.formula, ev.value) {
-            return Err(format!("evidence formula '{}' not found in graph", ev.formula));
+        let parsed = semantics::parse(&ev.formula)
+            .map_err(|e| format!("parse error in evidence '{}': {}", ev.formula, e))?;
+        let canonical = parsed.to_string();
+        if !graph.set_evidence(&canonical, ev.value) {
+            return Err(format!("evidence formula '{}' (canonical: '{}') not found in graph", ev.formula, canonical));
         }
     }
 
-    // Run BP
     let trace = belief_propagation(&mut graph, 50, 0.5, 1e-6);
 
-    // Check queries
+    // Queries: also parse to canonical form
     let mut query_results = Vec::new();
     for q in &fixture.queries {
-        let prob = graph.prob(&q.formula);
+        let parsed = semantics::parse(&q.formula)
+            .map_err(|e| format!("parse error in query '{}': {}", q.formula, e))?;
+        let canonical = parsed.to_string();
+        let prob = graph.prob(&canonical);
         let ok = if let Some(expected) = q.expected_prob {
             (prob - expected).abs() <= q.tolerance
         } else {
