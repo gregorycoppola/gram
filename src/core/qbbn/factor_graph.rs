@@ -285,11 +285,19 @@ impl QBBNGraph {
         }
     }
 
-    pub fn set_evidence(&mut self, formula: &str, value: bool) {
-        if let Some(id) = self.formula_to_id.get(formula).cloned() {
-            if let Some(var) = self.variables.get_mut(&id) {
-                var.set_evidence(value);
-            }
+    /// Set evidence for a formula. Returns true if the formula was found (or added), false on error.
+    pub fn set_evidence(&mut self, formula: &str, value: bool) -> bool {
+        let id = if let Some(id) = self.formula_to_id.get(formula).cloned() {
+            id
+        } else {
+            // Auto-add as a standalone proposition if not in graph
+            self.add_proposition(formula)
+        };
+        if let Some(var) = self.variables.get_mut(&id) {
+            var.set_evidence(value);
+            true
+        } else {
+            false
         }
     }
 

@@ -138,7 +138,9 @@ pub fn run_inference_fixture(fixture: &InferenceFixture) -> Result<InferenceResu
 
     // Set evidence
     for ev in &fixture.evidence {
-        graph.set_evidence(&ev.formula, ev.value);
+        if !graph.set_evidence(&ev.formula, ev.value) {
+            return Err(format!("evidence formula '{}' not found in graph", ev.formula));
+        }
     }
 
     // Run BP
