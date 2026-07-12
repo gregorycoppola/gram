@@ -33,6 +33,8 @@ pub async fn run_server(port: u16, fixtures_dir: PathBuf, proofs_dir: PathBuf) -
         .route("/fixtures", get(routes::list_fixtures))
         .route("/fixtures/*path", get(routes::handle_fixture))
         .route("/parse/one", post(routes::parse_one))
+        .route("/inference/fixtures", get(routes::list_inference_fixtures))
+        .route("/inference/run", post(routes::run_inference))
         .with_state(state)
         .layer(cors)
         .layer(TraceLayer::new_for_http());

@@ -58,7 +58,7 @@ fn print_beliefs(pi: &HashMap<String, [f64; 2]>, lam: &HashMap<String, [f64; 2]>
     println!();
 }
 
-fn cpt_prob_true(score_pos: f64, score_neg: f64) -> f64 {
+pub fn cpt_prob_true(score_pos: f64, score_neg: f64) -> f64 {
     let psi_1 = score_pos.exp();
     let psi_0 = score_neg.exp();
     if psi_1.is_infinite() && psi_0.is_infinite() {
