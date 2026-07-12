@@ -1,20 +1,24 @@
 use std::collections::HashMap;
+use serde::Serialize;
 
 use super::kb::KnowledgeBase;
+use super::bp::cpt_prob_true;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum NodeType {
     Proposition,
     Group,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum FactorType {
     And,
     Or,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Variable {
     pub id: String,
     pub node_type: NodeType,
@@ -40,7 +44,7 @@ impl Variable {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Factor {
     pub id: String,
     pub factor_type: FactorType,
@@ -49,13 +53,69 @@ pub struct Factor {
     pub output_id: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Rule {
     pub id: String,
     pub premise_patterns: Vec<String>,
     pub conclusion_pattern: String,
     pub variables: Vec<(String, String)>,
     pub weight: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GraphSnapshot {
+    pub nodes: Vec<GraphNode>,
+    pub edges: Vec<GraphEdge>,
+    pub rules: Vec<GraphRule>,
+    pub formula_map: Vec<(String, String)>,
+    pub cpt_tables: Vec<CPTTable>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GraphNode {
+    pub id: String,
+    pub node_type: String,
+    pub formula: Option<String>,
+    pub negated: bool,
+    pub is_evidence: bool,
+    pub evidence_prob: Option<f64>,
+    pub belief: f64,
+    pub rule_id: Option<String>,
+    pub conclusion_id: Option<String>,
+    pub conjunct_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GraphEdge {
+    pub id: String,
+    pub edge_type: String,
+    pub source_ids: Vec<String>,
+    pub target_id: String,
+    pub input_negated: Vec<bool>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GraphRule {
+    pub id: String,
+    pub premise_patterns: Vec<String>,
+    pub conclusion_pattern: String,
+    pub weight: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CPTTable {
+    pub factor_id: String,
+    pub factor_type: String,
+    pub inputs: Vec<String>,
+    pub output: String,
+    pub rows: Vec<CPTRow>,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CPTRow {
+    pub assignment: Vec<bool>,
+    pub prob_true: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -361,6 +421,122 @@ impl QBBNGraph {
 
         graph.build_or_factors();
         graph
+    }
+
+    pub fn snapshot(&self) -> GraphSnapshot {
+        let mut nodes = Vec::new();
+        for (id, var) in &self.variables {
+            nodes.push(GraphNode {
+                id: id.clone(),
+                node_type: match var.node_type {
+                    NodeType::Proposition => "proposition".to_string(),
+                    NodeType::Group => "group".to_string(),
+                },
+                formula: var.formula.clone(),
+                negated: var.negated,
+                is_evidence: var.is_evidence,
+                evidence_prob: var.evidence_prob,
+                belief: var.prob(),
+                rule_id: var.rule_id.clone(),
+                conclusion_id: var.conclusion_id.clone(),
+                conjunct_ids: var.conjunct_ids.clone(),
+            });
+        }
+        nodes.sort_by(|a, b| a.id.cmp(&b.id));
+
+        let mut edges = Vec::new();
+        for (id, factor) in &self.factors {
+            edges.push(GraphEdge {
+                id: id.clone(),
+                edge_type: match factor.factor_type {
+                    FactorType::And => "and".to_string(),
+                    FactorType::Or => "or".to_string(),
+                },
+                source_ids: factor.input_ids.clone(),
+                target_id: factor.output_id.clone(),
+                input_negated: factor.input_negated.clone(),
+            });
+        }
+        edges.sort_by(|a, b| a.id.cmp(&b.id));
+
+        let mut rules = Vec::new();
+        for (id, rule) in &self.rules {
+            rules.push(GraphRule {
+                id: id.clone(),
+                premise_patterns: rule.premise_patterns.clone(),
+                conclusion_pattern: rule.conclusion_pattern.clone(),
+                weight: rule.weight,
+            });
+        }
+        rules.sort_by(|a, b| a.id.cmp(&b.id));
+
+        let mut formula_map: Vec<(String, String)> = self.formula_to_id.iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        formula_map.sort_by(|a, b| a.1.cmp(&b.1));
+
+        let mut cpt_tables = Vec::new();
+        for (id, factor) in &self.factors {
+            let input_labels: Vec<String> = factor.input_ids.iter().map(|i| {
+                self.variables.get(i).and_then(|v| v.formula.clone()).unwrap_or_else(|| i.clone())
+            }).collect();
+            let output_label = self.variables.get(&factor.output_id).and_then(|v| v.formula.clone()).unwrap_or_else(|| factor.output_id.clone());
+
+            if factor.factor_type == FactorType::Or {
+                let n = factor.input_ids.len();
+                let max_rows = 6; // cap at 2^6 = 64 rows
+                let truncated = n > max_rows;
+                let limit = if truncated { 0 } else { 1 << n };
+                let mut rows = Vec::new();
+                for assignment in 0..limit {
+                    let mut score_pos = 0.0;
+                    let mut score_neg = 0.0;
+                    let mut input_states = Vec::new();
+                    for i in 0..n {
+                        let g_id = &factor.input_ids[i];
+                        let g = &self.variables[g_id];
+                        let is_active = (assignment >> i) & 1 == 1;
+                        input_states.push(is_active);
+                        if is_active {
+                            if let Some(rule_id) = &g.rule_id {
+                                if let Some(rule) = self.rules.get(rule_id) {
+                                    if g.negated {
+                                        score_neg += rule.weight;
+                                    } else {
+                                        score_pos += rule.weight;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    let prob_true = cpt_prob_true(score_pos, score_neg);
+                    rows.push(CPTRow {
+                        assignment: input_states,
+                        prob_true,
+                    });
+                }
+                cpt_tables.push(CPTTable {
+                    factor_id: id.clone(),
+                    factor_type: "or".to_string(),
+                    inputs: input_labels,
+                    output: output_label,
+                    rows,
+                    truncated,
+                });
+            } else {
+                cpt_tables.push(CPTTable {
+                    factor_id: id.clone(),
+                    factor_type: "and".to_string(),
+                    inputs: input_labels,
+                    output: output_label,
+                    rows: Vec::new(),
+                    truncated: false,
+                });
+            }
+        }
+        cpt_tables.sort_by(|a, b| a.factor_id.cmp(&b.factor_id));
+
+        GraphSnapshot { nodes, edges, rules, formula_map, cpt_tables }
     }
 }
 

@@ -235,3 +235,29 @@ fn fixture_path(dir: &PathBuf, name: &str) -> Result<PathBuf, anyhow::Error> {
     p.set_extension("json");
     Ok(p)
 }
+
+pub async fn list_inference_fixtures(
+    State(state): State<AppState>,
+) -> AppResult<Json<Vec<String>>> {
+    let dir = state.fixtures_dir.join("qbbn");
+    let mut names = Vec::new();
+    if dir.is_dir() {
+        for entry in std::fs::read_dir(&dir).map_err(|e| AppError(anyhow::anyhow!("reading qbbn dir: {}", e)))? {
+            if let Ok(e) = entry {
+                if let Some(name) = e.path().file_stem().and_then(|s| s.to_str()) {
+                    names.push(name.to_string());
+                }
+            }
+        }
+    }
+    names.sort();
+    Ok(Json(names))
+}
+
+pub async fn run_inference(
+    Json(req): Json<crate::core::qbbn::inference::InferenceFixture>,
+) -> AppResult<Json<crate::core::qbbn::inference::InferenceResult>> {
+    let result = crate::core::qbbn::inference::run_inference_fixture(&req)
+        .map_err(|e| AppError(anyhow::anyhow!("inference failed: {}", e)))?;
+    Ok(Json(result))
+}

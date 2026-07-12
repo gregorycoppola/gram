@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::core::logic::Expr;
 use crate::core::semantics;
@@ -156,7 +156,7 @@ fn convert_bound_entities(expr: &Expr, vars: &[(String, String)]) -> Expr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct QueryResult {
     pub formula: String,
     pub prob: f64,
@@ -165,12 +165,13 @@ pub struct QueryResult {
     pub ok: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct InferenceResult {
     pub title: String,
     pub query_results: Vec<QueryResult>,
     pub stats: (usize, usize, usize, usize, usize, usize),
     pub iterations: usize,
+    pub graph: Option<crate::core::qbbn::factor_graph::GraphSnapshot>,
 }
 
 pub fn run_inference_fixture(fixture: &InferenceFixture) -> Result<InferenceResult, String> {
@@ -268,10 +269,13 @@ pub fn run_inference_fixture_debug(fixture: &InferenceFixture, debug: bool) -> R
         });
     }
 
+    let graph_snapshot = graph.snapshot();
+
     Ok(InferenceResult {
         title: fixture.title.clone(),
         query_results,
         stats: graph.stats(),
         iterations: trace.iterations.len(),
+        graph: Some(graph_snapshot),
     })
 }
