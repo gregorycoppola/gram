@@ -20,7 +20,7 @@ fn print_graph(graph: &QBBNGraph) {
     println!("  Variables ({}):", graph.variables.len());
     for (id, var) in &graph.variables {
         let ev_str = if var.is_evidence {
-            format!(" [evidence={}]", var.evidence_value.unwrap_or(false))
+            format!(" [evidence={:.4}]", var.evidence_prob.unwrap_or(0.5))
         } else {
             String::new()
         };
@@ -91,13 +91,9 @@ pub fn belief_propagation(
 
     for (id, var) in &graph.variables {
         if var.is_evidence {
-            if var.evidence_value == Some(true) {
-                pi.insert(id.clone(), [0.0, 1.0]);
-                lam.insert(id.clone(), [0.0, 1.0]);
-            } else {
-                pi.insert(id.clone(), [1.0, 0.0]);
-                lam.insert(id.clone(), [1.0, 0.0]);
-            }
+            let prob = var.evidence_prob.unwrap_or(0.5);
+            pi.insert(id.clone(), [1.0 - prob, prob]);
+            lam.insert(id.clone(), [1.0, 1.0]);
         } else {
             pi.insert(id.clone(), [0.5, 0.5]);
             lam.insert(id.clone(), [1.0, 1.0]);
