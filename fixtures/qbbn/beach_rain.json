@@ -15,17 +15,17 @@
     },
     {
       "formula": "always [x:e]: rain(theme: x) -> not fun(theme: beach)",
-      "weight": 2
+      "weight": 99
     },
     {
       "formula": "always [x:e]: not rain(theme: x) -> fun(theme: beach)",
-      "weight": 2
+      "weight": 99
     }
   ],
   "evidence": [
     {"formula": "weather_said(theme: rain)", "value": true}
   ],
   "queries": [
-    {"formula": "fun(theme: beach)", "expected_prob": 0.15, "tolerance": 0.05}
+    {"formula": "fun(theme: beach)", "expected_prob": 0.01, "tolerance": 0.05}
   ]
 }
