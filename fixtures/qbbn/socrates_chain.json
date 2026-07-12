@@ -17,6 +17,6 @@
     {"formula": "man(theme: socrates)", "value": true}
   ],
   "queries": [
-    {"formula": "mortal(theme: socrates)", "expected_prob": 0.81, "tolerance": 0.05}
+    {"formula": "mortal(theme: socrates)", "expected_prob": 0.655, "tolerance": 0.05}
   ]
 }

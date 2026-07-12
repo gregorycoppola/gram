@@ -24,8 +24,9 @@ fn print_graph(graph: &QBBNGraph) {
         } else {
             String::new()
         };
+        let neg_str = if var.negated { " [negated]" } else { "" };
         let formula_str = var.formula.as_ref().map(|f| format!(" = {}", f)).unwrap_or_default();
-        println!("    {}: {:?}{}{}", id, var.node_type, formula_str, ev_str);
+        println!("    {}: {:?}{}{}{}", id, var.node_type, formula_str, ev_str, neg_str);
     }
     println!("  Factors ({}):", graph.factors.len());
     for (id, f) in &graph.factors {
@@ -52,7 +53,6 @@ fn print_beliefs(pi: &HashMap<String, [f64; 2]>, lam: &HashMap<String, [f64; 2]>
     println!();
 }
 
-/// Run loopy belief propagation on a QBBN graph.
 pub fn belief_propagation(
     graph: &mut QBBNGraph,
     iterations: usize,
@@ -61,7 +61,7 @@ pub fn belief_propagation(
     debug: bool,
 ) -> BPTrace {
     if debug {
-        println!("=== Belief Propagation Debug ===");
+        println!("=== Belief Propagation Debug (log-linear OR) ===");
         print_graph(graph);
     }
 
@@ -120,126 +120,116 @@ pub fn belief_propagation(
             .map(|id| (id.clone(), compute_belief(id, &pi, &lam)))
             .collect();
 
-        // === FORWARD PASS (π) ===
-
         if debug {
             println!("-- Forward (π) --");
         }
 
-        // AND factors: propositions → groups
         for factor in graph.factors.values().filter(|f| f.factor_type == FactorType::And) {
             let prob_all_true: f64 = factor.input_ids.iter().map(|p_id| pi[p_id][1]).product();
             let g_id = &factor.output_id;
             if !graph.variables[g_id].is_evidence {
                 if debug {
-                    println!("  AND {}: inputs={:?} -> {}  π(g=1) = product of inputs = {:.4}",
+                    println!("  AND {}: inputs={:?} -> {}  π(g=1) = product = {:.4}",
                         factor.id, factor.input_ids, g_id, prob_all_true);
                 }
                 pi.insert(g_id.clone(), [1.0 - prob_all_true, prob_all_true]);
             }
         }
 
-        // OR factors: groups → propositions (weighted maximum entropy)
-        // P(p=1) = 1 - Π_i (1 - w_i * π(g_i=1))
         for factor in graph.factors.values().filter(|f| f.factor_type == FactorType::Or) {
             let p_id = &factor.output_id;
             if graph.variables[p_id].is_evidence {
                 continue;
             }
-            let mut prob_all_false: f64 = 1.0;
+            let mut total_pos: f64 = 0.0;
+            let mut total_neg: f64 = 0.0;
             for g_id in &factor.input_ids {
+                let g = &graph.variables[g_id];
                 let pi_g = pi[g_id][1];
-                if let Some(rule_id) = graph.variables[g_id].rule_id.clone() {
-                    if let Some(rule) = graph.rules.get(&rule_id) {
-                        let w = rule.weight.min(1.0).max(0.0);
-                        prob_all_false *= 1.0 - w * pi_g;
+                if let Some(rule_id) = &g.rule_id {
+                    if let Some(rule) = graph.rules.get(rule_id) {
+                        let w = rule.weight;
+                        if g.negated {
+                            total_neg += w * pi_g;
+                        } else {
+                            total_pos += w * pi_g;
+                        }
                     }
                 }
             }
-            let prob_true = 1.0 - prob_all_false;
+            let psi_1 = total_pos.exp();
+            let psi_0 = total_neg.exp();
+            let prob_true = psi_1 / (psi_1 + psi_0);
             if debug {
-                println!("  OR {}: inputs={:?} -> {}  π(p=1) = 1 - product(1-w*π(g)) = 1 - {:.4} = {:.4}",
-                    factor.id, factor.input_ids, p_id, prob_all_false, prob_true);
+                println!("  OR {}: pos_sum={:.4} neg_sum={:.4}  Ψ(1)={:.4} Ψ(0)={:.4}  π(p=1)={:.4}",
+                    factor.id, total_pos, total_neg, psi_1, psi_0, prob_true);
             }
             pi.insert(p_id.clone(), [1.0 - prob_true, prob_true]);
         }
-
-        // NEG factors: enforce pos + neg = 1
-        for factor in graph.factors.values().filter(|f| f.factor_type == FactorType::Neg) {
-            let pos_id = &factor.input_ids[0];
-            let neg_id = &factor.output_id;
-            if graph.variables[neg_id].is_evidence && !graph.variables[pos_id].is_evidence {
-                if debug {
-                    println!("  NEG {}: {} -> {}  π({}) = [π({})[1], π({})[0]] = [{:.4}, {:.4}]",
-                        factor.id, pos_id, neg_id, pos_id, neg_id, neg_id, pi[neg_id][1], pi[neg_id][0]);
-                }
-                pi.insert(pos_id.clone(), [pi[neg_id][1], pi[neg_id][0]]);
-            } else if graph.variables[pos_id].is_evidence && !graph.variables[neg_id].is_evidence {
-                if debug {
-                    println!("  NEG {}: {} -> {}  π({}) = [π({})[1], π({})[0]] = [{:.4}, {:.4}]",
-                        factor.id, pos_id, neg_id, neg_id, pos_id, pos_id, pi[pos_id][1], pi[pos_id][0]);
-                }
-                pi.insert(neg_id.clone(), [pi[pos_id][1], pi[pos_id][0]]);
-            } else if !graph.variables[pos_id].is_evidence && !graph.variables[neg_id].is_evidence {
-                let pos_prob = pi[pos_id][1];
-                let neg_prob = pi[neg_id][1];
-                let pos_new = (pos_prob + (1.0 - neg_prob)) / 2.0;
-                let neg_new = (neg_prob + (1.0 - pos_prob)) / 2.0;
-                if debug {
-                    println!("  NEG {}: {} <-> {}  project onto pos+neg=1: pos={:.4}-> {:.4}, neg={:.4}-> {:.4}",
-                        factor.id, pos_id, neg_id, pos_prob, pos_new, neg_prob, neg_new);
-                }
-                pi.insert(pos_id.clone(), [1.0 - pos_new, pos_new]);
-                pi.insert(neg_id.clone(), [neg_new, 1.0 - neg_new]);
-            }
-        }
-
-        // === BACKWARD PASS (λ) ===
 
         if debug {
             println!("-- Backward (λ) --");
         }
 
-        // OR factors backward: propositions → groups
         for factor in graph.factors.values().filter(|f| f.factor_type == FactorType::Or) {
             let p_id = &factor.output_id;
             let lam_p = lam[p_id];
+
+            let mut total_pos: f64 = 0.0;
+            let mut total_neg: f64 = 0.0;
+            for g_id in &factor.input_ids {
+                let g = &graph.variables[g_id];
+                let pi_g = pi[g_id][1];
+                if let Some(rule_id) = &g.rule_id {
+                    if let Some(rule) = graph.rules.get(rule_id) {
+                        let w = rule.weight;
+                        if g.negated {
+                            total_neg += w * pi_g;
+                        } else {
+                            total_pos += w * pi_g;
+                        }
+                    }
+                }
+            }
+
             for g_id in &factor.input_ids {
                 if graph.variables[g_id].is_evidence {
                     continue;
                 }
-                let mut prob_all_false_without: f64 = 1.0;
-                let mut w_i: f64 = 0.0;
-                for (_j, other_g_id) in factor.input_ids.iter().enumerate() {
-                    if other_g_id == g_id {
-                        if let Some(rule_id) = graph.variables[other_g_id].rule_id.clone() {
-                            if let Some(rule) = graph.rules.get(&rule_id) {
-                                w_i = rule.weight.min(1.0).max(0.0);
-                            }
-                        }
-                    } else {
-                        let pi_gj = pi[other_g_id][1];
-                        if let Some(rule_id) = graph.variables[other_g_id].rule_id.clone() {
-                            if let Some(rule) = graph.rules.get(&rule_id) {
-                                let w_j = rule.weight.min(1.0).max(0.0);
-                                prob_all_false_without *= 1.0 - w_j * pi_gj;
-                            }
-                        }
-                    }
+                let g = &graph.variables[g_id];
+                let pi_g = pi[g_id][1];
+                let w = if let Some(rule_id) = &g.rule_id {
+                    graph.rules.get(rule_id).map(|r| r.weight).unwrap_or(0.0)
+                } else {
+                    0.0
+                };
+
+                let (p1_given_0, p1_given_1): (f64, f64);
+                if g.negated {
+                    let psi_1 = total_pos.exp();
+                    let psi_0_h0 = (total_neg - w * pi_g).exp();
+                    let psi_0_h1 = (total_neg + w * (1.0 - pi_g)).exp();
+                    p1_given_0 = psi_1 / (psi_1 + psi_0_h0);
+                    p1_given_1 = psi_1 / (psi_1 + psi_0_h1);
+                } else {
+                    let psi_1_g0 = (total_pos - w * pi_g).exp();
+                    let psi_1_g1 = (total_pos + w * (1.0 - pi_g)).exp();
+                    let psi_0 = total_neg.exp();
+                    p1_given_0 = psi_1_g0 / (psi_1_g0 + psi_0);
+                    p1_given_1 = psi_1_g1 / (psi_1_g1 + psi_0);
                 }
-                let p_given_g0 = 1.0 - prob_all_false_without;
-                let p_given_g1 = 1.0 - (1.0 - w_i) * prob_all_false_without;
-                let lam_g_0 = lam_p[0] * (1.0 - p_given_g0) + lam_p[1] * p_given_g0;
-                let lam_g_1 = lam_p[0] * (1.0 - p_given_g1) + lam_p[1] * p_given_g1;
+
+                let lam_g_0 = lam_p[0] * (1.0 - p1_given_0) + lam_p[1] * p1_given_0;
+                let lam_g_1 = lam_p[0] * (1.0 - p1_given_1) + lam_p[1] * p1_given_1;
+
                 if debug {
-                    println!("  OR {} backward: {} -> {}  λ({}) = [{:.4}, {:.4}]  (p_g0={:.4}, p_g1={:.4})",
-                        factor.id, g_id, p_id, g_id, lam_g_0, lam_g_1, p_given_g0, p_given_g1);
+                    println!("  OR {} backward: {} -> {}  λ({}) = [{:.4}, {:.4}]  (p1|0={:.4}, p1|1={:.4})",
+                        factor.id, g_id, p_id, g_id, lam_g_0, lam_g_1, p1_given_0, p1_given_1);
                 }
                 lam.insert(g_id.clone(), [lam_g_0, lam_g_1]);
             }
         }
 
-        // AND factors backward: groups → propositions
         for factor in graph.factors.values().filter(|f| f.factor_type == FactorType::And) {
             let g_id = &factor.output_id;
             let lam_g = lam[g_id];
@@ -264,29 +254,6 @@ pub fn belief_propagation(
             }
         }
 
-        // NEG factors backward: λ swap
-        for factor in graph.factors.values().filter(|f| f.factor_type == FactorType::Neg) {
-            let pos_id = &factor.input_ids[0];
-            let neg_id = &factor.output_id;
-            if !graph.variables[pos_id].is_evidence {
-                let lam_neg = lam[neg_id];
-                if debug {
-                    println!("  NEG {} backward: {} -> {}  λ({}) = [{:.4}, {:.4}]",
-                        factor.id, neg_id, pos_id, pos_id, lam_neg[1], lam_neg[0]);
-                }
-                lam.insert(pos_id.clone(), [lam_neg[1], lam_neg[0]]);
-            }
-            if !graph.variables[neg_id].is_evidence {
-                let lam_pos = lam[pos_id];
-                if debug {
-                    println!("  NEG {} backward: {} -> {}  λ({}) = [{:.4}, {:.4}]",
-                        factor.id, pos_id, neg_id, neg_id, lam_pos[1], lam_pos[0]);
-                }
-                lam.insert(neg_id.clone(), [lam_pos[1], lam_pos[0]]);
-            }
-        }
-
-        // === UPDATE BELIEFS ===
         if debug {
             println!("-- Update beliefs --");
         }
