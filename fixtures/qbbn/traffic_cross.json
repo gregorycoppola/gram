@@ -6,19 +6,19 @@
   ],
   "rules": [
     {
-      "formula": "always [x:e]: fast(theme: x) -> danger()",
+      "formula": "fast(theme: car1) -> danger()",
       "weight": 8
     },
     {
-      "formula": "always [x:e]: close(theme: x) -> danger()",
+      "formula": "close(theme: car1) -> danger()",
       "weight": 8
     },
     {
-      "formula": "always [x:e]: not fast(theme: x) -> not danger()",
+      "formula": "not fast(theme: car1) -> not danger()",
       "weight": 3
     },
     {
-      "formula": "always [x:e]: not close(theme: x) -> not danger()",
+      "formula": "not close(theme: car1) -> not danger()",
       "weight": 3
     },
     {
