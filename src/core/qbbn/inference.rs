@@ -56,7 +56,6 @@ fn default_tolerance() -> f64 {
     0.01
 }
 
-/// Extract (premises, conclusion, variables) from a parsed rule expression.
 fn extract_horn_clause(expr: &Expr) -> Result<(Vec<Expr>, Expr, Vec<(String, String)>), String> {
     match expr {
         Expr::ForAll { var, var_type, body } => {
@@ -113,6 +112,10 @@ pub struct InferenceResult {
 }
 
 pub fn run_inference_fixture(fixture: &InferenceFixture) -> Result<InferenceResult, String> {
+    run_inference_fixture_debug(fixture, false)
+}
+
+pub fn run_inference_fixture_debug(fixture: &InferenceFixture, debug: bool) -> Result<InferenceResult, String> {
     let mut kb = KnowledgeBase::new();
 
     for ent in &fixture.entities {
@@ -128,7 +131,6 @@ pub fn run_inference_fixture(fixture: &InferenceFixture) -> Result<InferenceResu
 
     let mut graph = QBBNGraph::from_kb(&kb);
 
-    // Set evidence: parse formula first to get canonical string representation
     for ev in &fixture.evidence {
         let parsed = semantics::parse(&ev.formula)
             .map_err(|e| format!("parse error in evidence '{}': {}", ev.formula, e))?;
@@ -138,9 +140,8 @@ pub fn run_inference_fixture(fixture: &InferenceFixture) -> Result<InferenceResu
         }
     }
 
-    let trace = belief_propagation(&mut graph, 50, 0.5, 1e-6);
+    let trace = belief_propagation(&mut graph, 50, 0.5, 1e-6, debug);
 
-    // Queries: also parse to canonical form
     let mut query_results = Vec::new();
     for q in &fixture.queries {
         let parsed = semantics::parse(&q.formula)

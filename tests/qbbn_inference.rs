@@ -1,12 +1,16 @@
 use std::path::PathBuf;
 
-use gram::core::qbbn::inference::{run_inference_fixture, InferenceFixture};
+use gram::core::qbbn::inference::{run_inference_fixture_debug, InferenceFixture};
 
 fn run_fixture(name: &str) {
+    run_fixture_debug(name, false);
+}
+
+fn run_fixture_debug(name: &str, debug: bool) {
     let path = PathBuf::from("fixtures/qbbn").join(name);
     let raw = std::fs::read_to_string(&path).expect("read fixture");
     let fixture: InferenceFixture = serde_json::from_str(&raw).expect("parse fixture");
-    let result = run_inference_fixture(&fixture).expect("run inference");
+    let result = run_inference_fixture_debug(&fixture, debug).expect("run inference");
 
     println!("\n📊 {}", result.title);
     println!("  Graph: {} propositions, {} groups, {} AND, {} OR, {} NEG, {} evidence",
@@ -30,7 +34,7 @@ fn run_fixture(name: &str) {
 
 #[test]
 fn test_socrates_mortal() {
-    run_fixture("socrates_mortal.json");
+    run_fixture_debug("socrates_mortal.json", true);
 }
 
 #[test]
