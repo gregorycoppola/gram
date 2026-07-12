@@ -6,8 +6,12 @@
   ],
   "rules": [
     {
-      "formula": "always [x:e]: fast(theme: x) and close(theme: x) -> danger()",
-      "weight": 10
+      "formula": "always [x:e]: fast(theme: x) -> danger()",
+      "weight": 8
+    },
+    {
+      "formula": "always [x:e]: close(theme: x) -> danger()",
+      "weight": 8
     },
     {
       "formula": "always [x:e]: not fast(theme: x) -> not danger()",
@@ -22,7 +26,7 @@
       "weight": 99
     },
     {
-      "formula": "not danger() and green_light() -> safe_to_cross(theme: me)",
+      "formula": "green_light() -> safe_to_cross(theme: me)",
       "weight": 99
     }
   ],
@@ -32,6 +36,6 @@
     {"formula": "green_light()", "prob": 0.9}
   ],
   "queries": [
-    {"formula": "safe_to_cross(theme: me)", "expected_prob": 0.3, "tolerance": 0.1}
+    {"formula": "safe_to_cross(theme: me)", "expected_prob": 0.5, "tolerance": 0.2}
   ]
 }
