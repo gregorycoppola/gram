@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use std::collections::HashMap;
 
 use crate::core::logic::Expr;
 use crate::core::semantics;
