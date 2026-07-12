@@ -1,0 +1,37 @@
+{
+  "title": "Should I cross the street?",
+  "entities": [
+    {"name": "me", "type": "e"},
+    {"name": "car1", "type": "e"}
+  ],
+  "rules": [
+    {
+      "formula": "always [x:e]: fast(theme: x) and close(theme: x) -> danger()",
+      "weight": 10
+    },
+    {
+      "formula": "always [x:e]: not fast(theme: x) -> not danger()",
+      "weight": 3
+    },
+    {
+      "formula": "always [x:e]: not close(theme: x) -> not danger()",
+      "weight": 3
+    },
+    {
+      "formula": "danger() -> not safe_to_cross(theme: me)",
+      "weight": 99
+    },
+    {
+      "formula": "not danger() and green_light() -> safe_to_cross(theme: me)",
+      "weight": 99
+    }
+  ],
+  "evidence": [
+    {"formula": "fast(theme: car1)", "prob": 0.8},
+    {"formula": "close(theme: car1)", "prob": 0.7},
+    {"formula": "green_light()", "prob": 0.9}
+  ],
+  "queries": [
+    {"formula": "safe_to_cross(theme: me)", "expected_prob": 0.3, "tolerance": 0.1}
+  ]
+}
