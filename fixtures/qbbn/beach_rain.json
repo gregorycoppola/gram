@@ -1,8 +1,7 @@
 {
   "title": "Beach: rain expected, not fun",
   "entities": [
-    {"name": "today", "type": "e"},
-    {"name": "beach", "type": "e"}
+    {"name": "today", "type": "e"}
   ],
   "rules": [
     {
