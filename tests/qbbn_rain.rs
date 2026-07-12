@@ -54,13 +54,13 @@ fn test_rain_inference() {
     // Set query
     graph.set_query("rain(theme: today)");
 
-    let trace = belief_propagation(&mut graph, 20, 0.5, 1e-6);
+    let trace = belief_propagation(&mut graph, 20, 0.5, 1e-6, false);
 
     let p_rain = graph.prob("rain(theme: today)");
     println!("P(rain) = {}", p_rain);
     println!("iterations = {}", trace.iterations.len());
 
-    // With conflicting evidence, rain should be somewhere between 0 and 1
-    assert!(p_rain >= 0.0 && p_rain <= 1.0);
+    // With deterministic OR, both rules fire so rain is true
+    assert!(p_rain > 0.9);
     assert!(!trace.iterations.is_empty());
 }
