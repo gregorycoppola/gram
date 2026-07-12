@@ -25,7 +25,7 @@ pub struct Variable {
     pub negated: bool,
     pub belief: [f64; 2],
     pub is_evidence: bool,
-    pub evidence_value: Option<bool>,
+    pub evidence_prob: Option<f64>,
 }
 
 impl Variable {
@@ -33,10 +33,10 @@ impl Variable {
         self.belief[1]
     }
 
-    pub fn set_evidence(&mut self, value: bool) {
+    pub fn set_evidence(&mut self, prob: f64) {
         self.is_evidence = true;
-        self.evidence_value = Some(value);
-        self.belief = if value { [0.0, 1.0] } else { [1.0, 0.0] };
+        self.evidence_prob = Some(prob);
+        self.belief = [1.0 - prob, prob];
     }
 }
 
@@ -108,7 +108,7 @@ impl QBBNGraph {
             negated: false,
             belief: [0.5, 0.5],
             is_evidence: false,
-            evidence_value: None,
+            evidence_prob: None,
         };
         self.variables.insert(id.clone(), var);
         self.formula_to_id.insert(formula.to_string(), id.clone());
@@ -136,7 +136,7 @@ impl QBBNGraph {
             negated,
             belief: [0.5, 0.5],
             is_evidence: false,
-            evidence_value: None,
+            evidence_prob: None,
         };
         self.variables.insert(id.clone(), var);
         self.var_to_factors.insert(id.clone(), Vec::new());
@@ -260,14 +260,14 @@ impl QBBNGraph {
         }
     }
 
-    pub fn set_evidence(&mut self, formula: &str, value: bool) -> bool {
+    pub fn set_evidence(&mut self, formula: &str, prob: f64) -> bool {
         let id = if let Some(id) = self.formula_to_id.get(formula).cloned() {
             id
         } else {
             self.add_proposition(formula)
         };
         if let Some(var) = self.variables.get_mut(&id) {
-            var.set_evidence(value);
+            var.set_evidence(prob);
             true
         } else {
             false
@@ -330,7 +330,7 @@ impl QBBNGraph {
             if clause.is_fact() {
                 let formula = clause.conclusion.to_string();
                 graph.add_proposition(&formula);
-                graph.set_evidence(&formula, true);
+                graph.set_evidence(&formula, 1.0);
             } else {
                 let prem_patterns: Vec<String> =
                     clause.premises.iter().map(|p| p.to_string()).collect();

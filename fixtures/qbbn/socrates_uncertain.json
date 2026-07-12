@@ -1,5 +1,5 @@
 {
-  "title": "Socrates is mortal",
+  "title": "Socrates is probably mortal",
   "entities": [
     {"name": "socrates", "type": "e"}
   ],
@@ -10,9 +10,9 @@
     }
   ],
   "evidence": [
-    {"formula": "man(theme: socrates)", "prob": 1.0}
+    {"formula": "man(theme: socrates)", "prob": 0.7}
   ],
   "queries": [
-    {"formula": "mortal(theme: socrates)", "expected_prob": 0.99, "tolerance": 0.01}
+    {"formula": "mortal(theme: socrates)", "expected_prob": 0.85, "tolerance": 0.05}
   ]
 }

@@ -40,7 +40,7 @@ fn default_weight() -> f64 {
 #[derive(Debug, Deserialize)]
 pub struct FixtureEvidence {
     pub formula: String,
-    pub value: bool,
+    pub prob: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -235,7 +235,7 @@ pub fn run_inference_fixture_debug(fixture: &InferenceFixture, debug: bool) -> R
             println!("  parsed: {}  AST: {:?}", parsed, parsed);
             println!("  canonical: {}", canonical);
         }
-        if !graph.set_evidence(&canonical, ev.value) {
+        if !graph.set_evidence(&canonical, ev.prob) {
             return Err(format!("evidence formula '{}' (canonical: '{}') not found in graph", ev.formula, canonical));
         }
     }

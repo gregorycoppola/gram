@@ -18,7 +18,7 @@
     }
   ],
   "evidence": [
-    {"formula": "weather_said(theme: rain)", "value": true}
+    {"formula": "weather_said(theme: rain)", "prob": 1.0}
   ],
   "queries": [
     {"formula": "fun(theme: beach)", "expected_prob": 0.12, "tolerance": 0.05}
