@@ -44,6 +44,7 @@ fn check_step(step: &ProofStep, premises: &[String], prior: &[Expr]) -> Result<E
         "belief_elim" => check_belief_elim(&formula, step, prior),
         "of_elim" => check_of_elim(&formula, step, prior),
         "apply_elim" => check_apply_elim(&formula, step, prior),
+        "exists_many_weaken" => check_exists_many_weaken(&formula, step, prior),
         other => Err(format!("unknown justification: {}", other)),
     }
 }
@@ -325,6 +326,42 @@ fn check_apply_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<
     }
 }
 
+fn check_exists_many_weaken(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+    let source_idx = step.from.get(0).copied()
+        .ok_or("exists_many_weaken requires a source step")?;
+    let source = prior.get(source_idx.saturating_sub(1))
+        .ok_or(format!("step {} not yet derived", source_idx))?;
+
+    let (var1, var_type1, count1, body1) = match source {
+        Expr::ExistsMany { var, var_type, count, body } => (var, var_type, count, body),
+        _ => return Err(format!("exists_many_weaken source must be ExistsMany, got: {}", source)),
+    };
+
+    let (var2, var_type2, count2, body2) = match formula {
+        Expr::ExistsMany { var, var_type, count, body } => (var, var_type, count, body),
+        _ => return Err(format!("exists_many_weaken target must be ExistsMany, got: {}", formula)),
+    };
+
+    if var1 != var2 {
+        return Err(format!("exists_many_weaken: variable mismatch: {} vs {}", var1, var2));
+    }
+    if var_type1 != var_type2 {
+        return Err(format!("exists_many_weaken: type mismatch: {} vs {}", var_type1, var_type2));
+    }
+    if !expr_eq(body1, body2) {
+        return Err(format!("exists_many_weaken: body mismatch"));
+    }
+
+    let n1: i32 = count1.parse().map_err(|_| format!("exists_many_weaken: source count '{}' is not a number", count1))?;
+    let n2: i32 = count2.parse().map_err(|_| format!("exists_many_weaken: target count '{}' is not a number", count2))?;
+
+    if n2 >= n1 {
+        return Err(format!("exists_many_weaken: target count {} must be less than source count {}", n2, n1));
+    }
+
+    Ok(formula.clone())
+}
+
 /// Substitute all occurrences of `Var { name: var }` or `Entity(var)` with `Entity(term)`.
 fn substitute_var_to_entity(expr: Expr, var: &str, term: &str) -> Expr {
     match expr {
@@ -479,5 +516,53 @@ mod tests {
             },
             other => panic!("expected Not, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn exists_many_weaken_3_to_2() {
+        let source = semantics::parse("exists_many [x:e, 3]: man(theme: x) ∧ in(theme: x, location: the_house)").unwrap();
+        let target = semantics::parse("exists_many [x:e, 2]: man(theme: x) ∧ in(theme: x, location: the_house)").unwrap();
+        let prior = vec![source];
+        let step = ProofStep {
+            step: 2,
+            formula: "exists_many [x:e, 2]: man(theme: x) ∧ in(theme: x, location: the_house)".to_string(),
+            justification: "exists_many_weaken".to_string(),
+            from: vec![1],
+            substitution: None,
+        };
+        let result = check_exists_many_weaken(&target, &step, &prior);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn exists_many_weaken_rejects_equal() {
+        let source = semantics::parse("exists_many [x:e, 3]: man(theme: x)").unwrap();
+        let target = semantics::parse("exists_many [x:e, 3]: man(theme: x)").unwrap();
+        let prior = vec![source];
+        let step = ProofStep {
+            step: 2,
+            formula: "exists_many [x:e, 3]: man(theme: x)".to_string(),
+            justification: "exists_many_weaken".to_string(),
+            from: vec![1],
+            substitution: None,
+        };
+        let result = check_exists_many_weaken(&target, &step, &prior);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn exists_many_weaken_rejects_greater() {
+        let source = semantics::parse("exists_many [x:e, 2]: man(theme: x)").unwrap();
+        let target = semantics::parse("exists_many [x:e, 3]: man(theme: x)").unwrap();
+        let prior = vec![source];
+        let step = ProofStep {
+            step: 2,
+            formula: "exists_many [x:e, 3]: man(theme: x)".to_string(),
+            justification: "exists_many_weaken".to_string(),
+            from: vec![1],
+            substitution: None,
+        };
+        let result = check_exists_many_weaken(&target, &step, &prior);
+        assert!(result.is_err());
     }
 }
