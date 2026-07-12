@@ -1,0 +1,11 @@
+{
+  "title": "Many implies some",
+  "premises": [
+    "exists_many [x:e, many]: happy(theme: x)"
+  ],
+  "conclusion": "exists_many [x:e, some]: happy(theme: x)",
+  "proof": [
+    {"step": 1, "formula": "exists_many [x:e, many]: happy(theme: x)", "justification": "premise"},
+    {"step": 2, "formula": "exists_many [x:e, some]: happy(theme: x)", "justification": "quantifier_weaken", "from": [1]}
+  ]
+}

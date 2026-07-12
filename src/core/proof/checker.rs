@@ -45,6 +45,7 @@ fn check_step(step: &ProofStep, premises: &[String], prior: &[Expr]) -> Result<E
         "of_elim" => check_of_elim(&formula, step, prior),
         "apply_elim" => check_apply_elim(&formula, step, prior),
         "exists_many_weaken" => check_exists_many_weaken(&formula, step, prior),
+        "quantifier_weaken" => check_quantifier_weaken(&formula, step, prior),
         other => Err(format!("unknown justification: {}", other)),
     }
 }
@@ -362,6 +363,40 @@ fn check_exists_many_weaken(formula: &Expr, step: &ProofStep, prior: &[Expr]) ->
     Ok(formula.clone())
 }
 
+fn check_quantifier_weaken(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+    let hierarchy = ["most", "many", "several", "some", "few"];
+    
+    let source_idx = step.from.get(0).copied()
+        .ok_or("quantifier_weaken requires a source step")?;
+    let source = prior.get(source_idx.saturating_sub(1))
+        .ok_or(format!("step {} not yet derived", source_idx))?;
+
+    let (var1, var_type1, count1, body1) = match source {
+        Expr::ExistsMany { var, var_type, count, body } => (var, var_type, count, body),
+        _ => return Err(format!("quantifier_weaken source must be ExistsMany with a vague quantifier, got: {}", source)),
+    };
+
+    let (var2, var_type2, count2, body2) = match formula {
+        Expr::ExistsMany { var, var_type, count, body } => (var, var_type, count, body),
+        _ => return Err(format!("quantifier_weaken target must be ExistsMany with a vague quantifier, got: {}", formula)),
+    };
+
+    if var1 != var2 || var_type1 != var_type2 || !expr_eq(body1, body2) {
+        return Err("quantifier_weaken: variable, type, or body mismatch".into());
+    }
+
+    let pos1 = hierarchy.iter().position(|&q| q == count1.as_str())
+        .ok_or(format!("quantifier_weaken: source count '{}' not in hierarchy", count1))?;
+    let pos2 = hierarchy.iter().position(|&q| q == count2.as_str())
+        .ok_or(format!("quantifier_weaken: target count '{}' not in hierarchy", count2))?;
+
+    if pos2 <= pos1 {
+        return Err(format!("quantifier_weaken: target '{}' must be weaker than source '{}'", count2, count1));
+    }
+
+    Ok(formula.clone())
+}
+
 /// Substitute all occurrences of `Var { name: var }` or `Entity(var)` with `Entity(term)`.
 fn substitute_var_to_entity(expr: Expr, var: &str, term: &str) -> Expr {
     match expr {
@@ -563,6 +598,70 @@ mod tests {
             substitution: None,
         };
         let result = check_exists_many_weaken(&target, &step, &prior);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn quantifier_weaken_most_to_many() {
+        let source = semantics::parse("exists_many [x:e, most]: man(theme: x) ∧ mortal(theme: x)").unwrap();
+        let target = semantics::parse("exists_many [x:e, many]: man(theme: x) ∧ mortal(theme: x)").unwrap();
+        let prior = vec![source];
+        let step = ProofStep {
+            step: 2,
+            formula: "exists_many [x:e, many]: man(theme: x) ∧ mortal(theme: x)".to_string(),
+            justification: "quantifier_weaken".to_string(),
+            from: vec![1],
+            substitution: None,
+        };
+        let result = check_quantifier_weaken(&target, &step, &prior);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn quantifier_weaken_most_to_some() {
+        let source = semantics::parse("exists_many [x:e, most]: happy(theme: x)").unwrap();
+        let target = semantics::parse("exists_many [x:e, some]: happy(theme: x)").unwrap();
+        let prior = vec![source];
+        let step = ProofStep {
+            step: 2,
+            formula: "exists_many [x:e, some]: happy(theme: x)".to_string(),
+            justification: "quantifier_weaken".to_string(),
+            from: vec![1],
+            substitution: None,
+        };
+        let result = check_quantifier_weaken(&target, &step, &prior);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn quantifier_weaken_rejects_same() {
+        let source = semantics::parse("exists_many [x:e, many]: happy(theme: x)").unwrap();
+        let target = semantics::parse("exists_many [x:e, many]: happy(theme: x)").unwrap();
+        let prior = vec![source];
+        let step = ProofStep {
+            step: 2,
+            formula: "exists_many [x:e, many]: happy(theme: x)".to_string(),
+            justification: "quantifier_weaken".to_string(),
+            from: vec![1],
+            substitution: None,
+        };
+        let result = check_quantifier_weaken(&target, &step, &prior);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn quantifier_weaken_rejects_stronger() {
+        let source = semantics::parse("exists_many [x:e, some]: happy(theme: x)").unwrap();
+        let target = semantics::parse("exists_many [x:e, many]: happy(theme: x)").unwrap();
+        let prior = vec![source];
+        let step = ProofStep {
+            step: 2,
+            formula: "exists_many [x:e, many]: happy(theme: x)".to_string(),
+            justification: "quantifier_weaken".to_string(),
+            from: vec![1],
+            substitution: None,
+        };
+        let result = check_quantifier_weaken(&target, &step, &prior);
         assert!(result.is_err());
     }
 }
