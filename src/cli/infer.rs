@@ -29,15 +29,15 @@ pub fn run_infer(args: InferArgs) -> Result<()> {
         match qr.expected {
             Some(expected) => {
                 if qr.ok {
-                    println!("  ✅ P({}) = {:.4f}  (expected {:.4f} ± {:.4f})",
+                    println!("  ✅ P({}) = {:.4}  (expected {:.4} ± {:.4})",
                         qr.formula, qr.prob, expected, qr.tolerance);
                 } else {
-                    println!("  ❌ P({}) = {:.4f}  (expected {:.4f} ± {:.4f})",
+                    println!("  ❌ P({}) = {:.4}  (expected {:.4} ± {:.4})",
                         qr.formula, qr.prob, expected, qr.tolerance);
                 }
             }
             None => {
-                println!("  ℹ️  P({}) = {:.4f}", qr.formula, qr.prob);
+                println!("  ℹ️  P({}) = {:.4}", qr.formula, qr.prob);
             }
         }
     }
