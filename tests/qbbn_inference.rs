@@ -46,3 +46,18 @@ fn test_rain_conflict() {
 fn test_socrates_chain() {
     run_fixture("socrates_chain.json");
 }
+
+#[test]
+fn test_beach_conflict() {
+    run_fixture("beach_conflict.json");
+}
+
+#[test]
+fn test_beach_rain() {
+    run_fixture("beach_rain.json");
+}
+
+#[test]
+fn test_beach_sunny() {
+    run_fixture("beach_sunny.json");
+}

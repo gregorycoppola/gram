@@ -1,0 +1,31 @@
+{
+  "title": "Beach: sunny expected, fun",
+  "entities": [
+    {"name": "today", "type": "e"},
+    {"name": "beach", "type": "e"}
+  ],
+  "rules": [
+    {
+      "formula": "always [x:e]: weather_said(theme: rain) -> rain(theme: x)",
+      "weight": 99
+    },
+    {
+      "formula": "always [x:e]: no_clouds() -> not rain(theme: x)",
+      "weight": 99
+    },
+    {
+      "formula": "always [x:e]: rain(theme: x) -> not fun(theme: beach)",
+      "weight": 99
+    },
+    {
+      "formula": "always [x:e]: not rain(theme: x) -> fun(theme: beach)",
+      "weight": 99
+    }
+  ],
+  "evidence": [
+    {"formula": "no_clouds()", "value": true}
+  ],
+  "queries": [
+    {"formula": "fun(theme: beach)", "expected_prob": 1.0, "tolerance": 0.05}
+  ]
+}
