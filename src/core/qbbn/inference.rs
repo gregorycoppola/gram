@@ -156,7 +156,7 @@ fn convert_bound_entities(expr: &Expr, vars: &[(String, String)]) -> Expr {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct QueryResult {
     pub formula: String,
     pub prob: f64,
@@ -165,7 +165,7 @@ pub struct QueryResult {
     pub ok: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct InferenceResult {
     pub title: String,
     pub query_results: Vec<QueryResult>,

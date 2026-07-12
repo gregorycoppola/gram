@@ -1,9 +1,10 @@
+pub mod inference;
+pub mod parse;
+pub mod proof;
+
 use anyhow::{Context, Result};
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
-
-use crate::cli::pretty::print_pretty;
-use crate::server::ParseResult;
 
 #[derive(Subcommand)]
 pub enum ApiCommand {
@@ -15,10 +16,10 @@ pub enum ApiCommand {
     Fixture {
         name: String,
     },
-    /// GET /fixtures/:name/parse — parse all sentences in a fixture
+    /// GET /fixtures/:name/parse — parse all sentences
     Parse {
         name: String,
-        /// Pretty-print the response (bracket tree, constituents, rule trace) instead of raw JSON.
+        /// Pretty-print the response.
         #[arg(long)]
         pretty: bool,
     },
@@ -28,25 +29,42 @@ pub enum ApiCommand {
         fixture: String,
         #[arg(long)]
         sentence: String,
-        /// Pretty-print the response (bracket tree, constituents, rule trace) instead of raw JSON.
+        /// Pretty-print the response.
         #[arg(long)]
         pretty: bool,
     },
-    /// POST /proof/check — check a proof file for valid inference steps
+    /// GET /proofs — list all proof names
+    Proofs,
+    /// GET /proofs/:name — show a proof file
+    Proof {
+        name: String,
+    },
+    /// POST /proof/check — check a proof
     CheckProof {
         /// Path to a proof JSON file.
         #[arg(long)]
         proof: PathBuf,
+    },
+    /// GET /inference/fixtures — list QBBN inference fixtures
+    InferenceFixtures,
+    /// POST /inference/run — run inference on a fixture
+    InferenceRun {
+        /// Fixture name (in fixtures/qbbn/).
+        #[arg(long)]
+        fixture: String,
+        /// Pretty-print the graph and results.
+        #[arg(long)]
+        pretty: bool,
     },
 }
 
 #[derive(Args)]
 pub struct ApiArgs {
     #[command(subcommand)]
-    command: ApiCommand,
+    pub command: ApiCommand,
     /// Server base URL.
     #[arg(long, default_value = "http://127.0.0.1:9101")]
-    url: String,
+    pub url: String,
 }
 
 pub fn run_api(args: ApiArgs) -> Result<()> {
@@ -58,60 +76,70 @@ pub fn run_api(args: ApiArgs) -> Result<()> {
 
 async fn run_api_async(args: ApiArgs) -> Result<()> {
     let base = args.url.trim_end_matches('/');
-
-    let (url, pretty, is_post, body) = match &args.command {
-        ApiCommand::Health => (format!("{}/health", base), false, false, None),
-        ApiCommand::Fixtures => (format!("{}/fixtures", base), false, false, None),
-        ApiCommand::Fixture { name } => (format!("{}/fixtures/{}", base, name), false, false, None),
-        ApiCommand::Parse { name, pretty } => (format!("{}/fixtures/{}/parse", base, name), *pretty, false, None),
-        ApiCommand::ParseOne { fixture, sentence, pretty } => {
-            let body = serde_json::json!({
-                "fixture": fixture,
-                "sentence": sentence,
-            });
-            (format!("{}/parse/one", base), *pretty, true, Some(body))
-        }
-        ApiCommand::CheckProof { proof } => {
-            let raw = std::fs::read_to_string(proof)
-                .with_context(|| format!("reading proof file {}", proof.display()))?;
-            let body: serde_json::Value = serde_json::from_str(&raw)
-                .with_context(|| format!("parsing proof JSON {}", proof.display()))?;
-            (format!("{}/proof/check", base), false, true, Some(body))
-        }
-    };
-
     let client = reqwest::Client::new();
 
-    let resp = if is_post {
-        let mut req = client.post(&url);
-        if let Some(b) = body {
-            req = req.json(&b);
+    match args.command {
+        ApiCommand::Health => {
+            let url = format!("{}/health", base);
+            let resp = client.get(&url).send().await.with_context(|| format!("GET {}", url))?;
+            let body = resp.json::<serde_json::Value>().await.context("parsing health response")?;
+            println!("{}", serde_json::to_string_pretty(&body)?);
+            Ok(())
         }
-        req.send().await.with_context(|| format!("POST {}", url))?
-    } else {
-        client.get(&url).send().await.with_context(|| format!("GET {}", url))?
-    };
+        ApiCommand::Fixtures => parse::run_fixtures(&client, base).await,
+        ApiCommand::Fixture { name } => parse::run_fixture(&client, base, &name).await,
+        ApiCommand::Parse { name, pretty } => parse::run_parse(&client, base, &name, pretty).await,
+        ApiCommand::ParseOne { fixture, sentence, pretty } => {
+            parse::run_parse_one(&client, base, &fixture, &sentence, pretty).await
+        }
+        ApiCommand::Proofs => proof::run_list(&client, base).await,
+        ApiCommand::Proof { name } => proof::run_show(&client, base, &name).await,
+        ApiCommand::CheckProof { proof } => proof::run_check(&client, base, &proof).await,
+        ApiCommand::InferenceFixtures => inference::run_fixtures(&client, base).await,
+        ApiCommand::InferenceRun { fixture, pretty } => {
+            inference::run_run(&client, base, &fixture, pretty).await
+        }
+    }
+}
 
+pub async fn get_json<T: serde::de::DeserializeOwned>(
+    client: &reqwest::Client,
+    url: &str,
+) -> Result<T> {
+    let resp = client
+        .get(url)
+        .send()
+        .await
+        .with_context(|| format!("GET {}", url))?;
     let status = resp.status();
     let body_text = resp
         .text()
         .await
-        .with_context(|| format!("reading response body from {}", url))?;
-
+        .with_context(|| format!("reading body from {}", url))?;
     if !status.is_success() {
-        let body: serde_json::Value = serde_json::from_str(&body_text).unwrap_or(serde_json::json!({}));
-        anyhow::bail!("{} -> {}: {}", url, status, body);
+        anyhow::bail!("{} -> {}: {}", url, status, body_text);
     }
+    serde_json::from_str(&body_text).with_context(|| format!("parsing JSON from {}", url))
+}
 
-    if pretty {
-        let results: Vec<ParseResult> = serde_json::from_str(&body_text)
-            .with_context(|| "deserializing parse results for pretty-print")?;
-        print_pretty(&results);
-        return Ok(());
+pub async fn post_json<T: serde::de::DeserializeOwned>(
+    client: &reqwest::Client,
+    url: &str,
+    body: serde_json::Value,
+) -> Result<T> {
+    let resp = client
+        .post(url)
+        .json(&body)
+        .send()
+        .await
+        .with_context(|| format!("POST {}", url))?;
+    let status = resp.status();
+    let body_text = resp
+        .text()
+        .await
+        .with_context(|| format!("reading body from {}", url))?;
+    if !status.is_success() {
+        anyhow::bail!("{} -> {}: {}", url, status, body_text);
     }
-
-    let body: serde_json::Value = serde_json::from_str(&body_text)
-        .with_context(|| format!("parsing JSON response from {}", url))?;
-    println!("{}", serde_json::to_string_pretty(&body).context("serializing response")?);
-    Ok(())
+    serde_json::from_str(&body_text).with_context(|| format!("parsing JSON from {}", url))
 }

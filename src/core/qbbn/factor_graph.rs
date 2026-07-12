@@ -1,24 +1,24 @@
 use std::collections::HashMap;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::kb::KnowledgeBase;
 use super::bp::cpt_prob_true;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum NodeType {
     Proposition,
     Group,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FactorType {
     And,
     Or,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Variable {
     pub id: String,
     pub node_type: NodeType,
@@ -44,7 +44,7 @@ impl Variable {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Factor {
     pub id: String,
     pub factor_type: FactorType,
@@ -53,7 +53,7 @@ pub struct Factor {
     pub output_id: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Rule {
     pub id: String,
     pub premise_patterns: Vec<String>,
@@ -62,7 +62,7 @@ pub struct Rule {
     pub weight: f64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphSnapshot {
     pub nodes: Vec<GraphNode>,
     pub edges: Vec<GraphEdge>,
@@ -71,7 +71,7 @@ pub struct GraphSnapshot {
     pub cpt_tables: Vec<CPTTable>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphNode {
     pub id: String,
     pub node_type: String,
@@ -85,7 +85,7 @@ pub struct GraphNode {
     pub conjunct_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphEdge {
     pub id: String,
     pub edge_type: String,
@@ -94,7 +94,7 @@ pub struct GraphEdge {
     pub input_negated: Vec<bool>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphRule {
     pub id: String,
     pub premise_patterns: Vec<String>,
@@ -102,7 +102,7 @@ pub struct GraphRule {
     pub weight: f64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CPTTable {
     pub factor_id: String,
     pub factor_type: String,
@@ -112,7 +112,7 @@ pub struct CPTTable {
     pub truncated: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CPTRow {
     pub assignment: Vec<bool>,
     pub prob_true: f64,
@@ -484,7 +484,7 @@ impl QBBNGraph {
 
             if factor.factor_type == FactorType::Or {
                 let n = factor.input_ids.len();
-                let max_rows = 6; // cap at 2^6 = 64 rows
+                let max_rows = 6;
                 let truncated = n > max_rows;
                 let limit = if truncated { 0 } else { 1 << n };
                 let mut rows = Vec::new();
