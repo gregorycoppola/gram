@@ -6,17 +6,17 @@
   "rules": [
     {
       "formula": "always [x:e]: man(theme: x) -> human(theme: x)",
-      "weight": 0.9
+      "weight": 99
     },
     {
       "formula": "always [x:e]: human(theme: x) -> mortal(theme: x)",
-      "weight": 0.9
+      "weight": 99
     }
   ],
   "evidence": [
     {"formula": "man(theme: socrates)", "value": true}
   ],
   "queries": [
-    {"formula": "mortal(theme: socrates)", "expected_prob": 0.655, "tolerance": 0.05}
+    {"formula": "mortal(theme: socrates)", "expected_prob": 0.99, "tolerance": 0.01}
   ]
 }
