@@ -58,7 +58,7 @@ pub struct CheckProofRequest {
 }
 
 /// POST /proof/check response body.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CheckProofResponse {
     pub title: String,
     pub conclusion: String,
@@ -66,7 +66,7 @@ pub struct CheckProofResponse {
     pub steps: Vec<CheckProofStep>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CheckProofStep {
     pub step: usize,
     pub formula: String,
