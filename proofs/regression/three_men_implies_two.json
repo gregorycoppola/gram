@@ -1,0 +1,11 @@
+{
+  "title": "Three men in the house implies at least two",
+  "premises": [
+    "exists_many [x:e, 3]: man(theme: x) ∧ in(theme: x, location: the_house)"
+  ],
+  "conclusion": "exists_many [x:e, 2]: man(theme: x) ∧ in(theme: x, location: the_house)",
+  "proof": [
+    {"step": 1, "formula": "exists_many [x:e, 3]: man(theme: x) ∧ in(theme: x, location: the_house)", "justification": "premise"},
+    {"step": 2, "formula": "exists_many [x:e, 2]: man(theme: x) ∧ in(theme: x, location: the_house)", "justification": "exists_many_weaken", "from": [1]}
+  ]
+}
