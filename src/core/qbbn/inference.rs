@@ -125,8 +125,38 @@ pub fn run_inference_fixture_debug(fixture: &InferenceFixture, debug: bool) -> R
     for rule in &fixture.rules {
         let expr = semantics::parse(&rule.formula)
             .map_err(|e| format!("parse error in '{}': {}", rule.formula, e))?;
+        if debug {
+            println!("=== Parsed rule ===");
+            println!("  AST: {:?}", expr);
+            println!("  to_string: {}", expr);
+        }
         let (premises, conclusion, variables) = extract_horn_clause(&expr)?;
+        if debug {
+            println!("=== Extracted Horn clause ===");
+            for (i, p) in premises.iter().enumerate() {
+                println!("  premise[{}]: {}  AST: {:?}", i, p, p);
+            }
+            println!("  conclusion: {}  AST: {:?}", conclusion, conclusion);
+            println!("  variables: {:?}", variables);
+        }
         kb.add_rule(premises, conclusion, variables, rule.weight);
+    }
+
+    if debug {
+        println!("=== KB state ===");
+        println!("  entities: {:?}", kb.entities);
+        println!("  types: {:?}", kb.types);
+        let grounded = kb.ground_all();
+        println!("  grounded clauses ({}):", grounded.len());
+        for (i, c) in grounded.iter().enumerate() {
+            println!("    clause {}:", i);
+            for (j, p) in c.premises.iter().enumerate() {
+                println!("      premise[{}]: {}  AST: {:?}", j, p, p);
+            }
+            println!("      conclusion: {}  AST: {:?}", c.conclusion, c.conclusion);
+            println!("      variables: {:?}", c.variables);
+            println!("      is_fact: {}", c.is_fact());
+        }
     }
 
     let mut graph = QBBNGraph::from_kb(&kb);
@@ -135,6 +165,12 @@ pub fn run_inference_fixture_debug(fixture: &InferenceFixture, debug: bool) -> R
         let parsed = semantics::parse(&ev.formula)
             .map_err(|e| format!("parse error in evidence '{}': {}", ev.formula, e))?;
         let canonical = parsed.to_string();
+        if debug {
+            println!("=== Evidence ===");
+            println!("  raw: {}", ev.formula);
+            println!("  parsed: {}  AST: {:?}", parsed, parsed);
+            println!("  canonical: {}", canonical);
+        }
         if !graph.set_evidence(&canonical, ev.value) {
             return Err(format!("evidence formula '{}' (canonical: '{}') not found in graph", ev.formula, canonical));
         }
@@ -147,6 +183,12 @@ pub fn run_inference_fixture_debug(fixture: &InferenceFixture, debug: bool) -> R
         let parsed = semantics::parse(&q.formula)
             .map_err(|e| format!("parse error in query '{}': {}", q.formula, e))?;
         let canonical = parsed.to_string();
+        if debug {
+            println!("=== Query ===");
+            println!("  raw: {}", q.formula);
+            println!("  parsed: {}  AST: {:?}", parsed, parsed);
+            println!("  canonical: {}", canonical);
+        }
         let prob = graph.prob(&canonical);
         let ok = if let Some(expected) = q.expected_prob {
             (prob - expected).abs() <= q.tolerance
