@@ -94,6 +94,70 @@ fn flatten_and(expr: &Expr) -> Vec<Expr> {
     }
 }
 
+/// Convert entities that match bound variable names into proper Var nodes.
+/// The parser produces Entity("x") instead of Var{..} inside ForAll/Exists bodies.
+fn convert_bound_entities(expr: &Expr, vars: &[(String, String)]) -> Expr {
+    match expr {
+        Expr::Entity(name) => {
+            if let Some((_, typ)) = vars.iter().find(|(v, _)| v == name) {
+                Expr::Var { name: name.clone(), typ: typ.clone() }
+            } else {
+                Expr::Entity(name.clone())
+            }
+        }
+        Expr::Pred { name, roles } => Expr::Pred {
+            name: name.clone(),
+            roles: roles.iter().map(|(r, a)| (r.clone(), convert_bound_entities(a, vars))).collect(),
+        },
+        Expr::Not(e) => Expr::Not(Box::new(convert_bound_entities(e, vars))),
+        Expr::And(l, r) => Expr::And(
+            Box::new(convert_bound_entities(l, vars)),
+            Box::new(convert_bound_entities(r, vars)),
+        ),
+        Expr::Implies { ante, cons } => Expr::Implies {
+            ante: Box::new(convert_bound_entities(ante, vars)),
+            cons: Box::new(convert_bound_entities(cons, vars)),
+        },
+        Expr::ForAll { var, var_type, body } => Expr::ForAll {
+            var: var.clone(),
+            var_type: var_type.clone(),
+            body: Box::new(convert_bound_entities(body, vars)),
+        },
+        Expr::The { var, var_type, body } => Expr::The {
+            var: var.clone(),
+            var_type: var_type.clone(),
+            body: Box::new(convert_bound_entities(body, vars)),
+        },
+        Expr::This { var, var_type, body } => Expr::This {
+            var: var.clone(),
+            var_type: var_type.clone(),
+            body: Box::new(convert_bound_entities(body, vars)),
+        },
+        Expr::That { var, var_type, body } => Expr::That {
+            var: var.clone(),
+            var_type: var_type.clone(),
+            body: Box::new(convert_bound_entities(body, vars)),
+        },
+        Expr::Exists { var, var_type, body, count } => Expr::Exists {
+            var: var.clone(),
+            var_type: var_type.clone(),
+            body: Box::new(convert_bound_entities(body, vars)),
+            count: count.clone(),
+        },
+        Expr::ExistsMany { var, var_type, count, body } => Expr::ExistsMany {
+            var: var.clone(),
+            var_type: var_type.clone(),
+            count: count.clone(),
+            body: Box::new(convert_bound_entities(body, vars)),
+        },
+        Expr::Var { name, typ } => Expr::Var { name: name.clone(), typ: typ.clone() },
+        Expr::Question { label, body } => Expr::Question {
+            label: label.clone(),
+            body: Box::new(convert_bound_entities(body, vars)),
+        },
+    }
+}
+
 #[derive(Debug)]
 pub struct QueryResult {
     pub formula: String,
@@ -131,8 +195,10 @@ pub fn run_inference_fixture_debug(fixture: &InferenceFixture, debug: bool) -> R
             println!("  to_string: {}", expr);
         }
         let (premises, conclusion, variables) = extract_horn_clause(&expr)?;
+        let premises: Vec<Expr> = premises.iter().map(|p| convert_bound_entities(p, &variables)).collect();
+        let conclusion = convert_bound_entities(&conclusion, &variables);
         if debug {
-            println!("=== Extracted Horn clause ===");
+            println!("=== Extracted Horn clause (after convert) ===");
             for (i, p) in premises.iter().enumerate() {
                 println!("  premise[{}]: {}  AST: {:?}", i, p, p);
             }
