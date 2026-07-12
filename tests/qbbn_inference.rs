@@ -16,13 +16,13 @@ fn run_fixture(name: &str) {
     for qr in &result.query_results {
         match qr.expected {
             Some(expected) => {
-                println!("  P({}) = {:.4f}  (expected {:.4f} ± {:.4f})",
+                println!("  P({}) = {:.4}  (expected {:.4} ± {:.4})",
                     qr.formula, qr.prob, expected, qr.tolerance);
-                assert!(qr.ok, "query {} failed: got {:.4f}, expected {:.4f} ± {:.4f}",
+                assert!(qr.ok, "query {} failed: got {:.4}, expected {:.4} ± {:.4}",
                     qr.formula, qr.prob, expected, qr.tolerance);
             }
             None => {
-                println!("  P({}) = {:.4f}", qr.formula, qr.prob);
+                println!("  P({}) = {:.4}", qr.formula, qr.prob);
             }
         }
     }
