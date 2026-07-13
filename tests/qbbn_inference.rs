@@ -1,22 +1,14 @@
 use std::path::PathBuf;
 
-use gram::core::qbbn::inference::{
-    run_inference_fixture_debug, InferenceFixture,
-};
+use gram::core::qbbn::inference::{run_inference_fixture_debug, InferenceFixture};
 
-fn run_fixture(
-    name: &str,
-    expected_acyclic: bool,
-) {
+fn run_fixture(name: &str, expected_acyclic: bool) {
     let path = PathBuf::from("fixtures/qbbn").join(name);
     let raw = std::fs::read_to_string(&path).expect("read fixture");
 
-    let fixture: InferenceFixture =
-        serde_json::from_str(&raw).expect("parse fixture");
+    let fixture: InferenceFixture = serde_json::from_str(&raw).expect("parse fixture");
 
-    let result =
-        run_inference_fixture_debug(&fixture, false)
-            .expect("run inference");
+    let result = run_inference_fixture_debug(&fixture, false).expect("run inference");
 
     println!("\n📊 {}", result.title);
     println!(
@@ -37,8 +29,7 @@ fn run_fixture(
     println!("  BP iterations: {}", result.iterations);
 
     assert_eq!(
-        result.topology.acyclic,
-        expected_acyclic,
+        result.topology.acyclic, expected_acyclic,
         "fixture {name} had unexpected topology: {:?}",
         result.topology
     );
@@ -46,10 +37,7 @@ fn run_fixture(
     for query in &result.query_results {
         println!(
             "  P({})  exact={:?}  BP={:.6}  delta={:?}",
-            query.formula,
-            query.exact_prob,
-            query.prob,
-            query.bp_exact_delta
+            query.formula, query.exact_prob, query.prob, query.bp_exact_delta
         );
 
         if query.expected.is_some() {
@@ -71,8 +59,7 @@ fn run_fixture(
         } else {
             println!(
                 "  loopy diagnostic: BP-exact delta for {} is {:?}",
-                query.formula,
-                query.bp_exact_delta
+                query.formula, query.bp_exact_delta
             );
         }
 
@@ -121,18 +108,12 @@ fn test_beach_conflict() {
 
 #[test]
 fn test_negated_premise_and_conclusion() {
-    run_fixture(
-        "negated_premise_conclusion.json",
-        true,
-    );
+    run_fixture("negated_premise_conclusion.json", true);
 }
 
 #[test]
 fn test_negated_premise_positive_conclusion() {
-    run_fixture(
-        "negated_premise_positive_conclusion.json",
-        true,
-    );
+    run_fixture("negated_premise_positive_conclusion.json", true);
 }
 
 #[test]
@@ -142,10 +123,7 @@ fn test_negated_conjunction() {
 
 #[test]
 fn test_complementary_polarity_rules() {
-    run_fixture(
-        "complementary_polarity_rules.json",
-        false,
-    );
+    run_fixture("complementary_polarity_rules.json", false);
 }
 
 #[test]

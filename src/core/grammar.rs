@@ -7,7 +7,10 @@ use crate::core::sem_dsl::SemSpec;
 pub enum Slot {
     Literal(String),
     Keyword(String),
-    Var { name: String, type_constraint: Option<String> },
+    Var {
+        name: String,
+        type_constraint: Option<String>,
+    },
     Sub {
         label: String,
         available_vars: Vec<(String, String)>,
@@ -87,8 +90,7 @@ fn parse_sub_slot(rest: &str) -> Result<Slot> {
             b']' => depth -= 1,
             b':' if depth == 0 => {
                 let after = &rest[i + 1..];
-                if !after.is_empty() && after.chars().all(|c| c.is_ascii_uppercase() || c == '_')
-                {
+                if !after.is_empty() && after.chars().all(|c| c.is_ascii_uppercase() || c == '_') {
                     last_keyword_colon = Some(i);
                 }
             }
@@ -185,11 +187,22 @@ pub fn matches_keyword(token: &str, keyword: &str) -> bool {
 }
 
 pub fn is_punctuation(token: &str) -> bool {
-    punctuation_tokens().iter().any(|p| p.eq_ignore_ascii_case(token))
+    punctuation_tokens()
+        .iter()
+        .any(|p| p.eq_ignore_ascii_case(token))
 }
 
 pub fn pronouns() -> &'static [&'static str] {
-    &["they", "he", "she", "them", "everyone", "everybody", "anyone", "anybody"]
+    &[
+        "they",
+        "he",
+        "she",
+        "them",
+        "everyone",
+        "everybody",
+        "anyone",
+        "anybody",
+    ]
 }
 
 pub fn is_pronoun(token: &str) -> bool {

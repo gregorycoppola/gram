@@ -24,7 +24,11 @@ impl HornClause {
 
     pub fn ground(&self, bindings: &HashMap<String, String>) -> Self {
         Self {
-            premises: self.premises.iter().map(|p| substitute(p, bindings)).collect(),
+            premises: self
+                .premises
+                .iter()
+                .map(|p| substitute(p, bindings))
+                .collect(),
             conclusion: substitute(&self.conclusion, bindings),
             variables: Vec::new(),
             weight: self.weight,
@@ -80,33 +84,59 @@ fn substitute(expr: &Expr, bindings: &HashMap<String, String>) -> Expr {
             ante: Box::new(substitute(ante, bindings)),
             cons: Box::new(substitute(cons, bindings)),
         },
-        Expr::ForAll { var, var_type, body } => Expr::ForAll {
+        Expr::ForAll {
+            var,
+            var_type,
+            body,
+        } => Expr::ForAll {
             var: var.clone(),
             var_type: var_type.clone(),
             body: Box::new(substitute(body, bindings)),
         },
-        Expr::The { var, var_type, body } => Expr::The {
+        Expr::The {
+            var,
+            var_type,
+            body,
+        } => Expr::The {
             var: var.clone(),
             var_type: var_type.clone(),
             body: Box::new(substitute(body, bindings)),
         },
-        Expr::This { var, var_type, body } => Expr::This {
+        Expr::This {
+            var,
+            var_type,
+            body,
+        } => Expr::This {
             var: var.clone(),
             var_type: var_type.clone(),
             body: Box::new(substitute(body, bindings)),
         },
-        Expr::That { var, var_type, body } => Expr::That {
+        Expr::That {
+            var,
+            var_type,
+            body,
+        } => Expr::That {
             var: var.clone(),
             var_type: var_type.clone(),
             body: Box::new(substitute(body, bindings)),
         },
-        Expr::Exists { var, var_type, body, count } => Expr::Exists {
+        Expr::Exists {
+            var,
+            var_type,
+            body,
+            count,
+        } => Expr::Exists {
             var: var.clone(),
             var_type: var_type.clone(),
             body: Box::new(substitute(body, bindings)),
             count: count.clone(),
         },
-        Expr::ExistsMany { var, var_type, count, body } => Expr::ExistsMany {
+        Expr::ExistsMany {
+            var,
+            var_type,
+            count,
+            body,
+        } => Expr::ExistsMany {
             var: var.clone(),
             var_type: var_type.clone(),
             count: count.clone(),
@@ -123,7 +153,7 @@ fn substitute(expr: &Expr, bindings: &HashMap<String, String>) -> Expr {
 /// Knowledge base: entities, types, and Horn clauses.
 #[derive(Debug, Clone)]
 pub struct KnowledgeBase {
-    pub entities: HashMap<String, String>, // name -> type
+    pub entities: HashMap<String, String>,   // name -> type
     pub types: HashMap<String, Vec<String>>, // type -> [entity names]
     pub clauses: Vec<HornClause>,
 }

@@ -11,7 +11,9 @@ fn parse_fixture(name: &str) -> Vec<(String, Result<Vec<gram::core::matcher::Mat
     let lexicon = Lexicon::from_fixture(&fixture);
     let rules = compile_rules(&fixture.grammar).unwrap();
 
-    fixture.sentences.iter()
+    fixture
+        .sentences
+        .iter()
         .filter_map(|sent| match sent {
             SentenceInput::Hinted(s) => {
                 let display = s.tokens.join(" ");
@@ -26,7 +28,12 @@ fn parse_fixture(name: &str) -> Vec<(String, Result<Vec<gram::core::matcher::Mat
 fn transitive_all_parse() {
     let results = parse_fixture("rc2_transitive");
     for (sentence, result) in &results {
-        assert!(result.is_ok(), "transitive failed on \"{}\": {}", sentence, result.as_ref().unwrap_err());
+        assert!(
+            result.is_ok(),
+            "transitive failed on \"{}\": {}",
+            sentence,
+            result.as_ref().unwrap_err()
+        );
     }
     assert_eq!(results.len(), 10);
 }
@@ -35,7 +42,12 @@ fn transitive_all_parse() {
 fn nested_all_parse() {
     let results = parse_fixture("rc2_nested");
     for (sentence, result) in &results {
-        assert!(result.is_ok(), "nested failed on \"{}\": {}", sentence, result.as_ref().unwrap_err());
+        assert!(
+            result.is_ok(),
+            "nested failed on \"{}\": {}",
+            sentence,
+            result.as_ref().unwrap_err()
+        );
     }
     assert_eq!(results.len(), 6);
 }
@@ -44,7 +56,12 @@ fn nested_all_parse() {
 fn relative_all_parse() {
     let results = parse_fixture("rc2_relative");
     for (sentence, result) in &results {
-        assert!(result.is_ok(), "relative failed on \"{}\": {}", sentence, result.as_ref().unwrap_err());
+        assert!(
+            result.is_ok(),
+            "relative failed on \"{}\": {}",
+            sentence,
+            result.as_ref().unwrap_err()
+        );
     }
     assert_eq!(results.len(), 5);
 }
@@ -53,7 +70,12 @@ fn relative_all_parse() {
 fn wh_all_parse() {
     let results = parse_fixture("rc2_wh");
     for (sentence, result) in &results {
-        assert!(result.is_ok(), "wh failed on \"{}\": {}", sentence, result.as_ref().unwrap_err());
+        assert!(
+            result.is_ok(),
+            "wh failed on \"{}\": {}",
+            sentence,
+            result.as_ref().unwrap_err()
+        );
     }
     assert_eq!(results.len(), 1);
 }

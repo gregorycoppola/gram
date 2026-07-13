@@ -18,8 +18,7 @@ pub fn run_check(args: CheckArgs) -> Result<()> {
     let file: ProofFile = serde_json::from_str(&raw)
         .with_context(|| format!("parsing proof JSON {}", args.proof.display()))?;
 
-    let result = check_proof(&file)
-        .map_err(|e| anyhow::anyhow!("proof check failed: {}", e))?;
+    let result = check_proof(&file).map_err(|e| anyhow::anyhow!("proof check failed: {}", e))?;
 
     println!("📋 {}\n", result.title);
     for (step, status) in &result.steps {
@@ -27,7 +26,8 @@ pub fn run_check(args: CheckArgs) -> Result<()> {
             crate::core::proof::StepResult::Ok => {
                 println!("  ✅ {:<14} {}", step.justification, step.formula);
                 if !step.from.is_empty() {
-                    let parts: Vec<String> = step.from.iter().map(|i: &usize| i.to_string()).collect();
+                    let parts: Vec<String> =
+                        step.from.iter().map(|i: &usize| i.to_string()).collect();
                     println!("     (from steps: {})", parts.join(", "));
                 }
             }

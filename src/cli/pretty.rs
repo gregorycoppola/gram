@@ -125,7 +125,13 @@ fn print_constituent_table(constituents: &[Constituent], output: &str) {
                 None => String::new(),
             };
             let indent = "  ".repeat(depth);
-            println!("    {:<16} {:<12} {}{}", span, format!("[{}]", c.label), indent, c.semantics);
+            println!(
+                "    {:<16} {:<12} {}{}",
+                span,
+                format!("[{}]", c.label),
+                indent,
+                c.semantics
+            );
             if !c.children.is_empty() {
                 print_rows(&c.children, depth + 1);
             }
@@ -159,12 +165,22 @@ fn print_bracket_tree(node: &SyntaxNode, depth: usize, is_last: bool, prefix: &s
     let full_prefix = format!("{}{}", prefix, connector);
 
     if is_leaf {
-        println!("    {}{} → \"{}\"", full_prefix, node.label, node.terminal.as_deref().unwrap_or(""));
+        println!(
+            "    {}{} → \"{}\"",
+            full_prefix,
+            node.label,
+            node.terminal.as_deref().unwrap_or("")
+        );
     } else {
         println!("    {}{}", full_prefix, node.label);
         for (i, child) in children.iter().enumerate() {
             let child_is_last = i == children.len() - 1;
-            print_bracket_tree(child, depth + 1, child_is_last, &format!("{}{}", prefix, child_prefix));
+            print_bracket_tree(
+                child,
+                depth + 1,
+                child_is_last,
+                &format!("{}{}", prefix, child_prefix),
+            );
         }
     }
 }

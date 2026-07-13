@@ -29,7 +29,9 @@ pub async fn list_proofs(State(state): State<AppState>) -> AppResult<Json<Vec<St
     let dir = state.proofs_dir.join("regression");
     let mut names = Vec::new();
     if dir.is_dir() {
-        for entry in std::fs::read_dir(&dir).map_err(|e| AppError(anyhow::anyhow!("reading proofs dir: {}", e)))? {
+        for entry in std::fs::read_dir(&dir)
+            .map_err(|e| AppError(anyhow::anyhow!("reading proofs dir: {}", e)))?
+        {
             if let Ok(e) = entry {
                 if let Some(name) = e.path().file_stem().and_then(|s| s.to_str()) {
                     names.push(name.to_string());
@@ -41,8 +43,14 @@ pub async fn list_proofs(State(state): State<AppState>) -> AppResult<Json<Vec<St
     Ok(Json(names))
 }
 
-pub async fn get_proof(State(state): State<AppState>, Path(name): Path<String>) -> AppResult<Json<Value>> {
-    let path = state.proofs_dir.join("regression").join(format!("{}.json", name));
+pub async fn get_proof(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+) -> AppResult<Json<Value>> {
+    let path = state
+        .proofs_dir
+        .join("regression")
+        .join(format!("{}.json", name));
     let raw = std::fs::read_to_string(&path)
         .map_err(|e| AppError(anyhow::anyhow!("reading proof {}: {}", path.display(), e)))?;
     let value: Value = serde_json::from_str(&raw)
@@ -50,7 +58,9 @@ pub async fn get_proof(State(state): State<AppState>, Path(name): Path<String>) 
     Ok(Json(value))
 }
 
-pub async fn check_proof(Json(req): Json<CheckProofRequest>) -> AppResult<Json<CheckProofResponse>> {
+pub async fn check_proof(
+    Json(req): Json<CheckProofRequest>,
+) -> AppResult<Json<CheckProofResponse>> {
     let file = ProofFile {
         title: req.title,
         premises: req.premises,
@@ -90,9 +100,7 @@ pub async fn check_proof(Json(req): Json<CheckProofRequest>) -> AppResult<Json<C
     }))
 }
 
-pub async fn list_fixtures(
-    State(state): State<AppState>,
-) -> AppResult<Json<Vec<FixtureSummary>>> {
+pub async fn list_fixtures(State(state): State<AppState>) -> AppResult<Json<Vec<FixtureSummary>>> {
     let dir = state.fixtures_dir.as_ref();
     let mut summaries = Vec::new();
     walk_dir(dir, "", &mut summaries, 0);
@@ -100,7 +108,12 @@ pub async fn list_fixtures(
     Ok(Json(summaries))
 }
 
-fn walk_dir(dir: &std::path::Path, prefix: &str, summaries: &mut Vec<FixtureSummary>, depth: usize) {
+fn walk_dir(
+    dir: &std::path::Path,
+    prefix: &str,
+    summaries: &mut Vec<FixtureSummary>,
+    depth: usize,
+) {
     if depth > 10 {
         return;
     }
@@ -116,9 +129,7 @@ fn walk_dir(dir: &std::path::Path, prefix: &str, summaries: &mut Vec<FixtureSumm
         };
         let path = entry.path();
         if path.is_dir() {
-            let dir_name = path.file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("");
+            let dir_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
             if dir_name.starts_with('.') {
                 continue;
             }
@@ -129,9 +140,7 @@ fn walk_dir(dir: &std::path::Path, prefix: &str, summaries: &mut Vec<FixtureSumm
             };
             walk_dir(&path, &new_prefix, summaries, depth + 1);
         } else if path.extension().and_then(|s| s.to_str()) == Some("json") {
-            let file_name = path.file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("");
+            let file_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
             if file_name.starts_with('.') {
                 continue;
             }
@@ -175,8 +184,7 @@ pub async fn handle_fixture(
 
 async fn do_get_fixture(state: AppState, name: &str) -> Result<String, anyhow::Error> {
     let path = fixture_path(state.fixtures_dir.as_ref(), name)?;
-    std::fs::read_to_string(&path)
-        .map_err(|e| anyhow::anyhow!("reading {}: {}", path.display(), e))
+    std::fs::read_to_string(&path).map_err(|e| anyhow::anyhow!("reading {}: {}", path.display(), e))
 }
 
 async fn do_parse_fixture(state: AppState, name: &str) -> Result<Vec<ParseResult>, anyhow::Error> {
@@ -245,7 +253,9 @@ pub async fn list_inference_fixtures(
     let dir = state.fixtures_dir.join("qbbn");
     let mut names = Vec::new();
     if dir.is_dir() {
-        for entry in std::fs::read_dir(&dir).map_err(|e| AppError(anyhow::anyhow!("reading qbbn dir: {}", e)))? {
+        for entry in std::fs::read_dir(&dir)
+            .map_err(|e| AppError(anyhow::anyhow!("reading qbbn dir: {}", e)))?
+        {
             if let Ok(e) = entry {
                 if let Some(name) = e.path().file_stem().and_then(|s| s.to_str()) {
                     names.push(name.to_string());

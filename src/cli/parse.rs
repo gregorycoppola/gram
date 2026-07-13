@@ -1,4 +1,3 @@
-
 use anyhow::{Context, Result};
 use clap::Args;
 use std::path::PathBuf;
@@ -81,7 +80,11 @@ pub fn run_parse_one(_args: ParseOneArgs) -> Result<()> {
     anyhow::bail!("parse-one requires hinted sentences (tokens + spans); use --fixture with a hinted JSON file instead")
 }
 
-fn parse_hinted(s: &crate::core::fixture::InputSentence, lexicon: &Lexicon, rules: &[crate::core::grammar::Rule]) -> ParsedSentence {
+fn parse_hinted(
+    s: &crate::core::fixture::InputSentence,
+    lexicon: &Lexicon,
+    rules: &[crate::core::grammar::Rule],
+) -> ParsedSentence {
     let display = s.tokens.join(" ");
     match parse_hinted_sentence(s, lexicon, rules) {
         Ok(matches) => ParsedSentence {
@@ -99,7 +102,11 @@ fn parse_hinted(s: &crate::core::fixture::InputSentence, lexicon: &Lexicon, rule
     }
 }
 
-fn parse_hinted_debug(s: &crate::core::fixture::InputSentence, lexicon: &Lexicon, rules: &[crate::core::grammar::Rule]) -> ParsedSentence {
+fn parse_hinted_debug(
+    s: &crate::core::fixture::InputSentence,
+    lexicon: &Lexicon,
+    rules: &[crate::core::grammar::Rule],
+) -> ParsedSentence {
     let display = s.tokens.join(" ");
     let mut trace = DebugTrace::new();
     let result = parse_hinted_sentence_traced(s, lexicon, rules, &mut trace);
@@ -168,8 +175,14 @@ fn emit_pretty(results: &[ParsedSentence]) {
         }
     }
 
-    println!("Parsed: {}/{}  Ambiguous: {}  Failed: {}  Errored: {}",
-        parsed, results.len(), ambiguous, failed, errored);
+    println!(
+        "Parsed: {}/{}  Ambiguous: {}  Failed: {}  Errored: {}",
+        parsed,
+        results.len(),
+        ambiguous,
+        failed,
+        errored
+    );
 }
 
 fn emit_constituents(constituents: &[crate::core::matcher::Constituent], indent: usize) {

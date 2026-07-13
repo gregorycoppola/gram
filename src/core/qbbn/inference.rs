@@ -64,9 +64,7 @@ fn default_tolerance() -> f64 {
     0.01
 }
 
-fn extract_horn_clause(
-    expr: &Expr,
-) -> Result<(Vec<Expr>, Expr, Vec<(String, String)>), String> {
+fn extract_horn_clause(expr: &Expr) -> Result<(Vec<Expr>, Expr, Vec<(String, String)>), String> {
     match expr {
         Expr::ForAll {
             var,
@@ -85,9 +83,7 @@ fn extract_horn_clause(
     }
 }
 
-fn extract_impl(
-    expr: &Expr,
-) -> Result<(Vec<Expr>, Expr, Vec<(String, String)>), String> {
+fn extract_impl(expr: &Expr) -> Result<(Vec<Expr>, Expr, Vec<(String, String)>), String> {
     match expr {
         Expr::Implies { ante, cons } => {
             let premises = flatten_and(ante);
@@ -111,15 +107,10 @@ fn flatten_and(expr: &Expr) -> Vec<Expr> {
     }
 }
 
-fn convert_bound_entities(
-    expr: &Expr,
-    vars: &[(String, String)],
-) -> Expr {
+fn convert_bound_entities(expr: &Expr, vars: &[(String, String)]) -> Expr {
     match expr {
         Expr::Entity(name) => {
-            if let Some((_, typ)) =
-                vars.iter().find(|(var, _)| var == name)
-            {
+            if let Some((_, typ)) = vars.iter().find(|(var, _)| var == name) {
                 Expr::Var {
                     name: name.clone(),
                     typ: typ.clone(),
@@ -132,17 +123,10 @@ fn convert_bound_entities(
             name: name.clone(),
             roles: roles
                 .iter()
-                .map(|(role, argument)| {
-                    (
-                        role.clone(),
-                        convert_bound_entities(argument, vars),
-                    )
-                })
+                .map(|(role, argument)| (role.clone(), convert_bound_entities(argument, vars)))
                 .collect(),
         },
-        Expr::Not(inner) => {
-            Expr::Not(Box::new(convert_bound_entities(inner, vars)))
-        }
+        Expr::Not(inner) => Expr::Not(Box::new(convert_bound_entities(inner, vars))),
         Expr::And(left, right) => Expr::And(
             Box::new(convert_bound_entities(left, vars)),
             Box::new(convert_bound_entities(right, vars)),
@@ -274,13 +258,10 @@ pub struct InferenceResult {
     #[serde(default)]
     pub exact_error: Option<String>,
 
-    pub graph:
-        Option<crate::core::qbbn::factor_graph::GraphSnapshot>,
+    pub graph: Option<crate::core::qbbn::factor_graph::GraphSnapshot>,
 }
 
-pub fn run_inference_fixture(
-    fixture: &InferenceFixture,
-) -> Result<InferenceResult, String> {
+pub fn run_inference_fixture(fixture: &InferenceFixture) -> Result<InferenceResult, String> {
     run_inference_fixture_debug(fixture, false)
 }
 
@@ -295,13 +276,8 @@ pub fn run_inference_fixture_debug(
     }
 
     for rule in &fixture.rules {
-        let expr =
-            semantics::parse(&rule.formula).map_err(|error| {
-                format!(
-                    "parse error in '{}': {}",
-                    rule.formula, error
-                )
-            })?;
+        let expr = semantics::parse(&rule.formula)
+            .map_err(|error| format!("parse error in '{}': {}", rule.formula, error))?;
 
         if debug {
             println!("=== Parsed rule ===");
@@ -309,44 +285,27 @@ pub fn run_inference_fixture_debug(
             println!("  to_string: {}", expr);
         }
 
-        let (premises, conclusion, variables) =
-            extract_horn_clause(&expr)?;
+        let (premises, conclusion, variables) = extract_horn_clause(&expr)?;
 
         let premises: Vec<Expr> = premises
             .iter()
-            .map(|premise| {
-                convert_bound_entities(premise, &variables)
-            })
+            .map(|premise| convert_bound_entities(premise, &variables))
             .collect();
 
-        let conclusion =
-            convert_bound_entities(&conclusion, &variables);
+        let conclusion = convert_bound_entities(&conclusion, &variables);
 
         if debug {
-            println!(
-                "=== Extracted Horn clause (after convert) ==="
-            );
+            println!("=== Extracted Horn clause (after convert) ===");
 
             for (index, premise) in premises.iter().enumerate() {
-                println!(
-                    "  premise[{}]: {}  AST: {:?}",
-                    index, premise, premise
-                );
+                println!("  premise[{}]: {}  AST: {:?}", index, premise, premise);
             }
 
-            println!(
-                "  conclusion: {}  AST: {:?}",
-                conclusion, conclusion
-            );
+            println!("  conclusion: {}  AST: {:?}", conclusion, conclusion);
             println!("  variables: {:?}", variables);
         }
 
-        kb.add_rule(
-            premises,
-            conclusion,
-            variables,
-            rule.weight,
-        );
+        kb.add_rule(premises, conclusion, variables, rule.weight);
     }
 
     if debug {
@@ -360,9 +319,7 @@ pub fn run_inference_fixture_debug(
         for (index, clause) in grounded.iter().enumerate() {
             println!("    clause {}:", index);
 
-            for (premise_index, premise) in
-                clause.premises.iter().enumerate()
-            {
+            for (premise_index, premise) in clause.premises.iter().enumerate() {
                 println!(
                     "      premise[{}]: {}  AST: {:?}",
                     premise_index, premise, premise
@@ -381,13 +338,9 @@ pub fn run_inference_fixture_debug(
     let mut graph = QBBNGraph::from_kb(&kb);
 
     for evidence in &fixture.evidence {
-        let parsed =
-            semantics::parse(&evidence.formula).map_err(|error| {
-                format!(
-                    "parse error in evidence '{}': {}",
-                    evidence.formula, error
-                )
-            })?;
+        let parsed = semantics::parse(&evidence.formula).map_err(|error| {
+            format!("parse error in evidence '{}': {}", evidence.formula, error)
+        })?;
 
         let canonical = parsed.to_string();
 
@@ -430,11 +383,7 @@ pub fn run_inference_fixture_debug(
         },
     );
 
-    let (
-        exact_result,
-        exact_partition_function,
-        exact_error,
-    ) = match exact_attempt {
+    let (exact_result, exact_partition_function, exact_error) = match exact_attempt {
         Ok(result) => {
             let partition = Some(result.partition_function);
             (Some(result), partition, None)
@@ -460,38 +409,26 @@ pub fn run_inference_fixture_debug(
     let mut query_results = Vec::new();
 
     for query in &fixture.queries {
-        let parsed =
-            semantics::parse(&query.formula).map_err(|error| {
-                format!(
-                    "parse error in query '{}': {}",
-                    query.formula, error
-                )
-            })?;
+        let parsed = semantics::parse(&query.formula)
+            .map_err(|error| format!("parse error in query '{}': {}", query.formula, error))?;
 
         let canonical = parsed.to_string();
         let bp_prob = graph.prob(&canonical);
 
         let exact_prob = exact_result
             .as_ref()
-            .and_then(|result| {
-                result.prob_formula(&graph, &canonical).ok()
-            });
+            .and_then(|result| result.prob_formula(&graph, &canonical).ok());
 
-        let bp_exact_delta =
-            exact_prob.map(|exact| bp_prob - exact);
+        let bp_exact_delta = exact_prob.map(|exact| bp_prob - exact);
 
         let expected_ok = query.expected_prob.map(|expected| {
             exact_prob
-                .map(|exact| {
-                    (exact - expected).abs()
-                        <= query.tolerance + f64::EPSILON
-                })
+                .map(|exact| (exact - expected).abs() <= query.tolerance + f64::EPSILON)
                 .unwrap_or(false)
         });
 
-        let bp_matches_exact = exact_prob.map(|exact| {
-            (bp_prob - exact).abs() <= BP_EXACT_TOLERANCE
-        });
+        let bp_matches_exact =
+            exact_prob.map(|exact| (bp_prob - exact).abs() <= BP_EXACT_TOLERANCE);
 
         let semantic_ok = expected_ok.unwrap_or(true);
 
@@ -512,17 +449,13 @@ pub fn run_inference_fixture_debug(
 
             if let Some(exact) = exact_prob {
                 println!("  exact: {:.12}", exact);
-                println!(
-                    "  BP - exact: {:+.12}",
-                    bp_prob - exact
-                );
+                println!("  BP - exact: {:+.12}", bp_prob - exact);
             }
 
             println!("  expected_ok: {:?}", expected_ok);
             println!(
                 "  bp_matches_exact: {:?} (tolerance={:.1e})",
-                bp_matches_exact,
-                BP_EXACT_TOLERANCE
+                bp_matches_exact, BP_EXACT_TOLERANCE
             );
             println!("  topology-aware ok: {}", ok);
         }

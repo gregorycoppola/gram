@@ -11,7 +11,9 @@ pub struct Predicate {
 impl Predicate {
     /// Canonical role signature, e.g. "{theme:e}" or "{agent:e,patient:e}".
     pub fn role_signature(&self) -> String {
-        let parts: Vec<String> = self.roles.iter()
+        let parts: Vec<String> = self
+            .roles
+            .iter()
             .map(|(r, t)| format!("{}:{}", r, t))
             .collect();
         format!("{{{}}}", parts.join(","))
@@ -59,14 +61,19 @@ impl Lexicon {
             for form in &forms {
                 let key = form.to_lowercase();
                 let len = key.split_whitespace().count();
-                if len > max_form_len { max_form_len = len; }
+                if len > max_form_len {
+                    max_form_len = len;
+                }
                 form_index.insert(key, (p.name.clone(), Category::Predicate));
             }
             predicates.insert(p.name.clone(), pred);
         }
 
         for e in &fixture.lexicon.entities {
-            let ent = Entity { name: e.name.clone(), typ: e.typ.clone() };
+            let ent = Entity {
+                name: e.name.clone(),
+                typ: e.typ.clone(),
+            };
             let forms: Vec<String> = if e.forms.is_empty() {
                 vec![e.name.clone()]
             } else {
@@ -75,13 +82,20 @@ impl Lexicon {
             for form in &forms {
                 let key = form.to_lowercase();
                 let len = key.split_whitespace().count();
-                if len > max_form_len { max_form_len = len; }
+                if len > max_form_len {
+                    max_form_len = len;
+                }
                 form_index.insert(key, (e.name.clone(), Category::Entity));
             }
             entities.insert(e.name.clone(), ent);
         }
 
-        Lexicon { predicates, entities, form_index, max_form_len }
+        Lexicon {
+            predicates,
+            entities,
+            form_index,
+            max_form_len,
+        }
     }
 
     /// Return a cloned lexicon with pronoun surface forms mapped to the given
@@ -101,7 +115,10 @@ impl Lexicon {
             // Register the variable itself as an entity so type lookups work.
             clone.entities.insert(
                 bare_name.to_string(),
-                Entity { name: bare_name.to_string(), typ: var_type.clone() },
+                Entity {
+                    name: bare_name.to_string(),
+                    typ: var_type.clone(),
+                },
             );
         }
         clone
@@ -119,10 +136,15 @@ impl Lexicon {
 
     /// Try to match tokens starting at `position`, longest match first.
     /// Returns (canonical_name, category, num_tokens_consumed).
-    pub fn lookup_at(&self, tokens: &[String], position: usize) -> Option<(String, Category, usize)> {
+    pub fn lookup_at(
+        &self,
+        tokens: &[String],
+        position: usize,
+    ) -> Option<(String, Category, usize)> {
         let max_len = self.max_form_len.min(tokens.len() - position);
         for length in (1..=max_len).rev() {
-            let phrase: String = tokens[position..position + length].iter()
+            let phrase: String = tokens[position..position + length]
+                .iter()
                 .map(|t| clean_token(t))
                 .collect::<Vec<_>>()
                 .join(" ");
@@ -133,13 +155,20 @@ impl Lexicon {
         None
     }
 
-    pub fn form_index_len(&self) -> usize { self.form_index.len() }
-    pub fn max_form_len(&self) -> usize { self.max_form_len }
+    pub fn form_index_len(&self) -> usize {
+        self.form_index.len()
+    }
+    pub fn max_form_len(&self) -> usize {
+        self.max_form_len
+    }
     pub fn form_index_entries(&self) -> impl Iterator<Item = (&String, &(String, Category))> {
         self.form_index.iter()
     }
 }
 
 pub fn clean_token(token: &str) -> String {
-    token.to_lowercase().trim_end_matches(|c: char| ".,!?;:".contains(c)).to_string()
+    token
+        .to_lowercase()
+        .trim_end_matches(|c: char| ".,!?;:".contains(c))
+        .to_string()
 }

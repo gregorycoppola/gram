@@ -11,11 +11,15 @@ pub struct DebugTrace {
 
 impl DebugTrace {
     pub fn new() -> Self {
-        Self { lines: Vec::new(), indent: 0 }
+        Self {
+            lines: Vec::new(),
+            indent: 0,
+        }
     }
 
     pub fn push(&mut self, msg: &str) {
-        self.lines.push(format!("{}{}", "  ".repeat(self.indent), msg));
+        self.lines
+            .push(format!("{}{}", "  ".repeat(self.indent), msg));
     }
 
     pub fn enter(&mut self, msg: &str) {
@@ -151,11 +155,27 @@ pub enum KindFilter {
 
 #[derive(Debug, Clone)]
 pub enum Consumption {
-    Var { variable: String, canonical: String, typ: String, start: usize, end: usize },
-    Keyword { class: String, position: usize },
-    Literal { position: usize },
-    Skipped { position: usize },
-    SubClause { start: usize, end: usize },
+    Var {
+        variable: String,
+        canonical: String,
+        typ: String,
+        start: usize,
+        end: usize,
+    },
+    Keyword {
+        class: String,
+        position: usize,
+    },
+    Literal {
+        position: usize,
+    },
+    Skipped {
+        position: usize,
+    },
+    SubClause {
+        start: usize,
+        end: usize,
+    },
 }
 
 // --- Span cache types ---

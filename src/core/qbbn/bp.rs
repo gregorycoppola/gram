@@ -38,9 +38,7 @@ fn damp(old: Message, new: Message, damping: f64) -> Message {
 }
 
 fn message_change(left: Message, right: Message) -> f64 {
-    (left[0] - right[0])
-        .abs()
-        .max((left[1] - right[1]).abs())
+    (left[0] - right[0]).abs().max((left[1] - right[1]).abs())
 }
 
 fn factor_variable_ids(factor: &Factor) -> Vec<String> {
@@ -63,26 +61,18 @@ fn produced_propositions(graph: &QBBNGraph) -> HashSet<String> {
 /// Source propositions receive the default Bernoulli(0.5) root prior.
 /// Produced propositions and group variables receive no independent prior.
 /// Evidence is represented as a unary likelihood [1-q, q].
-fn unary_potential(
-    graph: &QBBNGraph,
-    variable_id: &str,
-    produced: &HashSet<String>,
-) -> Message {
+fn unary_potential(graph: &QBBNGraph, variable_id: &str, produced: &HashSet<String>) -> Message {
     let variable = &graph.variables[variable_id];
 
-    let mut potential = if variable.node_type == NodeType::Proposition
-        && !produced.contains(variable_id)
-    {
-        [0.5, 0.5]
-    } else {
-        [1.0, 1.0]
-    };
+    let mut potential =
+        if variable.node_type == NodeType::Proposition && !produced.contains(variable_id) {
+            [0.5, 0.5]
+        } else {
+            [1.0, 1.0]
+        };
 
     if variable.is_evidence {
-        let probability = variable
-            .evidence_prob
-            .unwrap_or(0.5)
-            .clamp(0.0, 1.0);
+        let probability = variable.evidence_prob.unwrap_or(0.5).clamp(0.0, 1.0);
 
         potential[0] *= 1.0 - probability;
         potential[1] *= probability;
@@ -145,9 +135,7 @@ fn factor_potential(
             let mut score_pos = 0.0;
             let mut score_neg = 0.0;
 
-            for (index, group_id) in
-                factor.input_ids.iter().enumerate()
-            {
+            for (index, group_id) in factor.input_ids.iter().enumerate() {
                 if !assignment[index] {
                     continue;
                 }
@@ -217,17 +205,11 @@ fn compute_factor_message(
                     continue;
                 }
 
-                assignment[variable_index] =
-                    ((mask >> other_index) & 1) == 1;
+                assignment[variable_index] = ((mask >> other_index) & 1) == 1;
                 other_index += 1;
             }
 
-            let potential = factor_potential(
-                graph,
-                factor,
-                &variable_ids,
-                &assignment,
-            );
+            let potential = factor_potential(graph, factor, &variable_ids, &assignment);
 
             if potential == 0.0 {
                 continue;
@@ -235,20 +217,14 @@ fn compute_factor_message(
 
             let mut incoming_product = 1.0;
 
-            for (variable_index, variable_id) in
-                variable_ids.iter().enumerate()
-            {
+            for (variable_index, variable_id) in variable_ids.iter().enumerate() {
                 if variable_index == target_index {
                     continue;
                 }
 
-                let key =
-                    (factor.id.clone(), variable_id.clone());
+                let key = (factor.id.clone(), variable_id.clone());
 
-                let incoming = variable_to_factor
-                    .get(&key)
-                    .copied()
-                    .unwrap_or([0.5, 0.5]);
+                let incoming = variable_to_factor.get(&key).copied().unwrap_or([0.5, 0.5]);
 
                 let state = usize::from(assignment[variable_index]);
                 incoming_product *= incoming[state];
@@ -272,21 +248,16 @@ fn compute_variable_message(
     factor_to_variable: &HashMap<MessageKey, Message>,
     produced: &HashSet<String>,
 ) -> Message {
-    let mut result =
-        unary_potential(graph, variable_id, produced);
+    let mut result = unary_potential(graph, variable_id, produced);
 
     for factor_id in &graph.var_to_factors[variable_id] {
         if factor_id == target_factor_id {
             continue;
         }
 
-        let key =
-            (factor_id.clone(), variable_id.to_string());
+        let key = (factor_id.clone(), variable_id.to_string());
 
-        let incoming = factor_to_variable
-            .get(&key)
-            .copied()
-            .unwrap_or([1.0, 1.0]);
+        let incoming = factor_to_variable.get(&key).copied().unwrap_or([1.0, 1.0]);
 
         result[0] *= incoming[0];
         result[1] *= incoming[1];
@@ -301,17 +272,12 @@ fn compute_belief(
     factor_to_variable: &HashMap<MessageKey, Message>,
     produced: &HashSet<String>,
 ) -> Message {
-    let mut belief =
-        unary_potential(graph, variable_id, produced);
+    let mut belief = unary_potential(graph, variable_id, produced);
 
     for factor_id in &graph.var_to_factors[variable_id] {
-        let key =
-            (factor_id.clone(), variable_id.to_string());
+        let key = (factor_id.clone(), variable_id.to_string());
 
-        let incoming = factor_to_variable
-            .get(&key)
-            .copied()
-            .unwrap_or([1.0, 1.0]);
+        let incoming = factor_to_variable.get(&key).copied().unwrap_or([1.0, 1.0]);
 
         belief[0] *= incoming[0];
         belief[1] *= incoming[1];
@@ -323,8 +289,7 @@ fn compute_belief(
 fn print_graph(graph: &QBBNGraph) {
     println!("  === Graph Structure ===");
 
-    let mut variable_ids: Vec<_> =
-        graph.variables.keys().cloned().collect();
+    let mut variable_ids: Vec<_> = graph.variables.keys().cloned().collect();
     variable_ids.sort();
 
     println!("  Variables ({}):", variable_ids.len());
@@ -333,19 +298,12 @@ fn print_graph(graph: &QBBNGraph) {
         let variable = &graph.variables[&variable_id];
 
         let evidence = if variable.is_evidence {
-            format!(
-                " [evidence={:.4}]",
-                variable.evidence_prob.unwrap_or(0.5)
-            )
+            format!(" [evidence={:.4}]", variable.evidence_prob.unwrap_or(0.5))
         } else {
             String::new()
         };
 
-        let negated = if variable.negated {
-            " [negated]"
-        } else {
-            ""
-        };
+        let negated = if variable.negated { " [negated]" } else { "" };
 
         let formula = variable
             .formula
@@ -355,16 +313,11 @@ fn print_graph(graph: &QBBNGraph) {
 
         println!(
             "    {}: {:?}{}{}{}",
-            variable_id,
-            variable.node_type,
-            formula,
-            evidence,
-            negated
+            variable_id, variable.node_type, formula, evidence, negated
         );
     }
 
-    let mut factor_ids: Vec<_> =
-        graph.factors.keys().cloned().collect();
+    let mut factor_ids: Vec<_> = graph.factors.keys().cloned().collect();
     factor_ids.sort();
 
     println!("  Factors ({}):", factor_ids.len());
@@ -374,11 +327,7 @@ fn print_graph(graph: &QBBNGraph) {
 
         println!(
             "    {}: {:?} inputs={:?} negated={:?} -> {}",
-            factor_id,
-            factor.factor_type,
-            factor.input_ids,
-            factor.input_negated,
-            factor.output_id
+            factor_id, factor.factor_type, factor.input_ids, factor.input_negated, factor.output_id
         );
     }
 
@@ -390,19 +339,13 @@ fn print_beliefs(
     factor_to_variable: &HashMap<MessageKey, Message>,
     produced: &HashSet<String>,
 ) {
-    let mut variable_ids: Vec<_> =
-        graph.variables.keys().cloned().collect();
+    let mut variable_ids: Vec<_> = graph.variables.keys().cloned().collect();
     variable_ids.sort();
 
     println!("  --- Beliefs ---");
 
     for variable_id in variable_ids {
-        let belief = compute_belief(
-            graph,
-            &variable_id,
-            factor_to_variable,
-            produced,
-        );
+        let belief = compute_belief(graph, &variable_id, factor_to_variable, produced);
 
         let formula = graph.variables[&variable_id]
             .formula
@@ -442,39 +385,27 @@ pub fn belief_propagation(
 
     let produced = produced_propositions(graph);
 
-    let mut factor_ids: Vec<String> =
-        graph.factors.keys().cloned().collect();
+    let mut factor_ids: Vec<String> = graph.factors.keys().cloned().collect();
     factor_ids.sort();
 
-    let mut variable_ids: Vec<String> =
-        graph.variables.keys().cloned().collect();
+    let mut variable_ids: Vec<String> = graph.variables.keys().cloned().collect();
     variable_ids.sort();
 
-    let mut factor_to_variable:
-        HashMap<MessageKey, Message> = HashMap::new();
+    let mut factor_to_variable: HashMap<MessageKey, Message> = HashMap::new();
 
-    let mut variable_to_factor:
-        HashMap<MessageKey, Message> = HashMap::new();
+    let mut variable_to_factor: HashMap<MessageKey, Message> = HashMap::new();
 
     for factor_id in &factor_ids {
         let factor = &graph.factors[factor_id];
 
         for variable_id in factor_variable_ids(factor) {
-            let key =
-                (factor_id.clone(), variable_id.clone());
+            let key = (factor_id.clone(), variable_id.clone());
 
-            factor_to_variable.insert(
-                key.clone(),
-                [0.5, 0.5],
-            );
+            factor_to_variable.insert(key.clone(), [0.5, 0.5]);
 
             variable_to_factor.insert(
                 key,
-                normalize(unary_potential(
-                    graph,
-                    &variable_id,
-                    &produced,
-                )),
+                normalize(unary_potential(graph, &variable_id, &produced)),
             );
         }
     }
@@ -484,12 +415,7 @@ pub fn belief_propagation(
     let initial_beliefs: HashMap<String, f64> = variable_ids
         .iter()
         .map(|variable_id| {
-            let belief = compute_belief(
-                graph,
-                variable_id,
-                &factor_to_variable,
-                &produced,
-            );
+            let belief = compute_belief(graph, variable_id, &factor_to_variable, &produced);
 
             (variable_id.clone(), belief[1])
         })
@@ -499,26 +425,16 @@ pub fn belief_propagation(
 
     if debug {
         println!("--- Initial beliefs ---");
-        print_beliefs(
-            graph,
-            &factor_to_variable,
-            &produced,
-        );
+        print_beliefs(graph, &factor_to_variable, &produced);
     }
 
     for iteration in 0..iterations {
         let old_beliefs: HashMap<String, f64> = variable_ids
             .iter()
-            .map(|variable_id| {
-                (
-                    variable_id.clone(),
-                    graph.variables[variable_id].prob(),
-                )
-            })
+            .map(|variable_id| (variable_id.clone(), graph.variables[variable_id].prob()))
             .collect();
 
-        let mut next_factor_to_variable =
-            factor_to_variable.clone();
+        let mut next_factor_to_variable = factor_to_variable.clone();
 
         let mut max_message_change: f64 = 0.0;
 
@@ -527,39 +443,28 @@ pub fn belief_propagation(
             let factor = &graph.factors[factor_id];
 
             for variable_id in factor_variable_ids(factor) {
-                let key =
-                    (factor_id.clone(), variable_id.clone());
+                let key = (factor_id.clone(), variable_id.clone());
 
-                let raw = compute_factor_message(
-                    graph,
-                    factor,
-                    &variable_id,
-                    &variable_to_factor,
-                );
+                let raw = compute_factor_message(graph, factor, &variable_id, &variable_to_factor);
 
                 let old = factor_to_variable[&key];
                 let updated = damp(old, raw, damping);
 
-                max_message_change = max_message_change.max(
-                    message_change(old, updated),
-                );
+                max_message_change = max_message_change.max(message_change(old, updated));
 
                 next_factor_to_variable.insert(key, updated);
             }
         }
 
         // Variable -> factor cavity messages.
-        let mut next_variable_to_factor =
-            variable_to_factor.clone();
+        let mut next_variable_to_factor = variable_to_factor.clone();
 
         for variable_id in &variable_ids {
-            let mut neighbor_ids =
-                graph.var_to_factors[variable_id].clone();
+            let mut neighbor_ids = graph.var_to_factors[variable_id].clone();
             neighbor_ids.sort();
 
             for factor_id in neighbor_ids {
-                let key =
-                    (factor_id.clone(), variable_id.clone());
+                let key = (factor_id.clone(), variable_id.clone());
 
                 let raw = compute_variable_message(
                     graph,
@@ -572,9 +477,7 @@ pub fn belief_propagation(
                 let old = variable_to_factor[&key];
                 let updated = damp(old, raw, damping);
 
-                max_message_change = max_message_change.max(
-                    message_change(old, updated),
-                );
+                max_message_change = max_message_change.max(message_change(old, updated));
 
                 next_variable_to_factor.insert(key, updated);
             }
@@ -587,18 +490,11 @@ pub fn belief_propagation(
         let mut max_belief_change: f64 = 0.0;
 
         for variable_id in &variable_ids {
-            let belief = compute_belief(
-                graph,
-                variable_id,
-                &factor_to_variable,
-                &produced,
-            );
+            let belief = compute_belief(graph, variable_id, &factor_to_variable, &produced);
 
             let previous = old_beliefs[variable_id];
 
-            max_belief_change = max_belief_change.max(
-                (belief[1] - previous).abs(),
-            );
+            max_belief_change = max_belief_change.max((belief[1] - previous).abs());
 
             graph
                 .variables
@@ -606,38 +502,22 @@ pub fn belief_propagation(
                 .expect("variable must exist")
                 .belief = belief;
 
-            iteration_beliefs
-                .insert(variable_id.clone(), belief[1]);
+            iteration_beliefs.insert(variable_id.clone(), belief[1]);
         }
 
         trace.iterations.push(iteration_beliefs);
 
         if debug {
             println!("=== Iteration {} ===", iteration + 1);
-            println!(
-                "  max message change = {:.12}",
-                max_message_change
-            );
-            println!(
-                "  max belief change  = {:.12}",
-                max_belief_change
-            );
+            println!("  max message change = {:.12}", max_message_change);
+            println!("  max belief change  = {:.12}", max_belief_change);
 
-            print_beliefs(
-                graph,
-                &factor_to_variable,
-                &produced,
-            );
+            print_beliefs(graph, &factor_to_variable, &produced);
         }
 
-        if max_message_change < tolerance
-            && max_belief_change < tolerance
-        {
+        if max_message_change < tolerance && max_belief_change < tolerance {
             if debug {
-                println!(
-                    "=== Converged after {} iterations ===\n",
-                    iteration + 1
-                );
+                println!("=== Converged after {} iterations ===\n", iteration + 1);
             }
 
             break;

@@ -1,4 +1,3 @@
-
 /// Parsed semantic constructor specification from a fixture rule's `sem` field.
 ///
 /// Format: `constructor_name(arg1, arg2, ...)`

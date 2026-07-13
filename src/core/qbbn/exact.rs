@@ -88,11 +88,7 @@ impl ExactResult {
             .ok_or_else(|| ExactError::UnknownVariable(variable_id.to_string()))
     }
 
-    pub fn prob_formula(
-        &self,
-        graph: &QBBNGraph,
-        formula: &str,
-    ) -> Result<f64, ExactError> {
+    pub fn prob_formula(&self, graph: &QBBNGraph, formula: &str) -> Result<f64, ExactError> {
         let (positive_formula, negate) = match formula.strip_prefix("not ") {
             Some(rest) => (rest, true),
             None => (formula, false),
@@ -186,10 +182,7 @@ impl Display for ExactError {
                 write!(f, "malformed factor {factor_id}: {detail}")
             }
             ExactError::MissingRule { group_id, rule_id } => {
-                write!(
-                    f,
-                    "group {group_id} refers to missing rule {rule_id}"
-                )
+                write!(f, "group {group_id} refers to missing rule {rule_id}")
             }
             ExactError::ZeroPartition => {
                 write!(
@@ -223,9 +216,7 @@ fn validate_probability(label: impl Into<String>, value: f64) -> Result<(), Exac
 }
 
 /// Map every produced variable to its unique producing factor.
-fn build_producer_map(
-    graph: &QBBNGraph,
-) -> Result<HashMap<String, String>, ExactError> {
+fn build_producer_map(graph: &QBBNGraph) -> Result<HashMap<String, String>, ExactError> {
     let mut producers = HashMap::new();
 
     for factor in graph.factors.values() {
@@ -256,9 +247,7 @@ fn build_producer_map(
             });
         }
 
-        if let Some(first_factor) =
-            producers.insert(factor.output_id.clone(), factor.id.clone())
-        {
+        if let Some(first_factor) = producers.insert(factor.output_id.clone(), factor.id.clone()) {
             return Err(ExactError::MultipleProducers {
                 variable_id: factor.output_id.clone(),
                 first_factor,
@@ -325,9 +314,7 @@ fn assignment_weight(
 
     // Priors for source propositions.
     for variable in graph.variables.values() {
-        if variable.node_type == NodeType::Proposition
-            && !producers.contains_key(&variable.id)
-        {
+        if variable.node_type == NodeType::Proposition && !producers.contains_key(&variable.id) {
             let value = assignment_value(&variable.id, values, indices)?;
             weight *= if value {
                 config.root_prior
@@ -339,16 +326,14 @@ fn assignment_weight(
 
     // Conditional factors.
     for factor in graph.factors.values() {
-        let output_value =
-            assignment_value(&factor.output_id, values, indices)?;
+        let output_value = assignment_value(&factor.output_id, values, indices)?;
 
         match factor.factor_type {
             FactorType::And => {
                 let mut conjunction_value = true;
 
                 for (index, input_id) in factor.input_ids.iter().enumerate() {
-                    let raw_value =
-                        assignment_value(input_id, values, indices)?;
+                    let raw_value = assignment_value(input_id, values, indices)?;
                     let literal_value = if factor.input_negated[index] {
                         !raw_value
                     } else {
@@ -366,8 +351,7 @@ fn assignment_weight(
                 let mut score_neg = 0.0;
 
                 for group_id in &factor.input_ids {
-                    let active =
-                        assignment_value(group_id, values, indices)?;
+                    let active = assignment_value(group_id, values, indices)?;
 
                     if !active {
                         continue;
@@ -376,25 +360,24 @@ fn assignment_weight(
                     let group = graph
                         .variables
                         .get(group_id)
-                        .ok_or_else(|| {
-                            ExactError::UnknownVariable(group_id.clone())
-                        })?;
+                        .ok_or_else(|| ExactError::UnknownVariable(group_id.clone()))?;
 
-                    let rule_id = group.rule_id.as_ref().ok_or_else(|| {
-                        ExactError::MalformedFactor {
-                            factor_id: factor.id.clone(),
-                            detail: format!(
-                                "input group {group_id} has no rule ID"
-                            ),
-                        }
-                    })?;
+                    let rule_id =
+                        group
+                            .rule_id
+                            .as_ref()
+                            .ok_or_else(|| ExactError::MalformedFactor {
+                                factor_id: factor.id.clone(),
+                                detail: format!("input group {group_id} has no rule ID"),
+                            })?;
 
-                    let rule = graph.rules.get(rule_id).ok_or_else(|| {
-                        ExactError::MissingRule {
+                    let rule = graph
+                        .rules
+                        .get(rule_id)
+                        .ok_or_else(|| ExactError::MissingRule {
                             group_id: group_id.clone(),
                             rule_id: rule_id.clone(),
-                        }
-                    })?;
+                        })?;
 
                     if group.negated {
                         score_neg += rule.weight;
@@ -420,10 +403,7 @@ fn assignment_weight(
     // Unary likelihood factors for evidence.
     for variable in graph.variables.values().filter(|v| v.is_evidence) {
         let probability = variable.evidence_prob.unwrap_or(0.5);
-        validate_probability(
-            format!("evidence on {}", variable.id),
-            probability,
-        )?;
+        validate_probability(format!("evidence on {}", variable.id), probability)?;
 
         let value = assignment_value(&variable.id, values, indices)?;
         weight *= if value {
@@ -441,14 +421,10 @@ fn assignment_weight(
 ///
 /// This is exponential and intended only for tests, debugging, and small
 /// explanatory examples.
-pub fn exact_inference(
-    graph: &QBBNGraph,
-    config: ExactConfig,
-) -> Result<ExactResult, ExactError> {
+pub fn exact_inference(graph: &QBBNGraph, config: ExactConfig) -> Result<ExactResult, ExactError> {
     validate_probability("root prior", config.root_prior)?;
 
-    let mut variable_ids: Vec<String> =
-        graph.variables.keys().cloned().collect();
+    let mut variable_ids: Vec<String> = graph.variables.keys().cloned().collect();
     variable_ids.sort();
 
     let variable_count = variable_ids.len();
@@ -459,12 +435,13 @@ pub fn exact_inference(
         });
     }
 
-    let total_assignments = 1usize
-        .checked_shl(variable_count as u32)
-        .ok_or(ExactError::TooManyVariables {
-            count: variable_count,
-            max: usize::BITS as usize - 1,
-        })?;
+    let total_assignments =
+        1usize
+            .checked_shl(variable_count as u32)
+            .ok_or(ExactError::TooManyVariables {
+                count: variable_count,
+                max: usize::BITS as usize - 1,
+            })?;
 
     let indices: HashMap<String, usize> = variable_ids
         .iter()
@@ -483,13 +460,7 @@ pub fn exact_inference(
             .map(|index| ((mask >> index) & 1) == 1)
             .collect();
 
-        let weight = assignment_weight(
-            graph,
-            &config,
-            &producers,
-            &indices,
-            &values,
-        )?;
+        let weight = assignment_weight(graph, &config, &producers, &indices, &values)?;
 
         partition_function += weight;
 
@@ -511,12 +482,7 @@ pub fn exact_inference(
     let marginals = variable_ids
         .iter()
         .enumerate()
-        .map(|(index, id)| {
-            (
-                id.clone(),
-                marginal_numerators[index] / partition_function,
-            )
-        })
+        .map(|(index, id)| (id.clone(), marginal_numerators[index] / partition_function))
         .collect();
 
     let assignments = weighted_assignments

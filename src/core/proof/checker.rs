@@ -129,20 +129,41 @@ fn check_premise(formula: &Expr, premises: &[String]) -> Result<Expr, String> {
     Err(format!("formula not found in premises: {}", formula))
 }
 
-fn check_universal_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
-    let source_idx = step.from.get(0).copied()
+fn check_universal_elim(
+    formula: &Expr,
+    step: &ProofStep,
+    prior: &PriorSteps,
+) -> Result<Expr, String> {
+    let source_idx = step
+        .from
+        .get(0)
+        .copied()
         .ok_or("universal_elim requires a source step")?;
-    let source = prior.get(source_idx.saturating_sub(1))
+    let source = prior
+        .get(source_idx.saturating_sub(1))
         .ok_or(format!("step {} not yet derived", source_idx))?;
 
     let (var, var_type, body) = match source {
-        Expr::ForAll { var, var_type, body, .. } => (var, var_type, body),
-        _ => return Err(format!("universal_elim source must be ForAll, got: {}", source)),
+        Expr::ForAll {
+            var,
+            var_type,
+            body,
+            ..
+        } => (var, var_type, body),
+        _ => {
+            return Err(format!(
+                "universal_elim source must be ForAll, got: {}",
+                source
+            ))
+        }
     };
 
-    let subst = step.substitution.as_ref()
+    let subst = step
+        .substitution
+        .as_ref()
         .ok_or("universal_elim requires substitution")?;
-    let term = subst.get(var)
+    let term = subst
+        .get(var)
         .ok_or(format!("substitution must map variable '{}'", var))?;
 
     let substituted = if var_type == "s" {
@@ -155,56 +176,95 @@ fn check_universal_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) ->
     if expr_eq(formula, &substituted) {
         Ok(formula.clone())
     } else {
-        Err(format!("universal_elim: expected {}, got {}", substituted, formula))
+        Err(format!(
+            "universal_elim: expected {}, got {}",
+            substituted, formula
+        ))
     }
 }
 
-fn check_modus_ponens(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
+fn check_modus_ponens(
+    formula: &Expr,
+    step: &ProofStep,
+    prior: &PriorSteps,
+) -> Result<Expr, String> {
     if step.from.len() != 2 {
         return Err("modus_ponens requires exactly 2 source steps".into());
     }
-    let a = prior.get(step.from[0].saturating_sub(1))
+    let a = prior
+        .get(step.from[0].saturating_sub(1))
         .ok_or(format!("step {} not yet derived", step.from[0]))?;
-    let implication = prior.get(step.from[1].saturating_sub(1))
+    let implication = prior
+        .get(step.from[1].saturating_sub(1))
         .ok_or(format!("step {} not yet derived", step.from[1]))?;
 
     let (ante, cons) = match implication {
         Expr::Implies { ante, cons } => (ante, cons),
-        _ => return Err(format!("modus_ponens: second source must be implication, got: {}", implication)),
+        _ => {
+            return Err(format!(
+                "modus_ponens: second source must be implication, got: {}",
+                implication
+            ))
+        }
     };
 
     if !expr_eq(a, ante) {
-        return Err(format!("modus_ponens: antecedent mismatch. expected: {}, got: {}", ante, a));
+        return Err(format!(
+            "modus_ponens: antecedent mismatch. expected: {}, got: {}",
+            ante, a
+        ));
     }
 
     if expr_eq(formula, cons) {
         Ok(formula.clone())
     } else {
-        Err(format!("modus_ponens: expected conclusion {}, got {}", cons, formula))
+        Err(format!(
+            "modus_ponens: expected conclusion {}, got {}",
+            cons, formula
+        ))
     }
 }
 
-fn check_existential_intro(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
-    let source_idx = step.from.get(0).copied()
+fn check_existential_intro(
+    formula: &Expr,
+    step: &ProofStep,
+    prior: &PriorSteps,
+) -> Result<Expr, String> {
+    let source_idx = step
+        .from
+        .get(0)
+        .copied()
         .ok_or("existential_intro requires a source step")?;
-    let source = prior.get(source_idx.saturating_sub(1))
+    let source = prior
+        .get(source_idx.saturating_sub(1))
         .ok_or(format!("step {} not yet derived", source_idx))?;
 
     let (var, body) = match formula {
         Expr::Exists { var, body, .. } => (var, body),
-        _ => return Err(format!("existential_intro target must be Exists, got: {}", formula)),
+        _ => {
+            return Err(format!(
+                "existential_intro target must be Exists, got: {}",
+                formula
+            ))
+        }
     };
 
-    let subst = step.substitution.as_ref()
+    let subst = step
+        .substitution
+        .as_ref()
         .ok_or("existential_intro requires substitution")?;
-    let term = subst.get(var)
+    let term = subst
+        .get(var)
         .ok_or(format!("substitution must map variable '{}'", var))?;
 
     let substituted = substitute_var_to_entity(*body.clone(), var, term);
     if expr_eq(source, &substituted) {
         Ok(formula.clone())
     } else {
-        Err(format!("existential_intro: source {} does not match {} with {}->{}", source, substituted, var, term))
+        Err(format!(
+            "existential_intro: source {} does not match {} with {}->{}",
+            source, substituted, var, term
+        ))
     }
 }
 
@@ -212,23 +272,32 @@ fn check_and_intro(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Resu
     if step.from.len() != 2 {
         return Err("and_intro requires exactly 2 source steps".into());
     }
-    let a = prior.get(step.from[0].saturating_sub(1))
+    let a = prior
+        .get(step.from[0].saturating_sub(1))
         .ok_or(format!("step {} not yet derived", step.from[0]))?;
-    let b = prior.get(step.from[1].saturating_sub(1))
+    let b = prior
+        .get(step.from[1].saturating_sub(1))
         .ok_or(format!("step {} not yet derived", step.from[1]))?;
 
     let expected = Expr::And(Box::new(a.clone()), Box::new(b.clone()));
     if expr_eq(formula, &expected) {
         Ok(formula.clone())
     } else {
-        Err(format!("and_intro: expected {} ∧ {} = {}, got {}", a, b, expected, formula))
+        Err(format!(
+            "and_intro: expected {} ∧ {} = {}, got {}",
+            a, b, expected, formula
+        ))
     }
 }
 
 fn check_and_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
-    let source_idx = step.from.get(0).copied()
+    let source_idx = step
+        .from
+        .get(0)
+        .copied()
         .ok_or("and_elim requires a source step")?;
-    let source = prior.get(source_idx.saturating_sub(1))
+    let source = prior
+        .get(source_idx.saturating_sub(1))
         .ok_or(format!("step {} not yet derived", source_idx))?;
 
     match source {
@@ -238,7 +307,10 @@ fn check_and_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Resul
             } else if expr_eq(formula, right) {
                 Ok(formula.clone())
             } else {
-                Err(format!("and_elim: formula {} matches neither {} nor {}", formula, left, right))
+                Err(format!(
+                    "and_elim: formula {} matches neither {} nor {}",
+                    formula, left, right
+                ))
             }
         }
         _ => Err(format!("and_elim source must be And, got: {}", source)),
@@ -246,9 +318,13 @@ fn check_and_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Resul
 }
 
 fn check_and_elim_l(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
-    let source_idx = step.from.get(0).copied()
+    let source_idx = step
+        .from
+        .get(0)
+        .copied()
         .ok_or("and_elim_l requires a source step")?;
-    let source = prior.get(source_idx.saturating_sub(1))
+    let source = prior
+        .get(source_idx.saturating_sub(1))
         .ok_or(format!("step {} not yet derived", source_idx))?;
 
     match source {
@@ -256,7 +332,10 @@ fn check_and_elim_l(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Res
             if expr_eq(formula, left) {
                 Ok(formula.clone())
             } else {
-                Err(format!("and_elim_l: expected left conjunct {}, got {}", left, formula))
+                Err(format!(
+                    "and_elim_l: expected left conjunct {}, got {}",
+                    left, formula
+                ))
             }
         }
         _ => Err(format!("and_elim_l source must be And, got: {}", source)),
@@ -264,9 +343,13 @@ fn check_and_elim_l(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Res
 }
 
 fn check_and_elim_r(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
-    let source_idx = step.from.get(0).copied()
+    let source_idx = step
+        .from
+        .get(0)
+        .copied()
         .ok_or("and_elim_r requires a source step")?;
-    let source = prior.get(source_idx.saturating_sub(1))
+    let source = prior
+        .get(source_idx.saturating_sub(1))
         .ok_or(format!("step {} not yet derived", source_idx))?;
 
     match source {
@@ -274,7 +357,10 @@ fn check_and_elim_r(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Res
             if expr_eq(formula, right) {
                 Ok(formula.clone())
             } else {
-                Err(format!("and_elim_r: expected right conjunct {}, got {}", right, formula))
+                Err(format!(
+                    "and_elim_r: expected right conjunct {}, got {}",
+                    right, formula
+                ))
             }
         }
         _ => Err(format!("and_elim_r source must be And, got: {}", source)),
@@ -285,61 +371,109 @@ fn check_belief_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Re
     if step.from.len() != 2 {
         return Err("belief_elim requires exactly 2 source steps".into());
     }
-    let say_form = prior.get(step.from[0].saturating_sub(1))
+    let say_form = prior
+        .get(step.from[0].saturating_sub(1))
         .ok_or(format!("step {} not yet derived", step.from[0]))?;
-    let believable_form = prior.get(step.from[1].saturating_sub(1))
+    let believable_form = prior
+        .get(step.from[1].saturating_sub(1))
         .ok_or(format!("step {} not yet derived", step.from[1]))?;
 
     let (agent, content) = match say_form {
         Expr::Pred { name, roles } if name == "say" => {
-            let agent = roles.iter().find(|(r, _)| r == "agent")
-                .ok_or("belief_elim: say predicate missing agent role")?.1.clone();
-            let content = roles.iter().find(|(r, _)| r == "content")
-                .ok_or("belief_elim: say predicate missing content role")?.1.clone();
+            let agent = roles
+                .iter()
+                .find(|(r, _)| r == "agent")
+                .ok_or("belief_elim: say predicate missing agent role")?
+                .1
+                .clone();
+            let content = roles
+                .iter()
+                .find(|(r, _)| r == "content")
+                .ok_or("belief_elim: say predicate missing content role")?
+                .1
+                .clone();
             (agent, content)
         }
-        _ => return Err(format!("belief_elim: first source must be say(...), got: {}", say_form)),
+        _ => {
+            return Err(format!(
+                "belief_elim: first source must be say(...), got: {}",
+                say_form
+            ))
+        }
     };
 
     let theme = match believable_form {
-        Expr::Pred { name, roles } if name == "believable" => {
-            roles.iter().find(|(r, _)| r == "theme")
-                .ok_or("belief_elim: believable predicate missing theme role")?.1.clone()
+        Expr::Pred { name, roles } if name == "believable" => roles
+            .iter()
+            .find(|(r, _)| r == "theme")
+            .ok_or("belief_elim: believable predicate missing theme role")?
+            .1
+            .clone(),
+        _ => {
+            return Err(format!(
+                "belief_elim: second source must be believable(...), got: {}",
+                believable_form
+            ))
         }
-        _ => return Err(format!("belief_elim: second source must be believable(...), got: {}", believable_form)),
     };
 
     if !expr_eq(&agent, &theme) {
-        return Err(format!("belief_elim: agent {} does not match believable theme {}", agent, theme));
+        return Err(format!(
+            "belief_elim: agent {} does not match believable theme {}",
+            agent, theme
+        ));
     }
 
     if expr_eq(formula, &content) {
         Ok(formula.clone())
     } else {
-        Err(format!("belief_elim: expected content {}, got {}", content, formula))
+        Err(format!(
+            "belief_elim: expected content {}, got {}",
+            content, formula
+        ))
     }
 }
 
 fn check_of_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
-    let source_idx = step.from.get(0).copied()
+    let source_idx = step
+        .from
+        .get(0)
+        .copied()
         .ok_or("of_elim requires a source step")?;
-    let source = prior.get(source_idx.saturating_sub(1))
+    let source = prior
+        .get(source_idx.saturating_sub(1))
         .ok_or(format!("step {} not yet derived", source_idx))?;
 
     let (name, roles) = match source {
         Expr::Pred { name, roles } => (name, roles),
-        _ => return Err(format!("of_elim source must be a predicate, got: {}", source)),
+        _ => {
+            return Err(format!(
+                "of_elim source must be a predicate, got: {}",
+                source
+            ))
+        }
     };
 
     if !name.ends_with("_of") {
-        return Err(format!("of_elim: predicate name must end with '_of', got: {}", name));
+        return Err(format!(
+            "of_elim: predicate name must end with '_of', got: {}",
+            name
+        ));
     }
     let base_name = name.strip_suffix("_of").unwrap();
 
-    let theme = roles.iter().find(|(r, _)| r == "theme")
-        .ok_or("of_elim: predicate missing theme role")?.1.clone();
-    let location = roles.iter().find(|(r, _)| r == "location")
-        .ok_or("of_elim: predicate missing location role")?.1.clone();
+    let theme = roles
+        .iter()
+        .find(|(r, _)| r == "theme")
+        .ok_or("of_elim: predicate missing theme role")?
+        .1
+        .clone();
+    let location = roles
+        .iter()
+        .find(|(r, _)| r == "location")
+        .ok_or("of_elim: predicate missing location role")?
+        .1
+        .clone();
 
     let expected = Expr::And(
         Box::new(Expr::Pred {
@@ -348,36 +482,64 @@ fn check_of_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result
         }),
         Box::new(Expr::Pred {
             name: "in".to_string(),
-            roles: vec![("theme".to_string(), theme), ("location".to_string(), location)],
+            roles: vec![
+                ("theme".to_string(), theme),
+                ("location".to_string(), location),
+            ],
         }),
     );
 
     if expr_eq(formula, &expected) {
         Ok(formula.clone())
     } else {
-        Err(format!("of_elim: expected {} ∧ in(...), got {}", base_name, formula))
+        Err(format!(
+            "of_elim: expected {} ∧ in(...), got {}",
+            base_name, formula
+        ))
     }
 }
 
 fn check_apply_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
-    let source_idx = step.from.get(0).copied()
+    let source_idx = step
+        .from
+        .get(0)
+        .copied()
         .ok_or("apply_elim requires a source step")?;
-    let source = prior.get(source_idx.saturating_sub(1))
+    let source = prior
+        .get(source_idx.saturating_sub(1))
         .ok_or(format!("step {} not yet derived", source_idx))?;
 
     let (pred_name, entity) = match source {
         Expr::Pred { name, roles } if name == "apply" => {
-            let pred_expr = roles.iter().find(|(r, _)| r == "predicate")
-                .ok_or("apply_elim: apply missing predicate role")?.1.clone();
-            let ent_expr = roles.iter().find(|(r, _)| r == "entity")
-                .ok_or("apply_elim: apply missing entity role")?.1.clone();
+            let pred_expr = roles
+                .iter()
+                .find(|(r, _)| r == "predicate")
+                .ok_or("apply_elim: apply missing predicate role")?
+                .1
+                .clone();
+            let ent_expr = roles
+                .iter()
+                .find(|(r, _)| r == "entity")
+                .ok_or("apply_elim: apply missing entity role")?
+                .1
+                .clone();
             let pred_name = match pred_expr {
                 Expr::Entity(s) => s,
-                other => return Err(format!("apply_elim: predicate must be an entity name, got: {}", other)),
+                other => {
+                    return Err(format!(
+                        "apply_elim: predicate must be an entity name, got: {}",
+                        other
+                    ))
+                }
             };
             (pred_name, ent_expr)
         }
-        _ => return Err(format!("apply_elim source must be apply(...), got: {}", source)),
+        _ => {
+            return Err(format!(
+                "apply_elim source must be apply(...), got: {}",
+                source
+            ))
+        }
     };
 
     let expected = Expr::Pred {
@@ -388,75 +550,166 @@ fn check_apply_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Res
     if expr_eq(formula, &expected) {
         Ok(formula.clone())
     } else {
-        Err(format!("apply_elim: expected {}, got {}", expected, formula))
+        Err(format!(
+            "apply_elim: expected {}, got {}",
+            expected, formula
+        ))
     }
 }
 
-fn check_exists_many_weaken(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
-    let source_idx = step.from.get(0).copied()
+fn check_exists_many_weaken(
+    formula: &Expr,
+    step: &ProofStep,
+    prior: &PriorSteps,
+) -> Result<Expr, String> {
+    let source_idx = step
+        .from
+        .get(0)
+        .copied()
         .ok_or("exists_many_weaken requires a source step")?;
-    let source = prior.get(source_idx.saturating_sub(1))
+    let source = prior
+        .get(source_idx.saturating_sub(1))
         .ok_or(format!("step {} not yet derived", source_idx))?;
 
     let (var1, var_type1, count1, body1) = match source {
-        Expr::ExistsMany { var, var_type, count, body } => (var, var_type, count, body),
-        _ => return Err(format!("exists_many_weaken source must be ExistsMany, got: {}", source)),
+        Expr::ExistsMany {
+            var,
+            var_type,
+            count,
+            body,
+        } => (var, var_type, count, body),
+        _ => {
+            return Err(format!(
+                "exists_many_weaken source must be ExistsMany, got: {}",
+                source
+            ))
+        }
     };
 
     let (var2, var_type2, count2, body2) = match formula {
-        Expr::ExistsMany { var, var_type, count, body } => (var, var_type, count, body),
-        _ => return Err(format!("exists_many_weaken target must be ExistsMany, got: {}", formula)),
+        Expr::ExistsMany {
+            var,
+            var_type,
+            count,
+            body,
+        } => (var, var_type, count, body),
+        _ => {
+            return Err(format!(
+                "exists_many_weaken target must be ExistsMany, got: {}",
+                formula
+            ))
+        }
     };
 
     if var1 != var2 {
-        return Err(format!("exists_many_weaken: variable mismatch: {} vs {}", var1, var2));
+        return Err(format!(
+            "exists_many_weaken: variable mismatch: {} vs {}",
+            var1, var2
+        ));
     }
     if var_type1 != var_type2 {
-        return Err(format!("exists_many_weaken: type mismatch: {} vs {}", var_type1, var_type2));
+        return Err(format!(
+            "exists_many_weaken: type mismatch: {} vs {}",
+            var_type1, var_type2
+        ));
     }
     if !expr_eq(body1, body2) {
         return Err(format!("exists_many_weaken: body mismatch"));
     }
 
-    let n1: i32 = count1.parse().map_err(|_| format!("exists_many_weaken: source count '{}' is not a number", count1))?;
-    let n2: i32 = count2.parse().map_err(|_| format!("exists_many_weaken: target count '{}' is not a number", count2))?;
+    let n1: i32 = count1.parse().map_err(|_| {
+        format!(
+            "exists_many_weaken: source count '{}' is not a number",
+            count1
+        )
+    })?;
+    let n2: i32 = count2.parse().map_err(|_| {
+        format!(
+            "exists_many_weaken: target count '{}' is not a number",
+            count2
+        )
+    })?;
 
     if n2 >= n1 {
-        return Err(format!("exists_many_weaken: target count {} must be less than source count {}", n2, n1));
+        return Err(format!(
+            "exists_many_weaken: target count {} must be less than source count {}",
+            n2, n1
+        ));
     }
 
     Ok(formula.clone())
 }
 
-fn check_quantifier_weaken(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
+fn check_quantifier_weaken(
+    formula: &Expr,
+    step: &ProofStep,
+    prior: &PriorSteps,
+) -> Result<Expr, String> {
     let hierarchy = ["most", "many", "several", "some", "few"];
-    
-    let source_idx = step.from.get(0).copied()
+
+    let source_idx = step
+        .from
+        .get(0)
+        .copied()
         .ok_or("quantifier_weaken requires a source step")?;
-    let source = prior.get(source_idx.saturating_sub(1))
+    let source = prior
+        .get(source_idx.saturating_sub(1))
         .ok_or(format!("step {} not yet derived", source_idx))?;
 
     let (var1, var_type1, count1, body1) = match source {
-        Expr::ExistsMany { var, var_type, count, body } => (var, var_type, count, body),
-        _ => return Err(format!("quantifier_weaken source must be ExistsMany with a vague quantifier, got: {}", source)),
+        Expr::ExistsMany {
+            var,
+            var_type,
+            count,
+            body,
+        } => (var, var_type, count, body),
+        _ => {
+            return Err(format!(
+                "quantifier_weaken source must be ExistsMany with a vague quantifier, got: {}",
+                source
+            ))
+        }
     };
 
     let (var2, var_type2, count2, body2) = match formula {
-        Expr::ExistsMany { var, var_type, count, body } => (var, var_type, count, body),
-        _ => return Err(format!("quantifier_weaken target must be ExistsMany with a vague quantifier, got: {}", formula)),
+        Expr::ExistsMany {
+            var,
+            var_type,
+            count,
+            body,
+        } => (var, var_type, count, body),
+        _ => {
+            return Err(format!(
+                "quantifier_weaken target must be ExistsMany with a vague quantifier, got: {}",
+                formula
+            ))
+        }
     };
 
     if var1 != var2 || var_type1 != var_type2 || !expr_eq(body1, body2) {
         return Err("quantifier_weaken: variable, type, or body mismatch".into());
     }
 
-    let pos1 = hierarchy.iter().position(|&q| q == count1.as_str())
-        .ok_or(format!("quantifier_weaken: source count '{}' not in hierarchy", count1))?;
-    let pos2 = hierarchy.iter().position(|&q| q == count2.as_str())
-        .ok_or(format!("quantifier_weaken: target count '{}' not in hierarchy", count2))?;
+    let pos1 = hierarchy
+        .iter()
+        .position(|&q| q == count1.as_str())
+        .ok_or(format!(
+            "quantifier_weaken: source count '{}' not in hierarchy",
+            count1
+        ))?;
+    let pos2 = hierarchy
+        .iter()
+        .position(|&q| q == count2.as_str())
+        .ok_or(format!(
+            "quantifier_weaken: target count '{}' not in hierarchy",
+            count2
+        ))?;
 
     if pos2 <= pos1 {
-        return Err(format!("quantifier_weaken: target '{}' must be weaker than source '{}'", count2, count1));
+        return Err(format!(
+            "quantifier_weaken: target '{}' must be weaker than source '{}'",
+            count2, count1
+        ));
     }
 
     Ok(formula.clone())
@@ -471,7 +724,10 @@ fn substitute_var_to_entity(expr: Expr, var: &str, term: &str) -> Expr {
         Expr::Entity(s) => Expr::Entity(s),
         Expr::Pred { name, roles } => Expr::Pred {
             name,
-            roles: roles.into_iter().map(|(r, e)| (r, substitute_var_to_entity(e, var, term))).collect(),
+            roles: roles
+                .into_iter()
+                .map(|(r, e)| (r, substitute_var_to_entity(e, var, term)))
+                .collect(),
         },
         Expr::Not(e) => Expr::Not(Box::new(substitute_var_to_entity(*e, var, term))),
         Expr::And(l, r) => Expr::And(
@@ -482,26 +738,67 @@ fn substitute_var_to_entity(expr: Expr, var: &str, term: &str) -> Expr {
             ante: Box::new(substitute_var_to_entity(*ante, var, term)),
             cons: Box::new(substitute_var_to_entity(*cons, var, term)),
         },
-        Expr::ForAll { var: v, var_type, body } => Expr::ForAll {
-            var: v, var_type, body: Box::new(substitute_var_to_entity(*body, var, term)),
+        Expr::ForAll {
+            var: v,
+            var_type,
+            body,
+        } => Expr::ForAll {
+            var: v,
+            var_type,
+            body: Box::new(substitute_var_to_entity(*body, var, term)),
         },
-        Expr::The { var: v, var_type, body } => Expr::The {
-            var: v, var_type, body: Box::new(substitute_var_to_entity(*body, var, term)),
+        Expr::The {
+            var: v,
+            var_type,
+            body,
+        } => Expr::The {
+            var: v,
+            var_type,
+            body: Box::new(substitute_var_to_entity(*body, var, term)),
         },
-        Expr::This { var: v, var_type, body } => Expr::This {
-            var: v, var_type, body: Box::new(substitute_var_to_entity(*body, var, term)),
+        Expr::This {
+            var: v,
+            var_type,
+            body,
+        } => Expr::This {
+            var: v,
+            var_type,
+            body: Box::new(substitute_var_to_entity(*body, var, term)),
         },
-        Expr::That { var: v, var_type, body } => Expr::That {
-            var: v, var_type, body: Box::new(substitute_var_to_entity(*body, var, term)),
+        Expr::That {
+            var: v,
+            var_type,
+            body,
+        } => Expr::That {
+            var: v,
+            var_type,
+            body: Box::new(substitute_var_to_entity(*body, var, term)),
         },
-        Expr::Exists { var: v, var_type, body, count } => Expr::Exists {
-            var: v, var_type, body: Box::new(substitute_var_to_entity(*body, var, term)), count,
+        Expr::Exists {
+            var: v,
+            var_type,
+            body,
+            count,
+        } => Expr::Exists {
+            var: v,
+            var_type,
+            body: Box::new(substitute_var_to_entity(*body, var, term)),
+            count,
         },
-        Expr::ExistsMany { var: v, var_type, count, body } => Expr::ExistsMany {
-            var: v, var_type, count, body: Box::new(substitute_var_to_entity(*body, var, term)),
+        Expr::ExistsMany {
+            var: v,
+            var_type,
+            count,
+            body,
+        } => Expr::ExistsMany {
+            var: v,
+            var_type,
+            count,
+            body: Box::new(substitute_var_to_entity(*body, var, term)),
         },
         Expr::Question { label, body } => Expr::Question {
-            label, body: Box::new(substitute_var_to_entity(*body, var, term)),
+            label,
+            body: Box::new(substitute_var_to_entity(*body, var, term)),
         },
     }
 }
@@ -516,7 +813,10 @@ fn substitute_var(expr: Expr, var: &str, replacement: Expr) -> Expr {
         Expr::Entity(s) => Expr::Entity(s),
         Expr::Pred { name, roles } => Expr::Pred {
             name,
-            roles: roles.into_iter().map(|(r, e)| (r, substitute_var(e, var, replacement.clone()))).collect(),
+            roles: roles
+                .into_iter()
+                .map(|(r, e)| (r, substitute_var(e, var, replacement.clone())))
+                .collect(),
         },
         Expr::Not(e) => Expr::Not(Box::new(substitute_var(*e, var, replacement))),
         Expr::And(l, r) => Expr::And(
@@ -527,26 +827,67 @@ fn substitute_var(expr: Expr, var: &str, replacement: Expr) -> Expr {
             ante: Box::new(substitute_var(*ante, var, replacement.clone())),
             cons: Box::new(substitute_var(*cons, var, replacement)),
         },
-        Expr::ForAll { var: v, var_type, body } => Expr::ForAll {
-            var: v, var_type, body: Box::new(substitute_var(*body, var, replacement)),
+        Expr::ForAll {
+            var: v,
+            var_type,
+            body,
+        } => Expr::ForAll {
+            var: v,
+            var_type,
+            body: Box::new(substitute_var(*body, var, replacement)),
         },
-        Expr::The { var: v, var_type, body } => Expr::The {
-            var: v, var_type, body: Box::new(substitute_var(*body, var, replacement)),
+        Expr::The {
+            var: v,
+            var_type,
+            body,
+        } => Expr::The {
+            var: v,
+            var_type,
+            body: Box::new(substitute_var(*body, var, replacement)),
         },
-        Expr::This { var: v, var_type, body } => Expr::This {
-            var: v, var_type, body: Box::new(substitute_var(*body, var, replacement)),
+        Expr::This {
+            var: v,
+            var_type,
+            body,
+        } => Expr::This {
+            var: v,
+            var_type,
+            body: Box::new(substitute_var(*body, var, replacement)),
         },
-        Expr::That { var: v, var_type, body } => Expr::That {
-            var: v, var_type, body: Box::new(substitute_var(*body, var, replacement)),
+        Expr::That {
+            var: v,
+            var_type,
+            body,
+        } => Expr::That {
+            var: v,
+            var_type,
+            body: Box::new(substitute_var(*body, var, replacement)),
         },
-        Expr::Exists { var: v, var_type, body, count } => Expr::Exists {
-            var: v, var_type, body: Box::new(substitute_var(*body, var, replacement)), count,
+        Expr::Exists {
+            var: v,
+            var_type,
+            body,
+            count,
+        } => Expr::Exists {
+            var: v,
+            var_type,
+            body: Box::new(substitute_var(*body, var, replacement)),
+            count,
         },
-        Expr::ExistsMany { var: v, var_type, count, body } => Expr::ExistsMany {
-            var: v, var_type, count, body: Box::new(substitute_var(*body, var, replacement)),
+        Expr::ExistsMany {
+            var: v,
+            var_type,
+            count,
+            body,
+        } => Expr::ExistsMany {
+            var: v,
+            var_type,
+            count,
+            body: Box::new(substitute_var(*body, var, replacement)),
         },
         Expr::Question { label, body } => Expr::Question {
-            label, body: Box::new(substitute_var(*body, var, replacement)),
+            label,
+            body: Box::new(substitute_var(*body, var, replacement)),
         },
     }
 }
@@ -554,21 +895,116 @@ fn substitute_var(expr: Expr, var: &str, replacement: Expr) -> Expr {
 /// Structural equality on Expr.
 fn expr_eq(a: &Expr, b: &Expr) -> bool {
     match (a, b) {
-        (Expr::Pred { name: n1, roles: r1 }, Expr::Pred { name: n2, roles: r2 }) => {
-            n1 == n2 && r1.len() == r2.len() && r1.iter().zip(r2.iter()).all(|((r1, e1), (r2, e2))| r1 == r2 && expr_eq(e1, e2))
+        (
+            Expr::Pred {
+                name: n1,
+                roles: r1,
+            },
+            Expr::Pred {
+                name: n2,
+                roles: r2,
+            },
+        ) => {
+            n1 == n2
+                && r1.len() == r2.len()
+                && r1
+                    .iter()
+                    .zip(r2.iter())
+                    .all(|((r1, e1), (r2, e2))| r1 == r2 && expr_eq(e1, e2))
         }
         (Expr::Not(e1), Expr::Not(e2)) => expr_eq(e1, e2),
         (Expr::And(l1, r1), Expr::And(l2, r2)) => expr_eq(l1, l2) && expr_eq(r1, r2),
-        (Expr::Implies { ante: a1, cons: c1 }, Expr::Implies { ante: a2, cons: c2 }) => expr_eq(a1, a2) && expr_eq(c1, c2),
-        (Expr::ForAll { var: v1, var_type: t1, body: b1 }, Expr::ForAll { var: v2, var_type: t2, body: b2 }) => v1 == v2 && t1 == t2 && expr_eq(b1, b2),
-        (Expr::The { var: v1, var_type: t1, body: b1 }, Expr::The { var: v2, var_type: t2, body: b2 }) => v1 == v2 && t1 == t2 && expr_eq(b1, b2),
-        (Expr::This { var: v1, var_type: t1, body: b1 }, Expr::This { var: v2, var_type: t2, body: b2 }) => v1 == v2 && t1 == t2 && expr_eq(b1, b2),
-        (Expr::That { var: v1, var_type: t1, body: b1 }, Expr::That { var: v2, var_type: t2, body: b2 }) => v1 == v2 && t1 == t2 && expr_eq(b1, b2),
-        (Expr::Exists { var: v1, var_type: t1, body: b1, count: c1 }, Expr::Exists { var: v2, var_type: t2, body: b2, count: c2 }) => v1 == v2 && t1 == t2 && expr_eq(b1, b2) && c1 == c2,
-        (Expr::ExistsMany { var: v1, var_type: t1, count: c1, body: b1 }, Expr::ExistsMany { var: v2, var_type: t2, count: c2, body: b2 }) => v1 == v2 && t1 == t2 && c1 == c2 && expr_eq(b1, b2),
+        (Expr::Implies { ante: a1, cons: c1 }, Expr::Implies { ante: a2, cons: c2 }) => {
+            expr_eq(a1, a2) && expr_eq(c1, c2)
+        }
+        (
+            Expr::ForAll {
+                var: v1,
+                var_type: t1,
+                body: b1,
+            },
+            Expr::ForAll {
+                var: v2,
+                var_type: t2,
+                body: b2,
+            },
+        ) => v1 == v2 && t1 == t2 && expr_eq(b1, b2),
+        (
+            Expr::The {
+                var: v1,
+                var_type: t1,
+                body: b1,
+            },
+            Expr::The {
+                var: v2,
+                var_type: t2,
+                body: b2,
+            },
+        ) => v1 == v2 && t1 == t2 && expr_eq(b1, b2),
+        (
+            Expr::This {
+                var: v1,
+                var_type: t1,
+                body: b1,
+            },
+            Expr::This {
+                var: v2,
+                var_type: t2,
+                body: b2,
+            },
+        ) => v1 == v2 && t1 == t2 && expr_eq(b1, b2),
+        (
+            Expr::That {
+                var: v1,
+                var_type: t1,
+                body: b1,
+            },
+            Expr::That {
+                var: v2,
+                var_type: t2,
+                body: b2,
+            },
+        ) => v1 == v2 && t1 == t2 && expr_eq(b1, b2),
+        (
+            Expr::Exists {
+                var: v1,
+                var_type: t1,
+                body: b1,
+                count: c1,
+            },
+            Expr::Exists {
+                var: v2,
+                var_type: t2,
+                body: b2,
+                count: c2,
+            },
+        ) => v1 == v2 && t1 == t2 && expr_eq(b1, b2) && c1 == c2,
+        (
+            Expr::ExistsMany {
+                var: v1,
+                var_type: t1,
+                count: c1,
+                body: b1,
+            },
+            Expr::ExistsMany {
+                var: v2,
+                var_type: t2,
+                count: c2,
+                body: b2,
+            },
+        ) => v1 == v2 && t1 == t2 && c1 == c2 && expr_eq(b1, b2),
         (Expr::Var { name: n1, .. }, Expr::Var { name: n2, .. }) => n1 == n2,
         (Expr::Entity(s1), Expr::Entity(s2)) => s1 == s2,
-        (Expr::Question { label: l1, body: b1 }, Expr::Question { label: l2, body: b2 }) => l1 == l2 && expr_eq(b1, b2),
+        (
+            Expr::Question {
+                label: l1,
+                body: b1,
+            },
+            Expr::Question {
+                label: l2,
+                body: b2,
+            },
+        ) => l1 == l2 && expr_eq(b1, b2),
         _ => false,
     }
 }
@@ -577,12 +1013,7 @@ fn expr_eq(a: &Expr, b: &Expr) -> bool {
 mod tests {
     use super::*;
 
-    fn proof_step(
-        step: usize,
-        formula: &str,
-        justification: &str,
-        from: Vec<usize>,
-    ) -> ProofStep {
+    fn proof_step(step: usize, formula: &str, justification: &str, from: Vec<usize>) -> ProofStep {
         ProofStep {
             step,
             formula: formula.to_string(),
@@ -638,12 +1069,7 @@ mod tests {
             title: "bad numbering".to_string(),
             premises: vec!["man(theme: socrates)".to_string()],
             conclusion: "man(theme: socrates)".to_string(),
-            proof: vec![proof_step(
-                2,
-                "man(theme: socrates)",
-                "premise",
-                vec![],
-            )],
+            proof: vec![proof_step(2, "man(theme: socrates)", "premise", vec![])],
         };
 
         let error = check_proof(&file).unwrap_err();
@@ -676,12 +1102,7 @@ mod tests {
             title: "valid".to_string(),
             premises: vec!["man(theme: socrates)".to_string()],
             conclusion: "man(theme: socrates)".to_string(),
-            proof: vec![proof_step(
-                1,
-                "man(theme: socrates)",
-                "premise",
-                vec![],
-            )],
+            proof: vec![proof_step(1, "man(theme: socrates)", "premise", vec![])],
         };
 
         let result = check_proof(&file).unwrap();
@@ -735,12 +1156,19 @@ mod tests {
 
     #[test]
     fn exists_many_weaken_3_to_2() {
-        let source = semantics::parse("exists_many [x:e, 3]: man(theme: x) ∧ in(theme: x, location: the_house)").unwrap();
-        let target = semantics::parse("exists_many [x:e, 2]: man(theme: x) ∧ in(theme: x, location: the_house)").unwrap();
+        let source = semantics::parse(
+            "exists_many [x:e, 3]: man(theme: x) ∧ in(theme: x, location: the_house)",
+        )
+        .unwrap();
+        let target = semantics::parse(
+            "exists_many [x:e, 2]: man(theme: x) ∧ in(theme: x, location: the_house)",
+        )
+        .unwrap();
         let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
-            formula: "exists_many [x:e, 2]: man(theme: x) ∧ in(theme: x, location: the_house)".to_string(),
+            formula: "exists_many [x:e, 2]: man(theme: x) ∧ in(theme: x, location: the_house)"
+                .to_string(),
             justification: "exists_many_weaken".to_string(),
             from: vec![1],
             substitution: None,
@@ -783,8 +1211,10 @@ mod tests {
 
     #[test]
     fn quantifier_weaken_most_to_many() {
-        let source = semantics::parse("exists_many [x:e, most]: man(theme: x) ∧ mortal(theme: x)").unwrap();
-        let target = semantics::parse("exists_many [x:e, many]: man(theme: x) ∧ mortal(theme: x)").unwrap();
+        let source =
+            semantics::parse("exists_many [x:e, most]: man(theme: x) ∧ mortal(theme: x)").unwrap();
+        let target =
+            semantics::parse("exists_many [x:e, many]: man(theme: x) ∧ mortal(theme: x)").unwrap();
         let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,

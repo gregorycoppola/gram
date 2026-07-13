@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-use super::kb::KnowledgeBase;
 use super::bp::cpt_prob_true;
+use super::kb::KnowledgeBase;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -288,7 +288,7 @@ impl QBBNGraph {
     ) -> String {
         let is_negated = is_negated_formula(&conclusion_formula);
         let pos_formula = get_positive_formula(&conclusion_formula);
-        
+
         let mut premise_ids = Vec::new();
         let mut premise_negated = Vec::new();
         for f in &premise_formulas {
@@ -300,7 +300,7 @@ impl QBBNGraph {
                 premise_negated.push(false);
             }
         }
-        
+
         let conc_id = self.add_proposition(&pos_formula);
         let group_id = self.add_group(premise_ids.clone(), conc_id.clone(), rule_id, is_negated);
         self.add_and_factor(premise_ids, premise_negated, group_id.clone());
@@ -470,17 +470,30 @@ impl QBBNGraph {
         }
         rules.sort_by(|a, b| a.id.cmp(&b.id));
 
-        let mut formula_map: Vec<(String, String)> = self.formula_to_id.iter()
+        let mut formula_map: Vec<(String, String)> = self
+            .formula_to_id
+            .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
         formula_map.sort_by(|a, b| a.1.cmp(&b.1));
 
         let mut cpt_tables = Vec::new();
         for (id, factor) in &self.factors {
-            let input_labels: Vec<String> = factor.input_ids.iter().map(|i| {
-                self.variables.get(i).and_then(|v| v.formula.clone()).unwrap_or_else(|| i.clone())
-            }).collect();
-            let output_label = self.variables.get(&factor.output_id).and_then(|v| v.formula.clone()).unwrap_or_else(|| factor.output_id.clone());
+            let input_labels: Vec<String> = factor
+                .input_ids
+                .iter()
+                .map(|i| {
+                    self.variables
+                        .get(i)
+                        .and_then(|v| v.formula.clone())
+                        .unwrap_or_else(|| i.clone())
+                })
+                .collect();
+            let output_label = self
+                .variables
+                .get(&factor.output_id)
+                .and_then(|v| v.formula.clone())
+                .unwrap_or_else(|| factor.output_id.clone());
 
             if factor.factor_type == FactorType::Or {
                 let n = factor.input_ids.len();
@@ -536,7 +549,13 @@ impl QBBNGraph {
         }
         cpt_tables.sort_by(|a, b| a.factor_id.cmp(&b.factor_id));
 
-        GraphSnapshot { nodes, edges, rules, formula_map, cpt_tables }
+        GraphSnapshot {
+            nodes,
+            edges,
+            rules,
+            formula_map,
+            cpt_tables,
+        }
     }
 }
 

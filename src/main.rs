@@ -2,7 +2,10 @@ use anyhow::Result;
 use clap::Parser;
 
 #[derive(Parser)]
-#[command(name = "gram", about = "Typed slot grammar parser for natural language")]
+#[command(
+    name = "gram",
+    about = "Typed slot grammar parser for natural language"
+)]
 struct Cli {
     #[command(subcommand)]
     command: gram::cli::Command,
