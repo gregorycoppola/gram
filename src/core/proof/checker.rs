@@ -261,8 +261,7 @@ fn check_existential_intro(
         .get(var)
         .ok_or(format!("substitution must map variable '{}'", var))?;
 
-    let substituted =
-        shared_substitute_var_with_entity(body, var, term);
+    let substituted = shared_substitute_var_with_entity(body, var, term);
     if expr_eq(source, &substituted) {
         Ok(formula.clone())
     } else {
