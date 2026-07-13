@@ -1,0 +1,26 @@
+{
+  "title": "Complementary positive and negative rules",
+  "rules": [
+    {
+      "formula": "active(theme: switch) -> lit(theme: lamp)",
+      "weight": 2
+    },
+    {
+      "formula": "not active(theme: switch) -> not lit(theme: lamp)",
+      "weight": 2
+    }
+  ],
+  "evidence": [
+    {
+      "formula": "active(theme: switch)",
+      "prob": 0.25
+    }
+  ],
+  "queries": [
+    {
+      "formula": "lit(theme: lamp)",
+      "expected_prob": 0.309601,
+      "tolerance": 0.000001
+    }
+  ]
+}
