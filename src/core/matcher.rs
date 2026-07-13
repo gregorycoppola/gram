@@ -12,7 +12,7 @@ use crate::core::grammar::Rule;
 use crate::core::lexicon::Lexicon;
 use crate::core::value::VarGen;
 
-use engine::try_pattern_match;
+use engine::try_pattern_matches;
 use tree::span_result_to_match;
 use types::{SpanCache, SpanKey, SpanResult};
 
@@ -245,7 +245,7 @@ fn parse_bottom_up(
         };
         let span_tokens = &sentence.tokens[span.start..span.end];
 
-        let direct_children: Vec<SpanKey> = sentence
+        let mut direct_children: Vec<SpanKey> = sentence
             .spans
             .iter()
             .filter_map(|s| {
@@ -266,6 +266,7 @@ fn parse_bottom_up(
                 }
             })
             .collect();
+        direct_children.sort_by_key(|child| (child.start, child.end, child.label.clone()));
 
         if let Some(t) = &mut trace {
             t.enter(&format!(
@@ -279,10 +280,11 @@ fn parse_bottom_up(
             t.push(&format!("tokens: {:?}", span_tokens));
         }
 
-        let result = match_span(
+        let results = match_span(
             span_tokens,
             span.start,
             span,
+            &direct_children,
             lexicon,
             rules,
             &mut var_gen,
@@ -291,19 +293,22 @@ fn parse_bottom_up(
         )?;
 
         if let Some(t) = &mut trace {
-            t.push(&format!(
-                "→ {} [{}: {}]",
-                result.output, result.rule_name, result.pattern
-            ));
+            t.push(&format!("→ {} derivation(s)", results.len()));
+            for result in &results {
+                t.push(&format!(
+                    "  {} [{}: {}]",
+                    result.output, result.rule_name, result.pattern
+                ));
+            }
             t.leave();
         }
 
-        cache.insert(key, vec![result]);
+        cache.insert(key, results);
     }
 
     if top_level_keys.len() == 1 {
         let key = &top_level_keys[0];
-        let result = cache.get(key).unwrap().first().unwrap();
+        let results = cache.get(key).unwrap();
         let span = sentence
             .spans
             .iter()
@@ -315,8 +320,11 @@ fn parse_bottom_up(
                 } == *key
             })
             .unwrap();
-        let m = span_result_to_match(result, span, &sentence.tokens);
-        Ok(vec![m])
+
+        Ok(results
+            .iter()
+            .map(|result| span_result_to_match(result, span, &sentence.tokens))
+            .collect())
     } else {
         return Err(format!(
             "expected exactly one top-level span, found {}: {}",
@@ -334,28 +342,33 @@ fn match_span(
     span_tokens: &[String],
     global_start: usize,
     span: &Span,
+    direct_children: &[SpanKey],
     lexicon: &Lexicon,
     rules: &[Rule],
     var_gen: &mut VarGen,
     cache: &SpanCache,
     trace: Option<&mut DebugTrace>,
-) -> Result<SpanResult, String> {
-    try_pattern_match(
+) -> Result<Vec<SpanResult>, String> {
+    let results = try_pattern_matches(
         span_tokens,
         global_start,
         span,
+        direct_children,
         lexicon,
         rules,
         var_gen,
         cache,
         trace,
-    )
-    .ok_or_else(|| {
-        format!(
+    )?;
+
+    if results.is_empty() {
+        Err(format!(
             "span [{}] tokens[{}..{}] ({:?}): no matching rule",
             span.label, span.start, span.end, span_tokens
-        )
-    })
+        ))
+    } else {
+        Ok(results)
+    }
 }
 
 #[cfg(test)]

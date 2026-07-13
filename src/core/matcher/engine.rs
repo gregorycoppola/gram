@@ -1,5 +1,5 @@
 // gram/src/core/matcher/engine.rs
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use crate::core::construct::{apply_constructor, Arg};
 use crate::core::fixture::Span;
@@ -14,80 +14,118 @@ use super::types::*;
 
 // --- Pattern matching (cache-aware) ---
 
-pub fn try_pattern_match(
+const MAX_DERIVATIONS_PER_SPAN: usize = 10_000;
+
+#[derive(Debug, Clone)]
+struct PatternMatch {
+    bindings: BTreeMap<String, (String, String)>,
+    log: Vec<Consumption>,
+    constituents: Vec<Constituent>,
+    child_derivation_keys: Vec<String>,
+}
+
+pub fn try_pattern_matches(
     tokens: &[String],
     global_offset: usize,
     span: &Span,
+    direct_children: &[SpanKey],
     lexicon: &Lexicon,
     rules: &[Rule],
     var_gen: &mut VarGen,
-    cache: &HashMap<SpanKey, SpanResult>,
+    cache: &SpanCache,
     mut trace: Option<&mut DebugTrace>,
-) -> Option<SpanResult> {
+) -> Result<Vec<SpanResult>, String> {
     let filter = sub_filter_for_label(&span.label);
+    let base_var_gen = var_gen.clone();
+    let mut maximum_position = base_var_gen.position();
+    let mut results = Vec::new();
 
     if let Some(t) = &mut trace {
         t.enter(&format!(
-            "pattern match [{}] (filter: {})",
+            "pattern match [{}] (filter: {}, direct children: {})",
             span.label,
-            filter_label(&filter)
+            filter_label(&filter),
+            direct_children.len()
         ));
     }
 
     for rule in rules {
         match &filter {
             KindFilter::Any => {}
-            KindFilter::Only(k) if rule.kind != *k => continue,
+            KindFilter::Only(kind) if rule.kind != *kind => continue,
             KindFilter::Only(_) => {}
         }
+
         if let Some(t) = &mut trace {
             t.push(&format!(
                 "try: {} (kind: {}): {}",
                 rule.name, rule.kind, rule.pattern_str
             ));
         }
-        let bindings = BTreeMap::new();
-        let log: Vec<Consumption> = Vec::new();
-        let constituents = Vec::new();
-        if let Some((b, log, constituents)) = match_pattern(
+
+        let matches = match_pattern(
             &rule.pattern,
             0,
             tokens,
             0,
-            bindings,
-            log,
+            BTreeMap::new(),
+            Vec::new(),
             lexicon,
-            rules,
             0,
-            constituents,
-            &filter,
-            var_gen,
+            Vec::new(),
+            Vec::new(),
+            0,
+            direct_children,
             cache,
             global_offset,
-        ) {
+        );
+
+        if matches.is_empty() {
+            if let Some(t) = &mut trace {
+                t.push("  ✗ pattern didn't match");
+            }
+            continue;
+        }
+
+        for pattern_match in matches {
+            let PatternMatch {
+                bindings,
+                log,
+                constituents,
+                child_derivation_keys,
+            } = pattern_match;
+
             let local_annotations = annotate_tokens(tokens, &log);
             let global_constituents = offset_constituents(&constituents, global_offset);
+            let mut branch_var_gen = base_var_gen.clone();
 
             let (output, sem_value) = if let Some(ref sem_spec) = rule.sem {
-                match resolve_and_construct(sem_spec, &b, &constituents, var_gen) {
-                    Ok((sv, out)) => (out, Some(sv)),
-                    Err(e) => {
+                match resolve_and_construct(sem_spec, &bindings, &constituents, &mut branch_var_gen)
+                {
+                    Ok((sem_value, output)) => (output, Some(sem_value)),
+                    Err(error) => {
                         if let Some(t) = &mut trace {
-                            t.push(&format!("  ✗ sem construct failed: {}", e));
+                            t.push(&format!("  ✗ sem construct failed: {}", error));
                         }
                         continue;
                     }
                 }
             } else {
-                let out = apply_template(&rule.template, &b);
-                (out, None)
+                (apply_template(&rule.template, &bindings), None)
             };
+
+            maximum_position = maximum_position.max(branch_var_gen.position());
+
+            let derivation_key = format!(
+                "{}|{}|{:?}|{:?}",
+                rule.name, rule.pattern_str, bindings, child_derivation_keys
+            );
 
             if let Some(t) = &mut trace {
                 t.push(&format!("  ✓ → {}", output));
             }
 
-            return Some(SpanResult {
+            results.push(SpanResult {
                 sem_value: sem_value.unwrap_or_else(|| {
                     SemValue::Prop(crate::core::logic::Expr::Entity("_no_sem".into()))
                 }),
@@ -95,370 +133,386 @@ pub fn try_pattern_match(
                 rule_name: rule.name.clone(),
                 pattern: rule.pattern_str.clone(),
                 kind: rule.kind.clone(),
-                bindings: b,
+                bindings,
                 token_annotations: local_annotations,
                 constituents: global_constituents,
+                derivation_key,
             });
-        } else {
-            if let Some(t) = &mut trace {
-                t.push("  ✗ pattern didn't match");
+
+            if results.len() > MAX_DERIVATIONS_PER_SPAN {
+                return Err(format!(
+                    "span [{}] tokens[{}..{}] exceeded the derivation limit of {}",
+                    span.label, span.start, span.end, MAX_DERIVATIONS_PER_SPAN
+                ));
             }
         }
     }
 
+    results.sort_by(|left, right| {
+        left.derivation_key
+            .cmp(&right.derivation_key)
+            .then_with(|| left.output.cmp(&right.output))
+    });
+    results.dedup_by(|left, right| left.derivation_key == right.derivation_key);
+
+    var_gen.advance_to(maximum_position);
+
     if let Some(t) = &mut trace {
-        t.push("NO PATTERN MATCH");
+        if results.is_empty() {
+            t.push("NO PATTERN MATCH");
+        } else {
+            t.push(&format!("{} derivation(s)", results.len()));
+        }
         t.leave();
     }
 
-    None
+    Ok(results)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn match_pattern(
     pattern: &[Slot],
-    pi: usize,
+    pattern_index: usize,
     tokens: &[String],
-    ti: usize,
+    token_index: usize,
     bindings: BTreeMap<String, (String, String)>,
     log: Vec<Consumption>,
     lexicon: &Lexicon,
-    rules: &[Rule],
     sub_count: usize,
     constituents: Vec<Constituent>,
-    kind_filter: &KindFilter,
-    var_gen: &mut VarGen,
-    cache: &HashMap<SpanKey, SpanResult>,
+    child_derivation_keys: Vec<String>,
+    next_child_index: usize,
+    direct_children: &[SpanKey],
+    cache: &SpanCache,
     global_offset: usize,
-) -> Option<(
-    BTreeMap<String, (String, String)>,
-    Vec<Consumption>,
-    Vec<Constituent>,
-)> {
-    let next_is_literal = pi < pattern.len() && matches!(pattern[pi], Slot::Literal(_));
+) -> Vec<PatternMatch> {
+    let next_is_literal =
+        pattern_index < pattern.len() && matches!(pattern[pattern_index], Slot::Literal(_));
 
-    let mut ti = ti;
+    let mut token_index = token_index;
     let mut log = log;
+
     if !next_is_literal {
-        while ti < tokens.len() && is_punctuation(&clean_token(&tokens[ti])) {
-            log.push(Consumption::Skipped { position: ti });
-            ti += 1;
+        while token_index < tokens.len() && is_punctuation(&clean_token(&tokens[token_index])) {
+            log.push(Consumption::Skipped {
+                position: token_index,
+            });
+            token_index += 1;
         }
     }
 
-    if pi >= pattern.len() {
-        let mut ti = ti;
-        let mut log = log;
-        while ti < tokens.len() && is_punctuation(&clean_token(&tokens[ti])) {
-            log.push(Consumption::Skipped { position: ti });
-            ti += 1;
+    if let Some(child) = direct_children.get(next_child_index) {
+        if child.start < global_offset + token_index {
+            return Vec::new();
         }
-        if ti >= tokens.len() {
-            return Some((bindings, log, constituents));
-        }
-        return None;
     }
 
-    if ti >= tokens.len() {
-        return None;
+    if pattern_index >= pattern.len() {
+        while token_index < tokens.len() && is_punctuation(&clean_token(&tokens[token_index])) {
+            log.push(Consumption::Skipped {
+                position: token_index,
+            });
+            token_index += 1;
+        }
+
+        if token_index == tokens.len() && next_child_index == direct_children.len() {
+            return vec![PatternMatch {
+                bindings,
+                log,
+                constituents,
+                child_derivation_keys,
+            }];
+        }
+
+        return Vec::new();
     }
 
-    let slot = &pattern[pi];
-    let token = clean_token(&tokens[ti]);
+    if token_index >= tokens.len() {
+        return Vec::new();
+    }
 
-    match slot {
-        Slot::Literal(lit) => {
-            if &token == lit {
-                let mut log = log;
-                log.push(Consumption::Literal { position: ti });
-                match_pattern(
-                    pattern,
-                    pi + 1,
-                    tokens,
-                    ti + 1,
-                    bindings,
-                    log,
-                    lexicon,
-                    rules,
-                    sub_count,
-                    constituents,
-                    kind_filter,
-                    var_gen,
-                    cache,
-                    global_offset,
-                )
-            } else if is_punctuation(&token) {
-                let mut log = log;
-                log.push(Consumption::Skipped { position: ti });
-                match_pattern(
-                    pattern,
-                    pi,
-                    tokens,
-                    ti + 1,
-                    bindings,
-                    log,
-                    lexicon,
-                    rules,
-                    sub_count,
-                    constituents,
-                    kind_filter,
-                    var_gen,
-                    cache,
-                    global_offset,
-                )
-            } else {
-                None
+    let slot = &pattern[pattern_index];
+    let token = clean_token(&tokens[token_index]);
+
+    if !matches!(slot, Slot::Sub { .. }) {
+        if let Some(child) = direct_children.get(next_child_index) {
+            if child.start == global_offset + token_index {
+                return Vec::new();
             }
         }
-        Slot::Keyword(kw) => {
-            if matches_keyword(&token, kw) {
-                let mut log = log;
-                log.push(Consumption::Keyword {
-                    class: kw.clone(),
-                    position: ti,
+    }
+
+    match slot {
+        Slot::Literal(literal) => {
+            if &token == literal {
+                let mut next_log = log;
+                next_log.push(Consumption::Literal {
+                    position: token_index,
                 });
+
                 match_pattern(
                     pattern,
-                    pi + 1,
+                    pattern_index + 1,
                     tokens,
-                    ti + 1,
+                    token_index + 1,
                     bindings,
-                    log,
+                    next_log,
                     lexicon,
-                    rules,
                     sub_count,
                     constituents,
-                    kind_filter,
-                    var_gen,
+                    child_derivation_keys,
+                    next_child_index,
+                    direct_children,
                     cache,
                     global_offset,
                 )
             } else if is_punctuation(&token) {
-                let mut log = log;
-                log.push(Consumption::Skipped { position: ti });
+                let mut next_log = log;
+                next_log.push(Consumption::Skipped {
+                    position: token_index,
+                });
+
                 match_pattern(
                     pattern,
-                    pi,
+                    pattern_index,
                     tokens,
-                    ti + 1,
+                    token_index + 1,
                     bindings,
-                    log,
+                    next_log,
                     lexicon,
-                    rules,
                     sub_count,
                     constituents,
-                    kind_filter,
-                    var_gen,
+                    child_derivation_keys,
+                    next_child_index,
+                    direct_children,
                     cache,
                     global_offset,
                 )
             } else {
-                None
+                Vec::new()
+            }
+        }
+        Slot::Keyword(keyword) => {
+            if matches_keyword(&token, keyword) {
+                let mut next_log = log;
+                next_log.push(Consumption::Keyword {
+                    class: keyword.clone(),
+                    position: token_index,
+                });
+
+                match_pattern(
+                    pattern,
+                    pattern_index + 1,
+                    tokens,
+                    token_index + 1,
+                    bindings,
+                    next_log,
+                    lexicon,
+                    sub_count,
+                    constituents,
+                    child_derivation_keys,
+                    next_child_index,
+                    direct_children,
+                    cache,
+                    global_offset,
+                )
+            } else if is_punctuation(&token) {
+                let mut next_log = log;
+                next_log.push(Consumption::Skipped {
+                    position: token_index,
+                });
+
+                match_pattern(
+                    pattern,
+                    pattern_index,
+                    tokens,
+                    token_index + 1,
+                    bindings,
+                    next_log,
+                    lexicon,
+                    sub_count,
+                    constituents,
+                    child_derivation_keys,
+                    next_child_index,
+                    direct_children,
+                    cache,
+                    global_offset,
+                )
+            } else {
+                Vec::new()
             }
         }
         Slot::Var {
             name,
             type_constraint,
         } => {
-            if let Some((canonical, _cat, consumed)) = lexicon.lookup_at(tokens, ti) {
-                let actual_type = lexicon.get_type(&canonical).unwrap_or_default();
-                let type_ok = match type_constraint {
-                    Some(t) => &actual_type == t,
-                    None => true,
-                };
-                if type_ok {
-                    let mut new_bindings = bindings.clone();
-                    let mut new_log = log.clone();
-                    new_bindings.insert(name.clone(), (canonical.clone(), actual_type.clone()));
-                    new_log.push(Consumption::Var {
-                        variable: name.clone(),
-                        canonical,
-                        typ: actual_type,
-                        start: ti,
-                        end: ti + consumed,
-                    });
-                    if let Some(result) = match_pattern(
-                        pattern,
-                        pi + 1,
-                        tokens,
-                        ti + consumed,
-                        new_bindings,
-                        new_log,
-                        lexicon,
-                        rules,
-                        sub_count,
-                        constituents.clone(),
-                        kind_filter,
-                        var_gen,
-                        cache,
-                        global_offset,
-                    ) {
-                        return Some(result);
+            if let Some((canonical, _category, consumed)) = lexicon.lookup_at(tokens, token_index) {
+                let consumed_end = global_offset + token_index + consumed;
+                let crosses_child = direct_children
+                    .get(next_child_index)
+                    .is_some_and(|child| child.start < consumed_end);
+
+                if !crosses_child {
+                    let actual_type = lexicon.get_type(&canonical).unwrap_or_default();
+                    let type_ok = type_constraint
+                        .as_ref()
+                        .is_none_or(|expected| actual_type == *expected);
+
+                    if type_ok {
+                        let mut next_bindings = bindings.clone();
+                        let mut next_log = log.clone();
+
+                        next_bindings
+                            .insert(name.clone(), (canonical.clone(), actual_type.clone()));
+                        next_log.push(Consumption::Var {
+                            variable: name.clone(),
+                            canonical,
+                            typ: actual_type,
+                            start: token_index,
+                            end: token_index + consumed,
+                        });
+
+                        let results = match_pattern(
+                            pattern,
+                            pattern_index + 1,
+                            tokens,
+                            token_index + consumed,
+                            next_bindings,
+                            next_log,
+                            lexicon,
+                            sub_count,
+                            constituents.clone(),
+                            child_derivation_keys.clone(),
+                            next_child_index,
+                            direct_children,
+                            cache,
+                            global_offset,
+                        );
+
+                        if !results.is_empty() {
+                            return results;
+                        }
                     }
                 }
             }
+
             if is_punctuation(&token) {
-                let mut log = log;
-                log.push(Consumption::Skipped { position: ti });
+                let mut next_log = log;
+                next_log.push(Consumption::Skipped {
+                    position: token_index,
+                });
+
                 return match_pattern(
                     pattern,
-                    pi,
+                    pattern_index,
                     tokens,
-                    ti + 1,
+                    token_index + 1,
                     bindings,
-                    log,
+                    next_log,
                     lexicon,
-                    rules,
                     sub_count,
                     constituents,
-                    kind_filter,
-                    var_gen,
+                    child_derivation_keys,
+                    next_child_index,
+                    direct_children,
                     cache,
                     global_offset,
                 );
             }
-            None
+
+            Vec::new()
         }
         Slot::Sub {
             label, delimiter, ..
         } => {
-            let sub_start = ti;
-            let mut sub_ti = ti;
-            while sub_ti < tokens.len() && is_punctuation(&clean_token(&tokens[sub_ti])) {
-                log.push(Consumption::Skipped { position: sub_ti });
-                sub_ti += 1;
+            let Some(child) = direct_children.get(next_child_index) else {
+                return Vec::new();
+            };
+
+            if child.start != global_offset + token_index || child.label != *label {
+                return Vec::new();
             }
 
-            if let Some(delim_kw) = delimiter {
-                let mut end = tokens.len();
-                for i in sub_ti..tokens.len() {
-                    if matches_keyword(&clean_token(&tokens[i]), delim_kw) {
-                        end = i;
-                        break;
-                    }
-                }
-                let sub_tokens = &tokens[sub_ti..end];
-                if sub_tokens.is_empty() {
-                    return None;
-                }
-                let cache_key = SpanKey {
-                    start: global_offset + sub_start,
-                    end: global_offset + end,
-                    label: label.clone(),
-                };
-                if let Some(cached) = cache.get(&cache_key) {
-                    let mut new_bindings = bindings.clone();
-                    let mut new_log = log.clone();
-                    new_log.push(Consumption::SubClause {
-                        start: sub_start,
-                        end,
-                    });
-                    let sub_key = if sub_count == 0 {
-                        "SUB".into()
-                    } else {
-                        format!("SUB{}", sub_count)
-                    };
-                    new_bindings.insert(sub_key, (cached.output.clone(), label.clone()));
-                    let sub_tokens_slice = &tokens[sub_start..end];
-                    let syntax_tree = Some(build_syntax_tree_for_result(
-                        cached,
-                        sub_tokens_slice,
-                        global_offset + sub_start,
-                    ));
-                    let constituent = Constituent {
-                        label: label.clone(),
-                        semantics: cached.output.clone(),
-                        free_vars: Vec::new(),
-                        span: Some((sub_start, end)),
-                        syntax: None,
-                        syntax_tree,
-                        sem_value: Some(cached.sem_value.clone()),
-                        children: vec![],
-                        rule_name: cached.rule_name.clone(),
-                        pattern: cached.pattern.clone(),
-                    };
-                    let mut trial_constituents = constituents;
-                    trial_constituents.push(constituent);
-                    return match_pattern(
-                        pattern,
-                        pi + 1,
-                        tokens,
-                        end,
-                        new_bindings,
-                        new_log,
-                        lexicon,
-                        rules,
-                        sub_count + 1,
-                        trial_constituents,
-                        kind_filter,
-                        var_gen,
-                        cache,
-                        global_offset,
-                    );
-                } else {
-                    None
-                }
-            } else {
-                let max_end = tokens.len();
-                for end in (sub_ti + 1)..=max_end {
-                    let cache_key = SpanKey {
-                        start: global_offset + sub_start,
-                        end: global_offset + end,
-                        label: label.clone(),
-                    };
-                    if let Some(cached) = cache.get(&cache_key) {
-                        let mut trial_constituents = constituents.clone();
-                        let mut new_bindings = bindings.clone();
-                        let mut new_log = log.clone();
-                        new_log.push(Consumption::SubClause {
-                            start: sub_start,
-                            end,
-                        });
-                        let sub_key = if sub_count == 0 {
-                            "SUB".into()
-                        } else {
-                            format!("SUB{}", sub_count)
-                        };
-                        new_bindings.insert(sub_key, (cached.output.clone(), label.clone()));
-                        let sub_tokens_slice = &tokens[sub_start..end];
-                        let syntax_tree = Some(build_syntax_tree_for_result(
-                            cached,
-                            sub_tokens_slice,
-                            global_offset + sub_start,
-                        ));
-                        trial_constituents.push(Constituent {
-                            label: label.clone(),
-                            semantics: cached.output.clone(),
-                            free_vars: Vec::new(),
-                            span: Some((sub_start, end)),
-                            syntax: None,
-                            syntax_tree,
-                            sem_value: Some(cached.sem_value.clone()),
-                            children: vec![],
-                            rule_name: cached.rule_name.clone(),
-                            pattern: cached.pattern.clone(),
-                        });
-                        if let Some(result) = match_pattern(
-                            pattern,
-                            pi + 1,
-                            tokens,
-                            end,
-                            new_bindings,
-                            new_log,
-                            lexicon,
-                            rules,
-                            sub_count + 1,
-                            trial_constituents,
-                            kind_filter,
-                            var_gen,
-                            cache,
-                            global_offset,
-                        ) {
-                            return Some(result);
-                        }
-                    }
-                }
-                None
+            let local_end = child.end.saturating_sub(global_offset);
+            if local_end > tokens.len() || local_end <= token_index {
+                return Vec::new();
             }
+
+            if let Some(delimiter_keyword) = delimiter {
+                let delimiter_position = (token_index..tokens.len())
+                    .find(|index| matches_keyword(&clean_token(&tokens[*index]), delimiter_keyword))
+                    .unwrap_or(tokens.len());
+
+                if child.end != global_offset + delimiter_position {
+                    return Vec::new();
+                }
+            }
+
+            let Some(cached_results) = cache.get(child) else {
+                return Vec::new();
+            };
+
+            let mut results = Vec::new();
+
+            for cached in cached_results {
+                let mut next_bindings = bindings.clone();
+                let mut next_log = log.clone();
+                let mut next_constituents = constituents.clone();
+                let mut next_child_keys = child_derivation_keys.clone();
+
+                next_log.push(Consumption::SubClause {
+                    start: token_index,
+                    end: local_end,
+                });
+
+                let sub_key = if sub_count == 0 {
+                    "SUB".to_string()
+                } else {
+                    format!("SUB{}", sub_count)
+                };
+
+                next_bindings.insert(sub_key, (cached.output.clone(), label.clone()));
+
+                let child_tokens = &tokens[token_index..local_end];
+                let syntax_tree = Some(build_syntax_tree_for_result(
+                    cached,
+                    child_tokens,
+                    child.start,
+                ));
+
+                next_constituents.push(Constituent {
+                    label: label.clone(),
+                    semantics: cached.output.clone(),
+                    free_vars: Vec::new(),
+                    span: Some((token_index, local_end)),
+                    syntax: None,
+                    syntax_tree,
+                    sem_value: Some(cached.sem_value.clone()),
+                    children: Vec::new(),
+                    rule_name: cached.rule_name.clone(),
+                    pattern: cached.pattern.clone(),
+                });
+                next_child_keys.push(cached.derivation_key.clone());
+
+                results.extend(match_pattern(
+                    pattern,
+                    pattern_index + 1,
+                    tokens,
+                    local_end,
+                    next_bindings,
+                    next_log,
+                    lexicon,
+                    sub_count + 1,
+                    next_constituents,
+                    next_child_keys,
+                    next_child_index + 1,
+                    direct_children,
+                    cache,
+                    global_offset,
+                ));
+            }
+
+            results
         }
     }
 }
