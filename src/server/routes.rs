@@ -12,7 +12,6 @@ use crate::core::matcher::{evaluate_gold, parse_hinted_sentence, semantic_count}
 use crate::core::proof::checker::check_proof as proof_check;
 use crate::core::proof::ProofFile;
 use crate::core::proof::StepResult;
-use crate::core::tokenize::tokenize;
 
 use super::error::{AppError, AppResult};
 use super::types::{
