@@ -1,32 +1,30 @@
 {
   "title": "Beach: conflicting weather evidence",
-  "entities": [
-    {"name": "today", "type": "e"},
-    {"name": "beach", "type": "e"}
-  ],
   "rules": [
     {
-      "formula": "always [x:e]: weather_said(theme: rain) -> rain(theme: x)",
+      "formula": "weather_said(theme: rain) -> not fun(theme: beach)",
       "weight": 2
     },
     {
-      "formula": "always [x:e]: no_clouds() -> not rain(theme: x)",
+      "formula": "no_clouds() -> fun(theme: beach)",
       "weight": 2
-    },
-    {
-      "formula": "always [x:e]: rain(theme: x) -> not fun(theme: beach)",
-      "weight": 99
-    },
-    {
-      "formula": "always [x:e]: not rain(theme: x) -> fun(theme: beach)",
-      "weight": 99
     }
   ],
   "evidence": [
-    {"formula": "weather_said(theme: rain)", "prob": 1.0},
-    {"formula": "no_clouds()", "prob": 1.0}
+    {
+      "formula": "weather_said(theme: rain)",
+      "prob": 1.0
+    },
+    {
+      "formula": "no_clouds()",
+      "prob": 1.0
+    }
   ],
   "queries": [
-    {"formula": "fun(theme: beach)", "expected_prob": 0.5, "tolerance": 0.05}
+    {
+      "formula": "fun(theme: beach)",
+      "expected_prob": 0.5,
+      "tolerance": 0.000001
+    }
   ]
 }
