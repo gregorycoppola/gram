@@ -39,6 +39,8 @@ pub fn constructor_signature(name: &str) -> Option<&'static [ConstructorArgKind]
         "bare_dp" => Some(&[Lexical]),
         "adj_n" => Some(&[Lexical, Literal, Sub]),
         "adj_arg_n" => Some(&[Lexical, Sub, Sub, Literal, Literal]),
+        "n_arg" => Some(&[Sub, Sub, Literal]),
+        "and_dp" | "s_and" => Some(&[Sub, Sub]),
         "the_n_dp" | "a_n_dp" => Some(&[Sub]),
         "possessive_the_n_dp" => Some(&[Sub, Sub, Literal]),
         "the_of_dp" | "a_of_dp" => Some(&[Lexical, Sub, Literal, Literal]),
@@ -51,6 +53,32 @@ pub fn constructor_signature(name: &str) -> Option<&'static [ConstructorArgKind]
         "s_as_copula" => Some(&[Sub, Sub, Lexical, Literal]),
         "s_transitive" | "s_complement" => Some(&[Sub, Sub, Lexical, Literal, Literal]),
         "s_ditransitive" => Some(&[Sub, Sub, Sub, Lexical, Literal, Literal, Literal]),
+        "s_control_purpose_at_time" => Some(&[
+            Sub,
+            Sub,
+            Sub,
+            Lexical,
+            Lexical,
+            Literal,
+            Literal,
+            Literal,
+            Literal,
+            Literal,
+        ]),
+        "s_transitive_control_purpose_ditransitive" => Some(&[
+            Sub,
+            Sub,
+            Sub,
+            Sub,
+            Lexical,
+            Lexical,
+            Literal,
+            Literal,
+            Literal,
+            Literal,
+            Literal,
+            Literal,
+        ]),
         "s_gap_agent" | "s_gap_patient" => Some(&[Lexical, Literal, Literal, Sub]),
         "s_gap_theme" => Some(&[Lexical, Literal]),
         "rel_dp_agent" | "rel_dp_patient" | "rel_dp_theme" => Some(&[Lexical, Literal, Sub]),
@@ -71,6 +99,8 @@ pub fn apply_constructor(
         "bare_n" => construct_bare_n(args, var_gen),
         "adj_n" => construct_adj_n(args, var_gen),
         "adj_arg_n" => construct_adj_arg_n(args),
+        "n_arg" => construct_n_arg(args),
+        "and_dp" => construct_and_dp(args),
         "the_n_dp" => construct_the_n_dp(args),
         "a_n_dp" => construct_a_n_dp(args),
         "possessive_the_n_dp" => construct_possessive_the_n_dp(args),
@@ -86,8 +116,13 @@ pub fn apply_constructor(
         "s_identity" => construct_s_identity(args),
         "s_as_copula" => construct_s_as_copula(args),
         "s_when" => construct_s_when(args),
+        "s_and" => construct_s_and(args),
         "s_transitive" => construct_s_transitive(args),
         "s_ditransitive" => construct_s_ditransitive(args),
+        "s_control_purpose_at_time" => construct_s_control_purpose_at_time(args),
+        "s_transitive_control_purpose_ditransitive" => {
+            construct_s_transitive_control_purpose_ditransitive(args)
+        }
         "s_complement" => construct_s_complement(args),
         "s_gap_agent" => construct_s_gap("agent", "patient", args, var_gen),
         "s_gap_patient" => construct_s_gap("patient", "agent", args, var_gen),
@@ -356,6 +391,74 @@ fn add_role_to_head_predicate(
             "possessive_the_n_dp: N restriction must end in a predicate head".into(),
         ),
     }
+}
+
+fn construct_n_arg(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 3 {
+        return Err(format!("n_arg expects 3 args, got {}", args.len()));
+    }
+
+    let (noun_var, noun_restriction) = match &args[0] {
+        Arg::Sub(SemValue::N { var, restriction }) => {
+            (var.clone(), restriction.clone())
+        }
+        _ => return Err("n_arg: first arg must be an N".into()),
+    };
+
+    let argument = match &args[1] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::Bare,
+            ..
+        }) => var.clone(),
+        _ => return Err("n_arg: second arg must be a bare DP".into()),
+    };
+
+    let role = match &args[2] {
+        Arg::Literal(role) => role.clone(),
+        _ => return Err("n_arg: third arg must be a literal role".into()),
+    };
+
+    let restriction = add_role_to_head_predicate(
+        &noun_restriction,
+        &role,
+        &Expr::Entity(argument),
+    )?;
+
+    Ok(SemValue::N {
+        var: noun_var,
+        restriction,
+    })
+}
+
+fn construct_and_dp(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 2 {
+        return Err(format!("and_dp expects 2 args, got {}", args.len()));
+    }
+
+    let left = match &args[0] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant: DpQuant::Bare,
+        }) if var_type == "e" => var.clone(),
+        _ => return Err("and_dp: first arg must be a bare entity DP".into()),
+    };
+
+    let right = match &args[1] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant: DpQuant::Bare,
+        }) if var_type == "e" => var.clone(),
+        _ => return Err("and_dp: second arg must be a bare entity DP".into()),
+    };
+
+    Ok(SemValue::Dp {
+        var: format!("{}_and_{}", left, right),
+        var_type: "e".to_string(),
+        quant: DpQuant::Bare,
+    })
 }
 
 fn construct_possessive_the_n_dp(args: &[Arg]) -> Result<SemValue, String> {
@@ -917,6 +1020,27 @@ fn construct_s_when(args: &[Arg]) -> Result<SemValue, String> {
     Ok(SemValue::Prop(expr))
 }
 
+fn construct_s_and(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 2 {
+        return Err(format!("s_and expects 2 args, got {}", args.len()));
+    }
+
+    let left = match &args[0] {
+        Arg::Sub(SemValue::Prop(expr)) => expr.clone(),
+        _ => return Err("s_and: first arg must be a Prop".into()),
+    };
+
+    let right = match &args[1] {
+        Arg::Sub(SemValue::Prop(expr)) => expr.clone(),
+        _ => return Err("s_and: second arg must be a Prop".into()),
+    };
+
+    Ok(SemValue::Prop(Expr::And(
+        Box::new(left),
+        Box::new(right),
+    )))
+}
+
 fn construct_s_transitive(args: &[Arg]) -> Result<SemValue, String> {
     if args.len() != 5 {
         return Err(format!("s_transitive expects 5 args, got {}", args.len()));
@@ -1057,6 +1181,265 @@ fn construct_s_ditransitive(args: &[Arg]) -> Result<SemValue, String> {
     ];
     let expr = expand_quants(&dps, body)?;
     Ok(SemValue::Prop(expr))
+}
+
+fn construct_s_control_purpose_at_time(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 10 {
+        return Err(format!(
+            "s_control_purpose_at_time expects 10 args, got {}",
+            args.len()
+        ));
+    }
+
+    let time = match &args[0] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::Bare,
+            ..
+        }) => var.clone(),
+        _ => {
+            return Err(
+                "s_control_purpose_at_time: first arg must be a bare time DP".into(),
+            )
+        }
+    };
+
+    let (subject_var, subject_type, subject_quant) = match &args[1] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
+        _ => return Err("s_control_purpose_at_time: second arg must be a DP".into()),
+    };
+
+    let (object_var, object_type, object_quant) = match &args[2] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
+        _ => return Err("s_control_purpose_at_time: third arg must be a DP".into()),
+    };
+
+    let matrix_predicate = match &args[3] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("s_control_purpose_at_time: fourth arg must be lexical".into()),
+    };
+
+    let purpose_predicate = match &args[4] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("s_control_purpose_at_time: fifth arg must be lexical".into()),
+    };
+
+    let literal = |index: usize, description: &str| -> Result<String, String> {
+        match &args[index] {
+            Arg::Literal(role) => Ok(role.clone()),
+            _ => Err(format!(
+                "s_control_purpose_at_time: {} must be a literal role",
+                description
+            )),
+        }
+    };
+
+    let matrix_agent_role = literal(5, "sixth arg")?;
+    let matrix_time_role = literal(6, "seventh arg")?;
+    let matrix_purpose_role = literal(7, "eighth arg")?;
+    let purpose_agent_role = literal(8, "ninth arg")?;
+    let purpose_patient_role = literal(9, "tenth arg")?;
+
+    let purpose_body = Expr::Pred {
+        name: purpose_predicate,
+        roles: vec![
+            (
+                purpose_agent_role,
+                Expr::Var {
+                    name: subject_var.clone(),
+                    typ: subject_type.clone(),
+                },
+            ),
+            (
+                purpose_patient_role,
+                Expr::Var {
+                    name: object_var.clone(),
+                    typ: object_type.clone(),
+                },
+            ),
+        ],
+    };
+
+    let purpose = expand_quant(
+        object_var,
+        object_type,
+        &object_quant,
+        purpose_body,
+    )?;
+
+    let matrix_body = Expr::Pred {
+        name: matrix_predicate,
+        roles: vec![
+            (
+                matrix_agent_role,
+                Expr::Var {
+                    name: subject_var.clone(),
+                    typ: subject_type.clone(),
+                },
+            ),
+            (matrix_time_role, Expr::Entity(time)),
+            (matrix_purpose_role, purpose),
+        ],
+    };
+
+    let expression = expand_quant(
+        subject_var,
+        subject_type,
+        &subject_quant,
+        matrix_body,
+    )?;
+
+    Ok(SemValue::Prop(expression))
+}
+
+fn construct_s_transitive_control_purpose_ditransitive(
+    args: &[Arg],
+) -> Result<SemValue, String> {
+    if args.len() != 12 {
+        return Err(format!(
+            "s_transitive_control_purpose_ditransitive expects 12 args, got {}",
+            args.len()
+        ));
+    }
+
+    let read_dp = |index: usize, description: &str| {
+        match &args[index] {
+            Arg::Sub(SemValue::Dp {
+                var,
+                var_type,
+                quant,
+            }) => Ok((var.clone(), var_type.clone(), quant.clone())),
+            _ => Err(format!(
+                "s_transitive_control_purpose_ditransitive: {} must be a DP",
+                description
+            )),
+        }
+    };
+
+    let read_lexical = |index: usize, description: &str| {
+        match &args[index] {
+            Arg::Lexical(name, _) => Ok(name.clone()),
+            _ => Err(format!(
+                "s_transitive_control_purpose_ditransitive: {} must be lexical",
+                description
+            )),
+        }
+    };
+
+    let read_literal = |index: usize, description: &str| {
+        match &args[index] {
+            Arg::Literal(role) => Ok(role.clone()),
+            _ => Err(format!(
+                "s_transitive_control_purpose_ditransitive: {} must be a literal role",
+                description
+            )),
+        }
+    };
+
+    let (subject_var, subject_type, subject_quant) =
+        read_dp(0, "first arg")?;
+    let (matrix_object_var, matrix_object_type, matrix_object_quant) =
+        read_dp(1, "second arg")?;
+    let (purpose_arg1_var, purpose_arg1_type, purpose_arg1_quant) =
+        read_dp(2, "third arg")?;
+    let (purpose_arg2_var, purpose_arg2_type, purpose_arg2_quant) =
+        read_dp(3, "fourth arg")?;
+
+    let matrix_predicate = read_lexical(4, "fifth arg")?;
+    let purpose_predicate = read_lexical(5, "sixth arg")?;
+
+    let matrix_agent_role = read_literal(6, "seventh arg")?;
+    let matrix_patient_role = read_literal(7, "eighth arg")?;
+    let matrix_purpose_role = read_literal(8, "ninth arg")?;
+    let purpose_agent_role = read_literal(9, "tenth arg")?;
+    let purpose_arg1_role = read_literal(10, "eleventh arg")?;
+    let purpose_arg2_role = read_literal(11, "twelfth arg")?;
+
+    let purpose_body = Expr::Pred {
+        name: purpose_predicate,
+        roles: vec![
+            (
+                purpose_agent_role,
+                Expr::Var {
+                    name: subject_var.clone(),
+                    typ: subject_type.clone(),
+                },
+            ),
+            (
+                purpose_arg1_role,
+                Expr::Var {
+                    name: purpose_arg1_var.clone(),
+                    typ: purpose_arg1_type.clone(),
+                },
+            ),
+            (
+                purpose_arg2_role,
+                Expr::Var {
+                    name: purpose_arg2_var.clone(),
+                    typ: purpose_arg2_type.clone(),
+                },
+            ),
+        ],
+    };
+
+    let purpose = expand_quants(
+        &[
+            (
+                purpose_arg1_var,
+                purpose_arg1_type,
+                purpose_arg1_quant,
+            ),
+            (
+                purpose_arg2_var,
+                purpose_arg2_type,
+                purpose_arg2_quant,
+            ),
+        ],
+        purpose_body,
+    )?;
+
+    let matrix_body = Expr::Pred {
+        name: matrix_predicate,
+        roles: vec![
+            (
+                matrix_agent_role,
+                Expr::Var {
+                    name: subject_var.clone(),
+                    typ: subject_type.clone(),
+                },
+            ),
+            (
+                matrix_patient_role,
+                Expr::Var {
+                    name: matrix_object_var.clone(),
+                    typ: matrix_object_type.clone(),
+                },
+            ),
+            (matrix_purpose_role, purpose),
+        ],
+    };
+
+    let expression = expand_quants(
+        &[
+            (subject_var, subject_type, subject_quant),
+            (
+                matrix_object_var,
+                matrix_object_type,
+                matrix_object_quant,
+            ),
+        ],
+        matrix_body,
+    )?;
+
+    Ok(SemValue::Prop(expression))
 }
 
 fn construct_s_complement(args: &[Arg]) -> Result<SemValue, String> {
