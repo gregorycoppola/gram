@@ -982,3 +982,144 @@ fn test_the_pp_dp_rejects_quantified_complement() {
 
     assert!(error.contains("bare DP"), "got: {error}");
 }
+
+
+#[test]
+fn test_possessive_the_n_dp_enriches_composed_head() {
+    let noun = SemValue::N {
+        var: "x".into(),
+        restriction: Expr::And(
+            Box::new(Expr::Pred {
+                name: "first".into(),
+                roles: vec![(
+                    "theme".into(),
+                    Expr::Var {
+                        name: "x".into(),
+                        typ: "e".into(),
+                    },
+                )],
+            }),
+            Box::new(Expr::Pred {
+                name: "nba_championship".into(),
+                roles: vec![
+                    (
+                        "theme".into(),
+                        Expr::Var {
+                            name: "x".into(),
+                            typ: "e".into(),
+                        },
+                    ),
+                    ("interval".into(), Expr::Entity("years_53".into())),
+                ],
+            }),
+        ),
+    };
+
+    let args = vec![
+        Arg::Sub(SemValue::Dp {
+            var: "new_york_knicks".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        }),
+        Arg::Sub(noun),
+        Arg::Literal("team".into()),
+    ];
+
+    let result =
+        apply_constructor("possessive_the_n_dp", &args, &mut VarGen::new()).unwrap();
+
+    let SemValue::Dp {
+        var,
+        quant: DpQuant::The { restriction },
+        ..
+    } = result
+    else {
+        panic!("expected definite DP");
+    };
+
+    assert_eq!(var, "x");
+    assert_eq!(
+        format!("{}", restriction),
+        "first(theme: x, interval: years_53) ∧ nba_championship(theme: x, team: new_york_knicks)"
+    );
+}
+
+#[test]
+fn test_possessive_the_n_dp_rejects_quantified_possessor() {
+    let args = vec![
+        Arg::Sub(SemValue::Dp {
+            var: "team".into(),
+            var_type: "e".into(),
+            quant: DpQuant::The {
+                restriction: Expr::Pred {
+                    name: "team".into(),
+                    roles: vec![(
+                        "theme".into(),
+                        Expr::Var {
+                            name: "team".into(),
+                            typ: "e".into(),
+                        },
+                    )],
+                },
+            },
+        }),
+        Arg::Sub(SemValue::N {
+            var: "x".into(),
+            restriction: Expr::Pred {
+                name: "championship".into(),
+                roles: vec![(
+                    "theme".into(),
+                    Expr::Var {
+                        name: "x".into(),
+                        typ: "e".into(),
+                    },
+                )],
+            },
+        }),
+        Arg::Literal("team".into()),
+    ];
+
+    let error =
+        apply_constructor("possessive_the_n_dp", &args, &mut VarGen::new()).unwrap_err();
+
+    assert!(error.contains("bare possessor DP"), "got: {error}");
+}
+
+
+#[test]
+fn test_adj_arg_n_attaches_argument_to_modifier() {
+    let args = vec![
+        Arg::Lexical("first".into(), "{interval:n,theme:e}".into()),
+        Arg::Sub(SemValue::N {
+            var: "x".into(),
+            restriction: Expr::Pred {
+                name: "nba_championship".into(),
+                roles: vec![(
+                    "theme".into(),
+                    Expr::Var {
+                        name: "x".into(),
+                        typ: "e".into(),
+                    },
+                )],
+            },
+        }),
+        Arg::Sub(SemValue::Dp {
+            var: "years_53".into(),
+            var_type: "n".into(),
+            quant: DpQuant::Bare,
+        }),
+        Arg::Literal("theme".into()),
+        Arg::Literal("interval".into()),
+    ];
+
+    let result = apply_constructor("adj_arg_n", &args, &mut VarGen::new()).unwrap();
+
+    let SemValue::N { restriction, .. } = result else {
+        panic!("expected N");
+    };
+
+    assert_eq!(
+        format!("{}", restriction),
+        "first(theme: x, interval: years_53) ∧ nba_championship(theme: x)"
+    );
+}
