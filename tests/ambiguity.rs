@@ -3,7 +3,7 @@ use std::path::Path;
 use gram::core::fixture::{Fixture, InputSentence, SentenceInput, Span};
 use gram::core::grammar::{compile_rules, Rule};
 use gram::core::lexicon::Lexicon;
-use gram::core::matcher::{parse_hinted_sentence, Match};
+use gram::core::matcher::{evaluate_gold, parse_hinted_sentence, semantic_count, Match};
 
 fn load_fixture() -> Fixture {
     Fixture::from_path(Path::new("fixtures/ambiguity_cartesian.json")).unwrap()
@@ -116,9 +116,77 @@ fn subslots_cannot_invent_unhinted_child_spans() {
             start: 0,
             end: 3,
         }],
+        gold: None,
     };
 
     let error = parse_hinted_sentence(&sentence, &lexicon, &rules).unwrap_err();
 
     assert!(error.contains("no matching rule"), "{error}");
+}
+
+#[test]
+fn gold_evaluation_counts_every_matching_derivation() {
+    let fixture = load_fixture();
+    let lexicon = Lexicon::from_fixture(&fixture);
+    let rules = compile_rules(&fixture.grammar).unwrap();
+    let sentence = hinted_sentence(&fixture);
+
+    let matches = parse_with_rules(sentence, &lexicon, &rules);
+    let evaluation = evaluate_gold(&matches, sentence.gold.as_deref().unwrap()).unwrap();
+
+    assert!(evaluation.correct);
+    assert_eq!(evaluation.parse_count, 4);
+    assert_eq!(evaluation.semantic_count, 1);
+    assert_eq!(evaluation.gold_match_count, 4);
+    assert_eq!(evaluation.matching_parse_indices, vec![0, 1, 2, 3]);
+    assert_eq!(semantic_count(&matches), 1);
+}
+
+#[test]
+fn gold_evaluation_uses_alpha_equivalence() {
+    let fixture = Fixture::from_path(Path::new("fixtures/rc2_transitive.json")).unwrap();
+    let lexicon = Lexicon::from_fixture(&fixture);
+    let rules = compile_rules(&fixture.grammar).unwrap();
+
+    let sentence = match &fixture.sentences[2] {
+        SentenceInput::Hinted(sentence) => sentence,
+        SentenceInput::Plain(_) => panic!("expected hinted sentence"),
+    };
+
+    let matches = parse_with_rules(sentence, &lexicon, &rules);
+    let evaluation =
+        evaluate_gold(&matches, "always [y:e]: man(theme: y) -> happy(theme: y)").unwrap();
+
+    assert!(evaluation.correct);
+    assert_eq!(evaluation.parse_count, 1);
+    assert_eq!(evaluation.gold_match_count, 1);
+    assert_eq!(evaluation.matching_parse_indices, vec![0]);
+}
+
+#[test]
+fn gold_evaluation_reports_no_matching_candidate() {
+    let fixture = load_fixture();
+    let lexicon = Lexicon::from_fixture(&fixture);
+    let rules = compile_rules(&fixture.grammar).unwrap();
+
+    let matches = parse_with_rules(hinted_sentence(&fixture), &lexicon, &rules);
+    let evaluation = evaluate_gold(&matches, "hates(agent: sue, patient: tom)").unwrap();
+
+    assert!(!evaluation.correct);
+    assert_eq!(evaluation.parse_count, 4);
+    assert_eq!(evaluation.semantic_count, 1);
+    assert_eq!(evaluation.gold_match_count, 0);
+    assert!(evaluation.matching_parse_indices.is_empty());
+}
+
+#[test]
+fn malformed_gold_is_a_fixture_error() {
+    let fixture = load_fixture();
+    let lexicon = Lexicon::from_fixture(&fixture);
+    let rules = compile_rules(&fixture.grammar).unwrap();
+
+    let matches = parse_with_rules(hinted_sentence(&fixture), &lexicon, &rules);
+    let error = evaluate_gold(&matches, "always [").unwrap_err();
+
+    assert!(error.contains("invalid gold logical form"), "{error}");
 }

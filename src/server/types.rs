@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::core::matcher::Match;
+use crate::core::matcher::{GoldEvaluation, Match};
 use crate::core::proof::ProofStep;
 
 /// One parsed sentence — the unit gloss renders.
@@ -10,6 +10,9 @@ pub struct ParseResult {
     pub tokens: Vec<String>,
     pub matches: Vec<Match>,
     pub status: ParseStatus,
+    pub semantic_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gold_evaluation: Option<GoldEvaluation>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

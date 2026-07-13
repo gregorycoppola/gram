@@ -6,7 +6,8 @@ use crate::core::fixture::{Fixture, SentenceInput};
 use crate::core::grammar::compile_rules;
 use crate::core::lexicon::Lexicon;
 use crate::core::matcher::{
-    parse_hinted_sentence, parse_hinted_sentence_traced, DebugTrace, Match,
+    evaluate_gold, parse_hinted_sentence, parse_hinted_sentence_traced, semantic_count, DebugTrace,
+    GoldEvaluation, Match,
 };
 
 #[derive(Args)]
@@ -36,6 +37,9 @@ struct ParsedSentence {
     sentence: String,
     tokens: Vec<String>,
     matches: Vec<Match>,
+    semantic_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    gold_evaluation: Option<GoldEvaluation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
 }
@@ -81,50 +85,92 @@ pub fn run_parse_one(_args: ParseOneArgs) -> Result<()> {
 }
 
 fn parse_hinted(
-    s: &crate::core::fixture::InputSentence,
+    sentence: &crate::core::fixture::InputSentence,
     lexicon: &Lexicon,
     rules: &[crate::core::grammar::Rule],
 ) -> ParsedSentence {
-    let display = s.tokens.join(" ");
-    match parse_hinted_sentence(s, lexicon, rules) {
-        Ok(matches) => ParsedSentence {
+    parsed_sentence_from_result(sentence, parse_hinted_sentence(sentence, lexicon, rules))
+}
+
+fn parse_hinted_debug(
+    sentence: &crate::core::fixture::InputSentence,
+    lexicon: &Lexicon,
+    rules: &[crate::core::grammar::Rule],
+) -> ParsedSentence {
+    let mut trace = DebugTrace::new();
+    let result = parse_hinted_sentence_traced(sentence, lexicon, rules, &mut trace);
+
+    trace.emit();
+    eprintln!();
+
+    parsed_sentence_from_result(sentence, result)
+}
+
+fn parsed_sentence_from_result(
+    sentence: &crate::core::fixture::InputSentence,
+    result: Result<Vec<Match>, String>,
+) -> ParsedSentence {
+    let display = sentence.tokens.join(" ");
+
+    match result {
+        Ok(matches) => {
+            let distinct_semantics = semantic_count(&matches);
+
+            let gold_evaluation = match sentence.gold.as_deref() {
+                Some(gold) => match evaluate_gold(&matches, gold) {
+                    Ok(evaluation) => Some(evaluation),
+                    Err(error) => {
+                        return ParsedSentence {
+                            sentence: display,
+                            tokens: sentence.tokens.clone(),
+                            matches,
+                            semantic_count: distinct_semantics,
+                            gold_evaluation: None,
+                            error: Some(error),
+                        };
+                    }
+                },
+                None => None,
+            };
+
+            ParsedSentence {
+                sentence: display,
+                tokens: sentence.tokens.clone(),
+                matches,
+                semantic_count: distinct_semantics,
+                gold_evaluation,
+                error: None,
+            }
+        }
+        Err(error) => ParsedSentence {
             sentence: display,
-            tokens: s.tokens.clone(),
-            matches,
-            error: None,
-        },
-        Err(e) => ParsedSentence {
-            sentence: display,
-            tokens: s.tokens.clone(),
+            tokens: sentence.tokens.clone(),
             matches: Vec::new(),
-            error: Some(e),
+            semantic_count: 0,
+            gold_evaluation: None,
+            error: Some(error),
         },
     }
 }
 
-fn parse_hinted_debug(
-    s: &crate::core::fixture::InputSentence,
-    lexicon: &Lexicon,
-    rules: &[crate::core::grammar::Rule],
-) -> ParsedSentence {
-    let display = s.tokens.join(" ");
-    let mut trace = DebugTrace::new();
-    let result = parse_hinted_sentence_traced(s, lexicon, rules, &mut trace);
-    trace.emit();
-    eprintln!();
-    match result {
-        Ok(matches) => ParsedSentence {
-            sentence: display,
-            tokens: s.tokens.clone(),
-            matches,
-            error: None,
-        },
-        Err(e) => ParsedSentence {
-            sentence: display,
-            tokens: s.tokens.clone(),
-            matches: Vec::new(),
-            error: Some(e),
-        },
+fn emit_gold_evaluation(evaluation: &GoldEvaluation) {
+    println!("     gold: {}", evaluation.gold);
+    println!(
+        "     gold match: {}  ({}/{})",
+        if evaluation.correct { "✓" } else { "✗" },
+        evaluation.gold_match_count,
+        evaluation.parse_count
+    );
+
+    if !evaluation.matching_parse_indices.is_empty() {
+        let indices = evaluation
+            .matching_parse_indices
+            .iter()
+            .map(|index| (index + 1).to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        println!("     matching parses: {}", indices);
     }
 }
 
@@ -157,10 +203,14 @@ fn emit_pretty(results: &[ParsedSentence]) {
             if let Some(e) = &m.semantics_check {
                 println!("     ⚠️  semantics: {}", e);
             }
+            if let Some(evaluation) = &r.gold_evaluation {
+                emit_gold_evaluation(evaluation);
+            }
             println!();
         } else {
             ambiguous += 1;
             println!("  ⚠️  \"{}\"  ({} parses)", r.sentence, r.matches.len());
+            println!("     distinct semantics: {}", r.semantic_count);
             for m in &r.matches {
                 if let Some(syn) = &m.syntax {
                     println!("     {}", syn);
@@ -170,6 +220,9 @@ fn emit_pretty(results: &[ParsedSentence]) {
                 if let Some(e) = &m.semantics_check {
                     println!("       ⚠️  semantics: {}", e);
                 }
+            }
+            if let Some(evaluation) = &r.gold_evaluation {
+                emit_gold_evaluation(evaluation);
             }
             println!();
         }

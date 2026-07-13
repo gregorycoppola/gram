@@ -3,18 +3,76 @@ mod tree;
 mod types;
 
 pub use tree::build_syntax_tree_for_result;
-pub use types::{Constituent, DebugTrace, Match, SyntaxNode, TokenAnnotation, TokenKind};
+pub use types::{
+    Constituent, DebugTrace, GoldEvaluation, Match, SyntaxNode, TokenAnnotation, TokenKind,
+};
 
 use std::collections::{HashMap, HashSet};
 
 use crate::core::fixture::{InputSentence, Span};
 use crate::core::grammar::Rule;
 use crate::core::lexicon::Lexicon;
-use crate::core::value::VarGen;
+use crate::core::value::{SemValue, VarGen};
 
 use engine::try_pattern_matches;
 use tree::span_result_to_match;
 use types::{SpanCache, SpanKey, SpanResult};
+
+// --- Gold evaluation ---
+
+fn matches_semantically_equivalent(left: &Match, right: &Match) -> bool {
+    match (&left.sem_value, &right.sem_value) {
+        (Some(SemValue::Prop(left_expr)), Some(SemValue::Prop(right_expr))) => {
+            crate::core::logic::alpha_equivalent(left_expr, right_expr)
+        }
+        _ => left.output == right.output,
+    }
+}
+
+pub fn semantic_count(matches: &[Match]) -> usize {
+    let mut representatives: Vec<&Match> = Vec::new();
+
+    'candidate: for candidate in matches {
+        for representative in &representatives {
+            if matches_semantically_equivalent(candidate, representative) {
+                continue 'candidate;
+            }
+        }
+
+        representatives.push(candidate);
+    }
+
+    representatives.len()
+}
+
+pub fn evaluate_gold(matches: &[Match], gold: &str) -> Result<GoldEvaluation, String> {
+    let parsed_gold = crate::core::semantics::parse(gold)
+        .map_err(|error| format!("invalid gold logical form {:?}: {}", gold, error))?;
+
+    let matching_parse_indices = matches
+        .iter()
+        .enumerate()
+        .filter_map(|(index, candidate)| match &candidate.sem_value {
+            Some(SemValue::Prop(candidate_expr))
+                if crate::core::logic::alpha_equivalent(candidate_expr, &parsed_gold) =>
+            {
+                Some(index)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    let gold_match_count = matching_parse_indices.len();
+
+    Ok(GoldEvaluation {
+        gold: gold.to_string(),
+        correct: gold_match_count > 0,
+        parse_count: matches.len(),
+        semantic_count: semantic_count(matches),
+        gold_match_count,
+        matching_parse_indices,
+    })
+}
 
 // --- Public API ---
 
@@ -388,6 +446,7 @@ mod tests {
                     end,
                 })
                 .collect(),
+            gold: None,
         }
     }
 

@@ -90,6 +90,16 @@ pub struct Match {
     pub span: Option<(usize, usize)>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GoldEvaluation {
+    pub gold: String,
+    pub correct: bool,
+    pub parse_count: usize,
+    pub semantic_count: usize,
+    pub gold_match_count: usize,
+    pub matching_parse_indices: Vec<usize>,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyntaxNode {
     pub label: String,

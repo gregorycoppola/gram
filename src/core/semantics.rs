@@ -133,11 +133,16 @@ fn tokenize(input: &str) -> Result<Vec<Tok>, String> {
 struct Parser {
     tokens: Vec<Tok>,
     pos: usize,
+    bound_variables: Vec<(String, String)>,
 }
 
 impl Parser {
     fn new(tokens: Vec<Tok>) -> Self {
-        Parser { tokens, pos: 0 }
+        Parser {
+            tokens,
+            pos: 0,
+            bound_variables: Vec::new(),
+        }
     }
 
     fn peek(&self) -> Option<&Tok> {
@@ -233,9 +238,12 @@ impl Parser {
         let var_type = self.expect_ident()?;
         self.expect(&Tok::RBracket)?;
         self.expect(&Tok::Colon)?;
-        let body = self.parse_and()?;
 
-        Ok((var, var_type, body))
+        self.bound_variables.push((var.clone(), var_type.clone()));
+        let body = self.parse_and();
+        self.bound_variables.pop();
+
+        Ok((var, var_type, body?))
     }
 
     /// Parse [var:type]: impl_expr
@@ -246,9 +254,12 @@ impl Parser {
         let var_type = self.expect_ident()?;
         self.expect(&Tok::RBracket)?;
         self.expect(&Tok::Colon)?;
-        let body = self.parse_impl()?;
 
-        Ok((var, var_type, body))
+        self.bound_variables.push((var.clone(), var_type.clone()));
+        let body = self.parse_impl();
+        self.bound_variables.pop();
+
+        Ok((var, var_type, body?))
     }
 
     fn parse_impl(&mut self) -> Result<Expr, String> {
@@ -387,7 +398,11 @@ impl Parser {
 
                 self.expect(&Tok::RBracket)?;
                 self.expect(&Tok::Colon)?;
-                let body = self.parse_and()?;
+
+                self.bound_variables.push((var.clone(), var_type.clone()));
+                let body = self.parse_and();
+                self.bound_variables.pop();
+                let body = body?;
 
                 Ok(Expr::ExistsMany {
                     var,
@@ -431,8 +446,18 @@ impl Parser {
                         name: identifier,
                         typ,
                     })
+                } else if let Some((_, typ)) = self
+                    .bound_variables
+                    .iter()
+                    .rev()
+                    .find(|(name, _)| name == &identifier)
+                {
+                    Ok(Expr::Var {
+                        name: identifier,
+                        typ: typ.clone(),
+                    })
                 } else {
-                    // Entity
+                    // Unbound identifiers are named entities.
                     Ok(Expr::Entity(identifier))
                 }
             }
@@ -578,6 +603,63 @@ pub fn parse_with_types(input: &str, lexicon: &Lexicon) -> Result<Expr, String> 
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn bound_identifiers_parse_as_typed_variables() {
+        let expr = parse("always [x:e]: man(theme: x) -> happy(theme: x)").unwrap();
+
+        let Expr::ForAll { body, .. } = expr else {
+            panic!("expected universal");
+        };
+        let Expr::Implies { ante, cons } = *body else {
+            panic!("expected implication");
+        };
+
+        for expression in [*ante, *cons] {
+            let Expr::Pred { roles, .. } = expression else {
+                panic!("expected predicate");
+            };
+            assert!(matches!(
+                &roles[0].1,
+                Expr::Var { name, typ } if name == "x" && typ == "e"
+            ));
+        }
+    }
+
+    #[test]
+    fn nearest_binder_wins_under_shadowing() {
+        let expr = parse("always [x:e]: exists [x:n]: event(at_time: x)").unwrap();
+
+        let Expr::ForAll { body, .. } = expr else {
+            panic!("expected universal");
+        };
+        let Expr::Exists { body, .. } = *body else {
+            panic!("expected existential");
+        };
+        let Expr::Pred { roles, .. } = *body else {
+            panic!("expected predicate");
+        };
+
+        assert!(matches!(
+            &roles[0].1,
+            Expr::Var { name, typ } if name == "x" && typ == "n"
+        ));
+    }
+
+    #[test]
+    fn unbound_identifiers_remain_entities() {
+        let expr = parse("man(theme: socrates)").unwrap();
+
+        let Expr::Pred { roles, .. } = expr else {
+            panic!("expected predicate");
+        };
+
+        assert!(matches!(
+            &roles[0].1,
+            Expr::Entity(name) if name == "socrates"
+        ));
+    }
+
     use super::*;
 
     #[test]
