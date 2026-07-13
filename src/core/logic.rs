@@ -192,3 +192,348 @@ impl std::fmt::Display for Expr {
         }
     }
 }
+
+/// Compare logical expressions modulo consistent renaming of bound variables.
+///
+/// Free variables, entities, binder kinds, binder types, predicate names,
+/// role order, counts, and question labels must still match exactly.
+pub fn alpha_equivalent(left: &Expr, right: &Expr) -> bool {
+    fn bound_index(name: &str, environment: &[String]) -> Option<usize> {
+        environment.iter().rposition(|bound| bound == name)
+    }
+
+    fn equivalent(
+        left: &Expr,
+        right: &Expr,
+        left_environment: &mut Vec<String>,
+        right_environment: &mut Vec<String>,
+    ) -> bool {
+        match (left, right) {
+            (
+                Expr::Pred {
+                    name: left_name,
+                    roles: left_roles,
+                },
+                Expr::Pred {
+                    name: right_name,
+                    roles: right_roles,
+                },
+            ) => {
+                left_name == right_name
+                    && left_roles.len() == right_roles.len()
+                    && left_roles.iter().zip(right_roles).all(
+                        |((left_role, left_value), (right_role, right_value))| {
+                            left_role == right_role
+                                && equivalent(
+                                    left_value,
+                                    right_value,
+                                    left_environment,
+                                    right_environment,
+                                )
+                        },
+                    )
+            }
+            (Expr::Not(left_inner), Expr::Not(right_inner)) => {
+                equivalent(left_inner, right_inner, left_environment, right_environment)
+            }
+            (Expr::And(left_left, left_right), Expr::And(right_left, right_right)) => {
+                equivalent(left_left, right_left, left_environment, right_environment)
+                    && equivalent(left_right, right_right, left_environment, right_environment)
+            }
+            (
+                Expr::Implies {
+                    ante: left_ante,
+                    cons: left_cons,
+                },
+                Expr::Implies {
+                    ante: right_ante,
+                    cons: right_cons,
+                },
+            ) => {
+                equivalent(left_ante, right_ante, left_environment, right_environment)
+                    && equivalent(left_cons, right_cons, left_environment, right_environment)
+            }
+            (
+                Expr::ForAll {
+                    var: left_var,
+                    var_type: left_type,
+                    body: left_body,
+                },
+                Expr::ForAll {
+                    var: right_var,
+                    var_type: right_type,
+                    body: right_body,
+                },
+            )
+            | (
+                Expr::The {
+                    var: left_var,
+                    var_type: left_type,
+                    body: left_body,
+                },
+                Expr::The {
+                    var: right_var,
+                    var_type: right_type,
+                    body: right_body,
+                },
+            )
+            | (
+                Expr::This {
+                    var: left_var,
+                    var_type: left_type,
+                    body: left_body,
+                },
+                Expr::This {
+                    var: right_var,
+                    var_type: right_type,
+                    body: right_body,
+                },
+            )
+            | (
+                Expr::That {
+                    var: left_var,
+                    var_type: left_type,
+                    body: left_body,
+                },
+                Expr::That {
+                    var: right_var,
+                    var_type: right_type,
+                    body: right_body,
+                },
+            ) => {
+                if left_type != right_type {
+                    return false;
+                }
+
+                left_environment.push(left_var.clone());
+                right_environment.push(right_var.clone());
+
+                let result = equivalent(left_body, right_body, left_environment, right_environment);
+
+                left_environment.pop();
+                right_environment.pop();
+                result
+            }
+            (
+                Expr::Exists {
+                    var: left_var,
+                    var_type: left_type,
+                    body: left_body,
+                    count: left_count,
+                },
+                Expr::Exists {
+                    var: right_var,
+                    var_type: right_type,
+                    body: right_body,
+                    count: right_count,
+                },
+            ) => {
+                if left_type != right_type || left_count != right_count {
+                    return false;
+                }
+
+                left_environment.push(left_var.clone());
+                right_environment.push(right_var.clone());
+
+                let result = equivalent(left_body, right_body, left_environment, right_environment);
+
+                left_environment.pop();
+                right_environment.pop();
+                result
+            }
+            (
+                Expr::ExistsMany {
+                    var: left_var,
+                    var_type: left_type,
+                    count: left_count,
+                    body: left_body,
+                },
+                Expr::ExistsMany {
+                    var: right_var,
+                    var_type: right_type,
+                    count: right_count,
+                    body: right_body,
+                },
+            ) => {
+                if left_type != right_type || left_count != right_count {
+                    return false;
+                }
+
+                left_environment.push(left_var.clone());
+                right_environment.push(right_var.clone());
+
+                let result = equivalent(left_body, right_body, left_environment, right_environment);
+
+                left_environment.pop();
+                right_environment.pop();
+                result
+            }
+            (
+                Expr::Var {
+                    name: left_name,
+                    typ: left_type,
+                },
+                Expr::Var {
+                    name: right_name,
+                    typ: right_type,
+                },
+            ) => {
+                if left_type != right_type {
+                    return false;
+                }
+
+                match (
+                    bound_index(left_name, left_environment),
+                    bound_index(right_name, right_environment),
+                ) {
+                    (Some(left_index), Some(right_index)) => left_index == right_index,
+                    (None, None) => left_name == right_name,
+                    _ => false,
+                }
+            }
+            (Expr::Entity(left_name), Expr::Entity(right_name)) => left_name == right_name,
+            (
+                Expr::Question {
+                    label: left_label,
+                    body: left_body,
+                },
+                Expr::Question {
+                    label: right_label,
+                    body: right_body,
+                },
+            ) => {
+                left_label == right_label
+                    && equivalent(left_body, right_body, left_environment, right_environment)
+            }
+            _ => false,
+        }
+    }
+
+    equivalent(left, right, &mut Vec::new(), &mut Vec::new())
+}
+
+#[cfg(test)]
+mod alpha_equivalence_tests {
+    use super::*;
+
+    fn variable(name: &str, typ: &str) -> Expr {
+        Expr::Var {
+            name: name.to_string(),
+            typ: typ.to_string(),
+        }
+    }
+
+    fn relation(agent: Expr, patient: Expr) -> Expr {
+        Expr::Pred {
+            name: "loves".to_string(),
+            roles: vec![
+                ("agent".to_string(), agent),
+                ("patient".to_string(), patient),
+            ],
+        }
+    }
+
+    #[test]
+    fn consistently_renamed_binders_are_equivalent() {
+        let left = Expr::ForAll {
+            var: "x".to_string(),
+            var_type: "e".to_string(),
+            body: Box::new(Expr::Exists {
+                var: "y".to_string(),
+                var_type: "e".to_string(),
+                body: Box::new(relation(variable("x", "e"), variable("y", "e"))),
+                count: None,
+            }),
+        };
+
+        let right = Expr::ForAll {
+            var: "a".to_string(),
+            var_type: "e".to_string(),
+            body: Box::new(Expr::Exists {
+                var: "b".to_string(),
+                var_type: "e".to_string(),
+                body: Box::new(relation(variable("a", "e"), variable("b", "e"))),
+                count: None,
+            }),
+        };
+
+        assert!(alpha_equivalent(&left, &right));
+    }
+
+    #[test]
+    fn nested_shadowing_uses_the_nearest_binder() {
+        let left = Expr::ForAll {
+            var: "x".to_string(),
+            var_type: "e".to_string(),
+            body: Box::new(Expr::Exists {
+                var: "x".to_string(),
+                var_type: "e".to_string(),
+                body: Box::new(relation(variable("x", "e"), variable("x", "e"))),
+                count: None,
+            }),
+        };
+
+        let equivalent = Expr::ForAll {
+            var: "a".to_string(),
+            var_type: "e".to_string(),
+            body: Box::new(Expr::Exists {
+                var: "b".to_string(),
+                var_type: "e".to_string(),
+                body: Box::new(relation(variable("b", "e"), variable("b", "e"))),
+                count: None,
+            }),
+        };
+
+        let not_equivalent = Expr::ForAll {
+            var: "a".to_string(),
+            var_type: "e".to_string(),
+            body: Box::new(Expr::Exists {
+                var: "b".to_string(),
+                var_type: "e".to_string(),
+                body: Box::new(relation(variable("a", "e"), variable("b", "e"))),
+                count: None,
+            }),
+        };
+
+        assert!(alpha_equivalent(&left, &equivalent));
+        assert!(!alpha_equivalent(&left, &not_equivalent));
+    }
+
+    #[test]
+    fn free_variables_must_keep_their_names_and_types() {
+        assert!(alpha_equivalent(&variable("x", "e"), &variable("x", "e"),));
+        assert!(!alpha_equivalent(&variable("x", "e"), &variable("y", "e"),));
+        assert!(!alpha_equivalent(&variable("x", "e"), &variable("x", "s"),));
+    }
+
+    #[test]
+    fn binder_kind_type_and_count_remain_significant() {
+        let body = Box::new(variable("x", "e"));
+
+        let universal = Expr::ForAll {
+            var: "x".to_string(),
+            var_type: "e".to_string(),
+            body: body.clone(),
+        };
+        let definite = Expr::The {
+            var: "y".to_string(),
+            var_type: "e".to_string(),
+            body: Box::new(variable("y", "e")),
+        };
+        let counted_three = Expr::ExistsMany {
+            var: "x".to_string(),
+            var_type: "e".to_string(),
+            count: "3".to_string(),
+            body: body.clone(),
+        };
+        let counted_two = Expr::ExistsMany {
+            var: "y".to_string(),
+            var_type: "e".to_string(),
+            count: "2".to_string(),
+            body: Box::new(variable("y", "e")),
+        };
+
+        assert!(!alpha_equivalent(&universal, &definite));
+        assert!(!alpha_equivalent(&counted_three, &counted_two));
+    }
+}

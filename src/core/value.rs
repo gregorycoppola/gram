@@ -77,7 +77,7 @@ impl std::fmt::Display for SemValue {
 }
 
 /// Generates fresh variable names.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VarGen {
     counter: u32,
 }
