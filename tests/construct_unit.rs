@@ -991,16 +991,6 @@ fn test_possessive_the_n_dp_enriches_composed_head() {
         restriction: Expr::And(
             Box::new(Expr::Pred {
                 name: "first".into(),
-                roles: vec![(
-                    "theme".into(),
-                    Expr::Var {
-                        name: "x".into(),
-                        typ: "e".into(),
-                    },
-                )],
-            }),
-            Box::new(Expr::Pred {
-                name: "nba_championship".into(),
                 roles: vec![
                     (
                         "theme".into(),
@@ -1011,6 +1001,16 @@ fn test_possessive_the_n_dp_enriches_composed_head() {
                     ),
                     ("interval".into(), Expr::Entity("years_53".into())),
                 ],
+            }),
+            Box::new(Expr::Pred {
+                name: "nba_championship".into(),
+                roles: vec![(
+                    "theme".into(),
+                    Expr::Var {
+                        name: "x".into(),
+                        typ: "e".into(),
+                    },
+                )],
             }),
         ),
     };
@@ -1121,5 +1121,229 @@ fn test_adj_arg_n_attaches_argument_to_modifier() {
     assert_eq!(
         format!("{}", restriction),
         "first(theme: x, interval: years_53) ∧ nba_championship(theme: x)"
+    );
+}
+
+
+#[test]
+fn test_n_arg_enriches_noun_head() {
+    let args = vec![
+        Arg::Sub(SemValue::N {
+            var: "x".into(),
+            restriction: Expr::Pred {
+                name: "wedding".into(),
+                roles: vec![(
+                    "theme".into(),
+                    Expr::Var {
+                        name: "x".into(),
+                        typ: "e".into(),
+                    },
+                )],
+            },
+        }),
+        Arg::Sub(SemValue::Dp {
+            var: "madison_square_garden".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        }),
+        Arg::Literal("location".into()),
+    ];
+
+    let result = apply_constructor("n_arg", &args, &mut VarGen::new()).unwrap();
+
+    let SemValue::N { restriction, .. } = result else {
+        panic!("expected N");
+    };
+
+    assert_eq!(
+        format!("{}", restriction),
+        "wedding(theme: x, location: madison_square_garden)"
+    );
+}
+
+#[test]
+fn test_and_dp_builds_plural_individual() {
+    let args = vec![
+        Arg::Sub(SemValue::Dp {
+            var: "travis_kelce".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        }),
+        Arg::Sub(SemValue::Dp {
+            var: "taylor_swift".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        }),
+    ];
+
+    let result = apply_constructor("and_dp", &args, &mut VarGen::new()).unwrap();
+
+    let SemValue::Dp { var, quant, .. } = result else {
+        panic!("expected DP");
+    };
+
+    assert_eq!(var, "travis_kelce_and_taylor_swift");
+    assert!(matches!(quant, DpQuant::Bare));
+}
+
+#[test]
+fn test_s_and_conjoins_propositions() {
+    let args = vec![
+        Arg::Sub(SemValue::Prop(Expr::Pred {
+            name: "arrive".into(),
+            roles: vec![("agent".into(), Expr::Entity("sue".into()))],
+        })),
+        Arg::Sub(SemValue::Prop(Expr::Pred {
+            name: "leave".into(),
+            roles: vec![("agent".into(), Expr::Entity("tom".into()))],
+        })),
+    ];
+
+    let result = apply_constructor("s_and", &args, &mut VarGen::new()).unwrap();
+
+    let SemValue::Prop(expression) = result else {
+        panic!("expected proposition");
+    };
+
+    assert_eq!(
+        format!("{}", expression),
+        "arrive(agent: sue) ∧ leave(agent: tom)"
+    );
+}
+
+#[test]
+fn test_s_control_purpose_at_time_shares_subject() {
+    let args = vec![
+        Arg::Sub(SemValue::Dp {
+            var: "now".into(),
+            var_type: "n".into(),
+            quant: DpQuant::Bare,
+        }),
+        Arg::Sub(SemValue::Dp {
+            var: "jay_z".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        }),
+        Arg::Sub(SemValue::Dp {
+            var: "x".into(),
+            var_type: "e".into(),
+            quant: DpQuant::The {
+                restriction: Expr::Pred {
+                    name: "energy".into(),
+                    roles: vec![(
+                        "theme".into(),
+                        Expr::Var {
+                            name: "x".into(),
+                            typ: "e".into(),
+                        },
+                    )],
+                },
+            },
+        }),
+        Arg::Lexical("come_back".into(), "{agent:e,at_time:n,purpose:s}".into()),
+        Arg::Lexical("continue".into(), "{agent:e,patient:e}".into()),
+        Arg::Literal("agent".into()),
+        Arg::Literal("at_time".into()),
+        Arg::Literal("purpose".into()),
+        Arg::Literal("agent".into()),
+        Arg::Literal("patient".into()),
+    ];
+
+    let result =
+        apply_constructor("s_control_purpose_at_time", &args, &mut VarGen::new()).unwrap();
+
+    let SemValue::Prop(expression) = result else {
+        panic!("expected proposition");
+    };
+
+    assert_eq!(
+        format!("{}", expression),
+        "come_back(agent: jay_z, at_time: now, purpose: the [x:e]: energy(theme: x) -> continue(agent: jay_z, patient: x))"
+    );
+}
+
+
+#[test]
+fn test_s_transitive_control_purpose_ditransitive() {
+    let args = vec![
+        Arg::Sub(SemValue::Dp {
+            var: "jay_z".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        }),
+        Arg::Sub(SemValue::Dp {
+            var: "x".into(),
+            var_type: "e".into(),
+            quant: DpQuant::The {
+                restriction: Expr::Pred {
+                    name: "night".into(),
+                    roles: vec![(
+                        "theme".into(),
+                        Expr::Var {
+                            name: "x".into(),
+                            typ: "e".into(),
+                        },
+                    )],
+                },
+            },
+        }),
+        Arg::Sub(SemValue::Dp {
+            var: "years_30".into(),
+            var_type: "n".into(),
+            quant: DpQuant::Bare,
+        }),
+        Arg::Sub(SemValue::Dp {
+            var: "x1".into(),
+            var_type: "e".into(),
+            quant: DpQuant::The {
+                restriction: Expr::Pred {
+                    name: "debut_album".into(),
+                    roles: vec![
+                        (
+                            "theme".into(),
+                            Expr::Var {
+                                name: "x1".into(),
+                                typ: "e".into(),
+                            },
+                        ),
+                        (
+                            "title".into(),
+                            Expr::Entity("reasonable_doubt".into()),
+                        ),
+                        ("artist".into(), Expr::Entity("jay_z".into())),
+                    ],
+                },
+            },
+        }),
+        Arg::Lexical(
+            "break_up".into(),
+            "{agent:e,patient:e,purpose:s}".into(),
+        ),
+        Arg::Lexical(
+            "celebrate".into(),
+            "{agent:e,duration:n,theme:e}".into(),
+        ),
+        Arg::Literal("agent".into()),
+        Arg::Literal("patient".into()),
+        Arg::Literal("purpose".into()),
+        Arg::Literal("agent".into()),
+        Arg::Literal("duration".into()),
+        Arg::Literal("theme".into()),
+    ];
+
+    let result = apply_constructor(
+        "s_transitive_control_purpose_ditransitive",
+        &args,
+        &mut VarGen::new(),
+    )
+    .unwrap();
+
+    let SemValue::Prop(expression) = result else {
+        panic!("expected proposition");
+    };
+
+    assert_eq!(
+        format!("{}", expression),
+        "the [x:e]: night(theme: x) -> break_up(agent: jay_z, patient: x, purpose: the [x1:e]: debut_album(theme: x1, title: reasonable_doubt, artist: jay_z) -> celebrate(agent: jay_z, duration: years_30, theme: x1))"
     );
 }
