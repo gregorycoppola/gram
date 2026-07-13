@@ -5,7 +5,7 @@ mod engine;
 pub use types::{DebugTrace, Match, Constituent, SyntaxNode, TokenAnnotation, TokenKind};
 pub use tree::build_syntax_tree_for_result;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::core::fixture::{InputSentence, Span};
 use crate::core::grammar::Rule;
@@ -35,6 +35,158 @@ pub fn parse_hinted_sentence_traced(
     parse_bottom_up(sentence, lexicon, rules, Some(trace))
 }
 
+// --- Span-tree validation ---
+
+fn span_key(span: &Span) -> SpanKey {
+    SpanKey {
+        start: span.start,
+        end: span.end,
+        label: span.label.clone(),
+    }
+}
+
+fn strictly_contains(outer: &Span, inner: &Span) -> bool {
+    outer.start <= inner.start
+        && inner.end <= outer.end
+        && (outer.start < inner.start || inner.end < outer.end)
+}
+
+fn spans_cross(left: &Span, right: &Span) -> bool {
+    (left.start < right.start
+        && right.start < left.end
+        && left.end < right.end)
+        || (right.start < left.start
+            && left.start < right.end
+            && right.end < left.end)
+}
+
+fn validate_span_tree(
+    sentence: &InputSentence,
+) -> Result<HashMap<SpanKey, Option<SpanKey>>, String> {
+    if sentence.tokens.is_empty() {
+        return Err("hinted sentence has no tokens".into());
+    }
+
+    if sentence.spans.is_empty() {
+        return Err("no hint spans provided".into());
+    }
+
+    let token_count = sentence.tokens.len();
+    let mut intervals = HashSet::new();
+
+    for span in &sentence.spans {
+        if span.start >= span.end {
+            return Err(format!(
+                "invalid span [{}] {}..{}: start must be before end",
+                span.label, span.start, span.end
+            ));
+        }
+
+        if span.end > token_count {
+            return Err(format!(
+                "invalid span [{}] {}..{}: sentence has {} tokens",
+                span.label, span.start, span.end, token_count
+            ));
+        }
+
+        if !intervals.insert((span.start, span.end)) {
+            return Err(format!(
+                "duplicate span interval {}..{}",
+                span.start, span.end
+            ));
+        }
+    }
+
+    for (index, left) in sentence.spans.iter().enumerate() {
+        for right in sentence.spans.iter().skip(index + 1) {
+            if spans_cross(left, right) {
+                return Err(format!(
+                    "crossing spans: [{}] {}..{} and [{}] {}..{}",
+                    left.label,
+                    left.start,
+                    left.end,
+                    right.label,
+                    right.start,
+                    right.end
+                ));
+            }
+        }
+    }
+
+    let roots = sentence
+        .spans
+        .iter()
+        .filter(|span| span.start == 0 && span.end == token_count)
+        .collect::<Vec<_>>();
+
+    if roots.len() != 1 {
+        return Err(format!(
+            "expected exactly one full-sentence root span 0..{}, found {}",
+            token_count,
+            roots.len()
+        ));
+    }
+
+    let root_key = span_key(roots[0]);
+    let mut parent_map = HashMap::new();
+
+    for span in &sentence.spans {
+        let key = span_key(span);
+
+        if key == root_key {
+            parent_map.insert(key, None);
+            continue;
+        }
+
+        let parent = sentence
+            .spans
+            .iter()
+            .filter(|candidate| strictly_contains(candidate, span))
+            .min_by_key(|candidate| candidate.end - candidate.start)
+            .map(span_key)
+            .ok_or_else(|| {
+                format!(
+                    "span [{}] {}..{} is not reachable from the root",
+                    span.label, span.start, span.end
+                )
+            })?;
+
+        parent_map.insert(key, Some(parent));
+    }
+
+    for span in &sentence.spans {
+        let start_key = span_key(span);
+        let mut current = start_key.clone();
+        let mut visited = HashSet::new();
+
+        loop {
+            if current == root_key {
+                break;
+            }
+
+            if !visited.insert(current.clone()) {
+                return Err(format!(
+                    "cycle detected while validating span [{}] {}..{}",
+                    span.label, span.start, span.end
+                ));
+            }
+
+            current = parent_map
+                .get(&current)
+                .and_then(Option::as_ref)
+                .cloned()
+                .ok_or_else(|| {
+                    format!(
+                        "span [{}] {}..{} is not reachable from the root",
+                        span.label, span.start, span.end
+                    )
+                })?;
+        }
+    }
+
+    Ok(parent_map)
+}
+
 // --- Bottom-up core ---
 
 fn parse_bottom_up(
@@ -43,34 +195,12 @@ fn parse_bottom_up(
     rules: &[Rule],
     mut trace: Option<&mut DebugTrace>,
 ) -> Result<Vec<Match>, String> {
-    if sentence.spans.is_empty() {
-        return Err("no hint spans provided".into());
-    }
+    let parent_map = validate_span_tree(sentence)?;
 
     let mut var_gen = VarGen::new();
 
     let mut indexed: Vec<(usize, &Span)> = sentence.spans.iter().enumerate().collect();
     indexed.sort_by_key(|(_, span)| (span.end - span.start, span.start));
-
-    let mut parent_map: HashMap<SpanKey, Option<SpanKey>> = HashMap::new();
-    for (i, span) in sentence.spans.iter().enumerate() {
-        let key = SpanKey { start: span.start, end: span.end, label: span.label.clone() };
-        let mut best: Option<SpanKey> = None;
-        for (j, other) in sentence.spans.iter().enumerate() {
-            if i == j { continue; }
-            if span.start >= other.start && span.end <= other.end {
-                let other_key = SpanKey { start: other.start, end: other.end, label: other.label.clone() };
-                match &best {
-                    None => best = Some(other_key),
-                    Some(b) if other.start >= b.start && other.end <= b.end => {
-                        best = Some(other_key);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        parent_map.insert(key, best);
-    }
 
     let top_level_keys: Vec<SpanKey> = sentence.spans.iter()
         .filter_map(|s| {
@@ -169,4 +299,142 @@ fn match_span(
             "span [{}] tokens[{}..{}] ({:?}): no matching rule",
             span.label, span.start, span.end, span_tokens
         ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sentence(
+        token_count: usize,
+        spans: Vec<(&str, usize, usize)>,
+    ) -> InputSentence {
+        InputSentence {
+            tokens: (0..token_count)
+                .map(|index| format!("t{}", index))
+                .collect(),
+            spans: spans
+                .into_iter()
+                .map(|(label, start, end)| Span {
+                    label: label.to_string(),
+                    start,
+                    end,
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn valid_tree_assigns_nearest_strict_parents() {
+        let input = sentence(
+            5,
+            vec![
+                ("n", 1, 2),
+                ("dp", 0, 2),
+                ("dp", 3, 5),
+                ("s", 0, 5),
+            ],
+        );
+
+        let parents = validate_span_tree(&input).unwrap();
+
+        assert_eq!(
+            parents.get(&SpanKey {
+                label: "n".into(),
+                start: 1,
+                end: 2,
+            }),
+            Some(&Some(SpanKey {
+                label: "dp".into(),
+                start: 0,
+                end: 2,
+            }))
+        );
+
+        assert_eq!(
+            parents.get(&SpanKey {
+                label: "s".into(),
+                start: 0,
+                end: 5,
+            }),
+            Some(&None)
+        );
+    }
+
+    #[test]
+    fn rejects_empty_or_reversed_spans() {
+        let empty = sentence(3, vec![("dp", 1, 1), ("s", 0, 3)]);
+        assert!(validate_span_tree(&empty)
+            .unwrap_err()
+            .contains("start must be before end"));
+
+        let reversed = sentence(3, vec![("dp", 2, 1), ("s", 0, 3)]);
+        assert!(validate_span_tree(&reversed)
+            .unwrap_err()
+            .contains("start must be before end"));
+    }
+
+    #[test]
+    fn rejects_out_of_bounds_spans() {
+        let input = sentence(3, vec![("dp", 2, 4), ("s", 0, 3)]);
+        assert!(validate_span_tree(&input)
+            .unwrap_err()
+            .contains("sentence has 3 tokens"));
+    }
+
+    #[test]
+    fn rejects_duplicate_intervals_even_with_different_labels() {
+        let input = sentence(
+            3,
+            vec![
+                ("dp", 0, 1),
+                ("n", 0, 1),
+                ("s", 0, 3),
+            ],
+        );
+
+        assert!(validate_span_tree(&input)
+            .unwrap_err()
+            .contains("duplicate span interval 0..1"));
+    }
+
+    #[test]
+    fn rejects_crossing_spans() {
+        let input = sentence(
+            5,
+            vec![
+                ("left", 0, 3),
+                ("right", 2, 5),
+                ("s", 0, 5),
+            ],
+        );
+
+        assert!(validate_span_tree(&input)
+            .unwrap_err()
+            .contains("crossing spans"));
+    }
+
+    #[test]
+    fn requires_one_full_sentence_root() {
+        let input = sentence(
+            4,
+            vec![
+                ("dp", 0, 1),
+                ("s", 0, 3),
+            ],
+        );
+
+        assert!(validate_span_tree(&input)
+            .unwrap_err()
+            .contains("full-sentence root span 0..4"));
+    }
+
+    #[test]
+    fn rejects_empty_token_sequence() {
+        let input = sentence(0, vec![]);
+        assert_eq!(
+            validate_span_tree(&input).unwrap_err(),
+            "hinted sentence has no tokens"
+        );
+    }
 }
