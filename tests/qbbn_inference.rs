@@ -80,18 +80,18 @@ fn test_socrates_mortal() {
 }
 
 #[test]
-fn test_rain_conflict() {
-    run_fixture("rain_conflict.json");
-}
-
-#[test]
 fn test_socrates_chain() {
     run_fixture("socrates_chain.json");
 }
 
 #[test]
-fn test_beach_conflict() {
-    run_fixture("beach_conflict.json");
+fn test_socrates_uncertain() {
+    run_fixture("socrates_uncertain.json");
+}
+
+#[test]
+fn test_rain_conflict() {
+    run_fixture("rain_conflict.json");
 }
 
 #[test]
@@ -102,4 +102,14 @@ fn test_beach_rain() {
 #[test]
 fn test_beach_sunny() {
     run_fixture("beach_sunny.json");
+}
+
+#[test]
+fn test_beach_conflict() {
+    run_fixture("beach_conflict.json");
+}
+
+#[test]
+fn test_traffic_cross() {
+    run_fixture("traffic_cross.json");
 }
