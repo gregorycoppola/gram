@@ -1,7 +1,10 @@
+use std::collections::BTreeMap;
+
 use anyhow::{anyhow, Result};
 
+use crate::core::construct::{constructor_signature, ConstructorArgKind};
 use crate::core::fixture::FixtureRule;
-use crate::core::sem_dsl::SemSpec;
+use crate::core::sem_dsl::{SemArg, SemSpec};
 
 #[derive(Debug, Clone)]
 pub enum Slot {
@@ -50,6 +53,15 @@ fn compile_rule(r: &FixtureRule) -> Result<Rule> {
         )
     })?;
 
+    validate_sem_spec(&sem, &pattern).map_err(|error| {
+        anyhow!(
+            "rule {:?} has invalid sem {:?}: {}",
+            r.name,
+            sem_source,
+            error
+        )
+    })?;
+
     Ok(Rule {
         name: r.name.clone(),
         pattern,
@@ -57,6 +69,102 @@ fn compile_rule(r: &FixtureRule) -> Result<Rule> {
         kind: r.kind.clone(),
         sem,
     })
+}
+
+fn validate_sem_spec(sem: &SemSpec, pattern: &[Slot]) -> Result<()> {
+    let signature = constructor_signature(&sem.constructor)
+        .ok_or_else(|| anyhow!("unknown semantic constructor {:?}", sem.constructor))?;
+
+    if sem.args.len() != signature.len() {
+        return Err(anyhow!(
+            "constructor {:?} expects {} arguments, got {}",
+            sem.constructor,
+            signature.len(),
+            sem.args.len()
+        ));
+    }
+
+    let available_slots = semantic_slots(pattern);
+
+    for (index, (argument, expected_kind)) in sem.args.iter().zip(signature.iter()).enumerate() {
+        let argument_number = index + 1;
+
+        match argument {
+            SemArg::Literal(value) => {
+                if *expected_kind != ConstructorArgKind::Literal {
+                    return Err(anyhow!(
+                        "constructor {:?} argument {} expects {}, got literal {:?}",
+                        sem.constructor,
+                        argument_number,
+                        expected_kind.description(),
+                        value
+                    ));
+                }
+            }
+            SemArg::Slot(name) => {
+                let actual_kind =
+                    available_slots.get(name).copied().ok_or_else(|| {
+                        let available = available_slots
+                            .keys()
+                            .map(|slot| format!("${}", slot))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+
+                        anyhow!(
+                            "constructor {:?} argument {} references unknown slot ${}; available slots: {}",
+                            sem.constructor,
+                            argument_number,
+                            name,
+                            if available.is_empty() {
+                                "<none>".to_string()
+                            } else {
+                                available
+                            }
+                        )
+                    })?;
+
+                if actual_kind != *expected_kind {
+                    return Err(anyhow!(
+                        "constructor {:?} argument {} expects {}, but ${} is a {}",
+                        sem.constructor,
+                        argument_number,
+                        expected_kind.description(),
+                        name,
+                        actual_kind.description()
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn semantic_slots(pattern: &[Slot]) -> BTreeMap<String, ConstructorArgKind> {
+    let mut slots = BTreeMap::new();
+    let mut sub_index = 0usize;
+
+    for slot in pattern {
+        match slot {
+            Slot::Var { name, .. } => {
+                let normalized = name.strip_prefix('$').unwrap_or(name).to_string();
+                slots.insert(normalized, ConstructorArgKind::Lexical);
+            }
+            Slot::Sub { .. } => {
+                let name = if sub_index == 0 {
+                    "SUB".to_string()
+                } else {
+                    format!("SUB{}", sub_index)
+                };
+
+                slots.insert(name, ConstructorArgKind::Sub);
+                sub_index += 1;
+            }
+            Slot::Literal(_) | Slot::Keyword(_) => {}
+        }
+    }
+
+    slots
 }
 
 fn parse_slot(spec: &str) -> Result<Slot> {
@@ -221,9 +329,13 @@ mod tests {
     use super::*;
 
     fn fixture_rule(name: &str, sem: Option<&str>) -> FixtureRule {
+        fixture_rule_with_pattern(name, "$x:e", sem)
+    }
+
+    fn fixture_rule_with_pattern(name: &str, pattern: &str, sem: Option<&str>) -> FixtureRule {
         FixtureRule {
             name: name.to_string(),
-            pattern: "$x:e".to_string(),
+            pattern: pattern.to_string(),
             kind: "dp".to_string(),
             sem: sem.map(str::to_string),
         }
@@ -259,5 +371,148 @@ mod tests {
 
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].sem.constructor, "bare_dp");
+    }
+
+    #[test]
+    fn compile_rejects_unknown_constructor() {
+        let error = compile_rules(&[fixture_rule(
+            "unknown_constructor",
+            Some("does_not_exist($x)"),
+        )])
+        .unwrap_err()
+        .to_string();
+
+        assert!(
+            error.contains("unknown_constructor")
+                && error.contains("unknown semantic constructor")
+                && error.contains("does_not_exist"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn compile_rejects_wrong_constructor_arity() {
+        let error = compile_rules(&[fixture_rule("wrong_arity", Some("bare_dp($x, extra)"))])
+            .unwrap_err()
+            .to_string();
+
+        assert!(
+            error.contains("wrong_arity") && error.contains("expects 1 arguments, got 2"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn compile_rejects_unknown_lexical_slot() {
+        let error = compile_rules(&[fixture_rule("unknown_slot", Some("bare_dp($missing)"))])
+            .unwrap_err()
+            .to_string();
+
+        assert!(
+            error.contains("unknown_slot")
+                && error.contains("unknown slot $missing")
+                && error.contains("$x"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn compile_rejects_sub_index_beyond_pattern_children() {
+        let rule = fixture_rule_with_pattern(
+            "missing_sub",
+            "SUB:dp $V:{agent:e,patient:e}",
+            Some("s_transitive($SUB, $SUB1, $V, agent, patient)"),
+        );
+
+        let error = compile_rules(&[rule]).unwrap_err().to_string();
+
+        assert!(
+            error.contains("missing_sub")
+                && error.contains("unknown slot $SUB1")
+                && error.contains("$SUB"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn compile_rejects_lexical_slot_where_constituent_is_required() {
+        let rule = fixture_rule_with_pattern(
+            "lexical_for_sub",
+            "$x:e $V:{agent:e,patient:e} SUB:dp",
+            Some("s_transitive($x, $SUB, $V, agent, patient)"),
+        );
+
+        let error = compile_rules(&[rule]).unwrap_err().to_string();
+
+        assert!(
+            error.contains("lexical_for_sub")
+                && error.contains("expects constituent slot")
+                && error.contains("$x is a lexical slot"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn compile_rejects_constituent_slot_where_lexical_is_required() {
+        let rule = fixture_rule_with_pattern(
+            "sub_for_lexical",
+            "SUB:dp SUB:dp SUB:dp",
+            Some("s_transitive($SUB, $SUB1, $SUB2, agent, patient)"),
+        );
+
+        let error = compile_rules(&[rule]).unwrap_err().to_string();
+
+        assert!(
+            error.contains("sub_for_lexical")
+                && error.contains("expects lexical slot")
+                && error.contains("$SUB2 is a constituent slot"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn compile_rejects_literal_where_slot_is_required() {
+        let error = compile_rules(&[fixture_rule("literal_for_slot", Some("bare_dp(sue)"))])
+            .unwrap_err()
+            .to_string();
+
+        assert!(
+            error.contains("literal_for_slot")
+                && error.contains("expects lexical slot")
+                && error.contains("got literal"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn compile_rejects_slot_where_literal_is_required() {
+        let rule = fixture_rule_with_pattern(
+            "slot_for_literal",
+            "$N:{theme:e} $role:e",
+            Some("the_dp($N, $role)"),
+        );
+
+        let error = compile_rules(&[rule]).unwrap_err().to_string();
+
+        assert!(
+            error.contains("slot_for_literal")
+                && error.contains("expects literal")
+                && error.contains("$role is a lexical slot"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn compile_accepts_valid_mixed_constructor_signature() {
+        let rule = fixture_rule_with_pattern(
+            "valid_transitive",
+            "SUB:dp $V:{agent:e,patient:e} SUB:dp",
+            Some("s_transitive($SUB, $SUB1, $V, agent, patient)"),
+        );
+
+        let rules = compile_rules(&[rule]).unwrap();
+
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].sem.constructor, "s_transitive");
     }
 }
