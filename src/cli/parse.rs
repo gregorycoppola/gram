@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use clap::Args;
 use std::path::PathBuf;
 
-use crate::core::fixture::{Fixture, SentenceInput};
+use crate::core::fixture::Fixture;
 use crate::core::grammar::compile_rules;
 use crate::core::lexicon::Lexicon;
 use crate::core::matcher::{
@@ -57,19 +57,12 @@ pub fn run_parse(args: ParseArgs) -> Result<()> {
                 continue;
             }
         }
-        match sent {
-            SentenceInput::Plain(_) => {
-                continue;
-            }
-            SentenceInput::Hinted(s) => {
-                let parsed = if args.debug {
-                    parse_hinted_debug(s, &lexicon, &rules)
-                } else {
-                    parse_hinted(s, &lexicon, &rules)
-                };
-                results.push(parsed);
-            }
-        }
+        let parsed = if args.debug {
+            parse_hinted_debug(sent, &lexicon, &rules)
+        } else {
+            parse_hinted(sent, &lexicon, &rules)
+        };
+        results.push(parsed);
     }
 
     if args.json {

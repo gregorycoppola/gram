@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use gram::core::fixture::{Fixture, InputSentence, SentenceInput, Span};
+use gram::core::fixture::{Fixture, InputSentence, Span};
 use gram::core::grammar::{compile_rules, Rule};
 use gram::core::lexicon::Lexicon;
 use gram::core::matcher::{evaluate_gold, parse_hinted_sentence, semantic_count, Match};
@@ -10,10 +10,7 @@ fn load_fixture() -> Fixture {
 }
 
 fn hinted_sentence(fixture: &Fixture) -> &InputSentence {
-    match fixture.sentences.first().unwrap() {
-        SentenceInput::Hinted(sentence) => sentence,
-        SentenceInput::Plain(_) => panic!("expected hinted sentence"),
-    }
+    fixture.sentences.first().unwrap()
 }
 
 fn parse_with_rules(sentence: &InputSentence, lexicon: &Lexicon, rules: &[Rule]) -> Vec<Match> {
@@ -148,10 +145,7 @@ fn gold_evaluation_uses_alpha_equivalence() {
     let lexicon = Lexicon::from_fixture(&fixture);
     let rules = compile_rules(&fixture.grammar).unwrap();
 
-    let sentence = match &fixture.sentences[2] {
-        SentenceInput::Hinted(sentence) => sentence,
-        SentenceInput::Plain(_) => panic!("expected hinted sentence"),
-    };
+    let sentence = &fixture.sentences[2];
 
     let matches = parse_with_rules(sentence, &lexicon, &rules);
     let evaluation =

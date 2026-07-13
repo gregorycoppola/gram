@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use gram::core::fixture::{Fixture, SentenceInput};
+use gram::core::fixture::Fixture;
 use gram::core::grammar::compile_rules;
 use gram::core::lexicon::Lexicon;
 use gram::core::matcher::{evaluate_gold, parse_hinted_sentence};
@@ -15,17 +15,7 @@ fn assert_fixture_semantics(name: &str, expected_sentences: usize) {
 
     let mut checked = 0;
 
-    for input in &fixture.sentences {
-        let sentence = match input {
-            SentenceInput::Hinted(sentence) => sentence,
-            SentenceInput::Plain(text) => {
-                panic!(
-                    "{} contains an unexpected legacy plain sentence: {:?}",
-                    name, text
-                );
-            }
-        };
-
+    for sentence in &fixture.sentences {
         checked += 1;
         let display = sentence.tokens.join(" ");
         let gold = sentence.gold.as_deref().unwrap_or_else(|| {

@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use clap::Args;
 use std::path::PathBuf;
 
-use crate::core::fixture::{Fixture, SentenceInput};
+use crate::core::fixture::Fixture;
 use crate::core::grammar::compile_rules;
 use crate::core::lexicon::Lexicon;
 use crate::core::matcher::parse_hinted_sentence;
@@ -19,31 +19,25 @@ pub fn run_tree(args: TreeArgs) -> Result<()> {
     let lexicon = Lexicon::from_fixture(&fixture);
     let rules = compile_rules(&fixture.grammar)?;
 
-    for input in &fixture.sentences {
-        match input {
-            SentenceInput::Plain(_) => {
-                continue;
-            }
-            SentenceInput::Hinted(s) => {
-                let tokens = &s.tokens;
-                println!("\"{}\" (hinted)", tokens.join(" "));
-                match parse_hinted_sentence(s, &lexicon, &rules) {
-                    Ok(matches) => {
-                        if matches.is_empty() {
-                            println!("   no matching rule\n");
-                            continue;
-                        }
-                        for m in &matches {
-                            if let Some(ref tree) = m.syntax_tree {
-                                println!("{}", tree);
-                            }
-                            println!("→ {}  [{}]\n", m.output, m.rule_name);
-                        }
-                    }
-                    Err(e) => {
-                        println!("   error: {}\n", e);
-                    }
+    for sentence in &fixture.sentences {
+        println!("\"{}\" (hinted)", sentence.tokens.join(" "));
+
+        match parse_hinted_sentence(sentence, &lexicon, &rules) {
+            Ok(matches) => {
+                if matches.is_empty() {
+                    println!("   no matching rule\n");
+                    continue;
                 }
+
+                for matched in &matches {
+                    if let Some(ref tree) = matched.syntax_tree {
+                        println!("{}", tree);
+                    }
+                    println!("→ {}  [{}]\n", matched.output, matched.rule_name);
+                }
+            }
+            Err(error) => {
+                println!("   error: {}\n", error);
             }
         }
     }
