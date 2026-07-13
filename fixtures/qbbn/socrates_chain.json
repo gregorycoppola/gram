@@ -1,7 +1,10 @@
 {
   "title": "Socrates chain: man -> human -> mortal",
   "entities": [
-    {"name": "socrates", "type": "e"}
+    {
+      "name": "socrates",
+      "type": "e"
+    }
   ],
   "rules": [
     {
@@ -14,9 +17,16 @@
     }
   ],
   "evidence": [
-    {"formula": "man(theme: socrates)", "value": true}
+    {
+      "formula": "man(theme: socrates)",
+      "prob": 1.0
+    }
   ],
   "queries": [
-    {"formula": "mortal(theme: socrates)", "expected_prob": 0.99, "tolerance": 0.01}
+    {
+      "formula": "mortal(theme: socrates)",
+      "expected_prob": 0.99,
+      "tolerance": 0.01
+    }
   ]
 }

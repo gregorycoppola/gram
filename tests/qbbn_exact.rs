@@ -1,0 +1,459 @@
+use gram::core::qbbn::{
+    analyze_topology, belief_propagation, exact_inference, ExactConfig,
+    ExactResult, NodeType, QBBNGraph,
+};
+
+fn assert_close(actual: f64, expected: f64, tolerance: f64) {
+    assert!(
+        (actual - expected).abs() <= tolerance,
+        "got {actual:.12}, expected {expected:.12} ± {tolerance}"
+    );
+}
+
+fn exact(graph: &QBBNGraph) -> ExactResult {
+    exact_inference(graph, ExactConfig::default())
+        .expect("exact inference should succeed")
+}
+
+fn assert_acyclic(graph: &QBBNGraph) {
+    let topology = analyze_topology(graph);
+
+    assert!(
+        topology.acyclic,
+        "BP equality test requires an acyclic factor graph, got {:?}",
+        topology
+    );
+}
+
+fn add_rule(
+    graph: &mut QBBNGraph,
+    premises: &[&str],
+    conclusion: &str,
+    weight: f64,
+) {
+    let premise_formulas: Vec<String> =
+        premises.iter().map(|p| (*p).to_string()).collect();
+
+    let rule_id = graph.add_rule(
+        premise_formulas.clone(),
+        conclusion.to_string(),
+        Vec::new(),
+        weight,
+    );
+
+    graph.add_grounded_rule(
+        premise_formulas,
+        conclusion.to_string(),
+        rule_id,
+    );
+}
+
+fn single_rule_graph(
+    premise: &str,
+    conclusion: &str,
+    weight: f64,
+) -> QBBNGraph {
+    let mut graph = QBBNGraph::new();
+    add_rule(&mut graph, &[premise], conclusion, weight);
+    graph.build_or_factors();
+    graph
+}
+
+fn two_child_graph(weight: f64) -> QBBNGraph {
+    let mut graph = QBBNGraph::new();
+    add_rule(&mut graph, &["a"], "b", weight);
+    add_rule(&mut graph, &["a"], "c", weight);
+    graph.build_or_factors();
+    graph
+}
+
+fn three_node_chain(weight: f64) -> QBBNGraph {
+    let mut graph = QBBNGraph::new();
+    add_rule(&mut graph, &["a"], "b", weight);
+    add_rule(&mut graph, &["b"], "c", weight);
+    graph.build_or_factors();
+    graph
+}
+
+#[test]
+fn soft_evidence_on_uniform_root_produces_requested_posterior() {
+    let mut graph = QBBNGraph::new();
+    graph.add_proposition("a");
+    graph.set_evidence("a", 0.7);
+
+    let result = exact(&graph);
+
+    assert_close(
+        result.prob_formula(&graph, "a").unwrap(),
+        0.7,
+        1e-12,
+    );
+}
+
+#[test]
+fn exact_forward_probability_matches_hand_calculation() {
+    let mut graph =
+        single_rule_graph("a", "b", 3.0_f64.ln());
+    graph.set_evidence("a", 0.7);
+
+    let result = exact(&graph);
+
+    assert_close(
+        result.prob_formula(&graph, "a").unwrap(),
+        0.7,
+        1e-12,
+    );
+
+    assert_close(
+        result.prob_formula(&graph, "b").unwrap(),
+        0.675,
+        1e-12,
+    );
+}
+
+#[test]
+fn exact_backward_conditioning_matches_bayes_rule() {
+    let mut graph =
+        single_rule_graph("a", "b", 3.0_f64.ln());
+    graph.set_evidence("b", 1.0);
+
+    let result = exact(&graph);
+
+    assert_close(
+        result.prob_formula(&graph, "a").unwrap(),
+        0.6,
+        1e-12,
+    );
+}
+
+#[test]
+fn exact_combines_evidence_from_two_children() {
+    let mut graph = two_child_graph(3.0_f64.ln());
+    graph.set_evidence("b", 1.0);
+    graph.set_evidence("c", 1.0);
+
+    let result = exact(&graph);
+
+    assert_close(
+        result.prob_formula(&graph, "a").unwrap(),
+        9.0 / 13.0,
+        1e-12,
+    );
+}
+
+#[test]
+fn exact_handles_negated_premise_in_backward_direction() {
+    let mut graph =
+        single_rule_graph("not a", "b", 3.0_f64.ln());
+    graph.set_evidence("b", 1.0);
+
+    let result = exact(&graph);
+
+    assert_close(
+        result.prob_formula(&graph, "a").unwrap(),
+        0.4,
+        1e-12,
+    );
+
+    assert_close(
+        result.prob_formula(&graph, "not a").unwrap(),
+        0.6,
+        1e-12,
+    );
+}
+
+#[test]
+fn exact_multistep_backward_chain_matches_hand_calculation() {
+    let mut graph =
+        three_node_chain(3.0_f64.ln());
+    graph.set_evidence("c", 1.0);
+
+    let result = exact(&graph);
+
+    assert_close(
+        result.prob_formula(&graph, "a").unwrap(),
+        11.0 / 21.0,
+        1e-12,
+    );
+
+    assert_close(
+        result.prob_formula(&graph, "b").unwrap(),
+        5.0 / 7.0,
+        1e-12,
+    );
+}
+
+#[test]
+fn and_group_is_deterministic_in_every_nonzero_assignment() {
+    let mut graph = QBBNGraph::new();
+
+    add_rule(
+        &mut graph,
+        &["a", "c"],
+        "b",
+        3.0_f64.ln(),
+    );
+
+    graph.build_or_factors();
+
+    let result = exact(&graph);
+
+    let a_id = graph.formula_to_id["a"].clone();
+    let c_id = graph.formula_to_id["c"].clone();
+
+    let group_id = graph
+        .variables
+        .values()
+        .find(|variable| variable.node_type == NodeType::Group)
+        .expect("graph should contain a group")
+        .id
+        .clone();
+
+    for assignment in result
+        .assignments
+        .iter()
+        .filter(|assignment| assignment.posterior > 0.0)
+    {
+        let a = assignment.values[&a_id];
+        let c = assignment.values[&c_id];
+        let group = assignment.values[&group_id];
+
+        assert_eq!(
+            group,
+            a && c,
+            "nonzero assignment violates deterministic AND: {:?}",
+            assignment.values
+        );
+    }
+}
+
+#[test]
+fn exact_assignment_probabilities_normalize_to_one() {
+    let mut graph = QBBNGraph::new();
+
+    add_rule(
+        &mut graph,
+        &["a"],
+        "b",
+        3.0_f64.ln(),
+    );
+
+    add_rule(
+        &mut graph,
+        &["b"],
+        "c",
+        2.0_f64.ln(),
+    );
+
+    graph.build_or_factors();
+    graph.set_evidence("c", 0.8);
+
+    let result = exact(&graph);
+
+    let total: f64 = result
+        .assignments
+        .iter()
+        .map(|assignment| assignment.posterior)
+        .sum();
+
+    assert_close(total, 1.0, 1e-12);
+
+    for probability in result.marginals.values() {
+        assert!((0.0..=1.0).contains(probability));
+    }
+}
+
+#[test]
+fn bp_matches_exact_for_simple_forward_tree() {
+    let mut graph =
+        single_rule_graph("a", "b", 3.0_f64.ln());
+    graph.set_evidence("a", 0.7);
+
+    assert_acyclic(&graph);
+
+    let exact_result = exact(&graph);
+    let exact_b =
+        exact_result.prob_formula(&graph, "b").unwrap();
+
+    let mut bp_graph = graph.clone();
+
+    belief_propagation(
+        &mut bp_graph,
+        100,
+        0.5,
+        1e-10,
+        false,
+    );
+
+    assert_close(
+        bp_graph.prob("b"),
+        exact_b,
+        1e-6,
+    );
+}
+
+#[test]
+fn bp_matches_exact_for_downstream_evidence_on_tree() {
+    let mut graph =
+        single_rule_graph("a", "b", 3.0_f64.ln());
+    graph.set_evidence("b", 1.0);
+
+    assert_acyclic(&graph);
+
+    let exact_result = exact(&graph);
+    let exact_a =
+        exact_result.prob_formula(&graph, "a").unwrap();
+
+    let mut bp_graph = graph.clone();
+
+    belief_propagation(
+        &mut bp_graph,
+        100,
+        0.5,
+        1e-10,
+        false,
+    );
+
+    assert_close(
+        bp_graph.prob("a"),
+        exact_a,
+        1e-6,
+    );
+}
+
+#[test]
+fn bp_combines_two_children_like_exact() {
+    let mut graph = two_child_graph(3.0_f64.ln());
+    graph.set_evidence("b", 1.0);
+    graph.set_evidence("c", 1.0);
+
+    assert_acyclic(&graph);
+
+    let exact_result = exact(&graph);
+    let exact_a =
+        exact_result.prob_formula(&graph, "a").unwrap();
+
+    let mut bp_graph = graph.clone();
+
+    belief_propagation(
+        &mut bp_graph,
+        100,
+        0.5,
+        1e-10,
+        false,
+    );
+
+    assert_close(
+        bp_graph.prob("a"),
+        exact_a,
+        1e-6,
+    );
+}
+
+#[test]
+fn bp_handles_negated_premise_like_exact() {
+    let mut graph =
+        single_rule_graph("not a", "b", 3.0_f64.ln());
+    graph.set_evidence("b", 1.0);
+
+    assert_acyclic(&graph);
+
+    let exact_result = exact(&graph);
+    let exact_a =
+        exact_result.prob_formula(&graph, "a").unwrap();
+
+    let mut bp_graph = graph.clone();
+
+    belief_propagation(
+        &mut bp_graph,
+        100,
+        0.5,
+        1e-10,
+        false,
+    );
+
+    assert_close(
+        bp_graph.prob("a"),
+        exact_a,
+        1e-6,
+    );
+}
+
+#[test]
+fn bp_matches_exact_for_multistep_backward_chain() {
+    let mut graph =
+        three_node_chain(3.0_f64.ln());
+    graph.set_evidence("c", 1.0);
+
+    assert_acyclic(&graph);
+
+    let exact_result = exact(&graph);
+
+    let exact_a =
+        exact_result.prob_formula(&graph, "a").unwrap();
+
+    let exact_b =
+        exact_result.prob_formula(&graph, "b").unwrap();
+
+    let mut bp_graph = graph.clone();
+
+    belief_propagation(
+        &mut bp_graph,
+        100,
+        0.5,
+        1e-10,
+        false,
+    );
+
+    assert_close(
+        bp_graph.prob("a"),
+        exact_a,
+        1e-6,
+    );
+
+    assert_close(
+        bp_graph.prob("b"),
+        exact_b,
+        1e-6,
+    );
+}
+
+#[test]
+fn topology_recognizes_tree() {
+    let graph = single_rule_graph("a", "b", 1.0);
+    let topology = analyze_topology(&graph);
+
+    assert!(topology.acyclic);
+    assert_eq!(topology.connected_components, 1);
+    assert_eq!(topology.kind(), "tree");
+}
+
+#[test]
+fn topology_recognizes_forest() {
+    let mut graph = QBBNGraph::new();
+    graph.add_proposition("a");
+    graph.add_proposition("b");
+
+    let topology = analyze_topology(&graph);
+
+    assert!(topology.acyclic);
+    assert_eq!(topology.connected_components, 2);
+    assert_eq!(topology.kind(), "forest");
+}
+
+#[test]
+fn topology_recognizes_loopy_factor_graph() {
+    // Two branches leave A and meet again at the B AND C factor.
+    let mut graph = QBBNGraph::new();
+
+    add_rule(&mut graph, &["a"], "b", 1.0);
+    add_rule(&mut graph, &["a"], "c", 1.0);
+    add_rule(&mut graph, &["b", "c"], "d", 1.0);
+
+    graph.build_or_factors();
+
+    let topology = analyze_topology(&graph);
+
+    assert!(!topology.acyclic);
+    assert_eq!(topology.kind(), "loopy");
+}
