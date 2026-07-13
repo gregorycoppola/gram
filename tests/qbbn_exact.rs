@@ -82,14 +82,6 @@ fn soft_evidence_on_uniform_root_produces_requested_posterior() {
 
 #[test]
 fn exact_forward_probability_matches_hand_calculation() {
-    // With w = ln(3):
-    //
-    // P(B=1 | A=0) = 0.5
-    // P(B=1 | A=1) = 0.75
-    //
-    // Given P(A=1)=0.7:
-    //
-    // P(B=1) = 0.3(0.5) + 0.7(0.75) = 0.675.
     let mut graph = single_rule_graph("a", "b", 3.0_f64.ln());
     graph.set_evidence("a", 0.7);
 
@@ -109,14 +101,6 @@ fn exact_forward_probability_matches_hand_calculation() {
 
 #[test]
 fn exact_backward_conditioning_matches_bayes_rule() {
-    // Prior P(A=1) = 0.5.
-    //
-    // P(B=1 | A=1) = 0.75
-    // P(B=1 | A=0) = 0.50
-    //
-    // P(A=1 | B=1)
-    //   = 0.5(0.75) / [0.5(0.75) + 0.5(0.50)]
-    //   = 0.6.
     let mut graph = single_rule_graph("a", "b", 3.0_f64.ln());
     graph.set_evidence("b", 1.0);
 
@@ -131,12 +115,6 @@ fn exact_backward_conditioning_matches_bayes_rule() {
 
 #[test]
 fn exact_combines_evidence_from_two_children() {
-    // P(B=1 | A=1) = P(C=1 | A=1) = 0.75
-    // P(B=1 | A=0) = P(C=1 | A=0) = 0.50
-    //
-    // P(A=1 | B=1,C=1)
-    //   = 0.75² / (0.75² + 0.50²)
-    //   = 9/13.
     let mut graph = two_child_graph(3.0_f64.ln());
     graph.set_evidence("b", 1.0);
     graph.set_evidence("c", 1.0);
@@ -152,14 +130,6 @@ fn exact_combines_evidence_from_two_children() {
 
 #[test]
 fn exact_handles_negated_premise_in_backward_direction() {
-    // not A -> B
-    //
-    // P(B=1 | A=0) = 0.75
-    // P(B=1 | A=1) = 0.50
-    //
-    // P(A=1 | B=1)
-    //   = 0.5(0.50) / [0.5(0.50) + 0.5(0.75)]
-    //   = 0.4.
     let mut graph =
         single_rule_graph("not a", "b", 3.0_f64.ln());
     graph.set_evidence("b", 1.0);
@@ -180,22 +150,6 @@ fn exact_handles_negated_premise_in_backward_direction() {
 
 #[test]
 fn exact_multistep_backward_chain_matches_hand_calculation() {
-    // A -> B -> C, with the same CPT at both links:
-    //
-    // P(child=1 | parent=0) = 0.50
-    // P(child=1 | parent=1) = 0.75
-    //
-    // P(C=1 | A=0)
-    //   = 0.5(0.75) + 0.5(0.50)
-    //   = 10/16.
-    //
-    // P(C=1 | A=1)
-    //   = 0.75(0.75) + 0.25(0.50)
-    //   = 11/16.
-    //
-    // Therefore:
-    //
-    // P(A=1 | C=1) = 11 / (11 + 10) = 11/21.
     let mut graph = three_node_chain(3.0_f64.ln());
     graph.set_evidence("c", 1.0);
 
@@ -206,13 +160,6 @@ fn exact_multistep_backward_chain_matches_hand_calculation() {
         11.0 / 21.0,
         1e-12,
     );
-
-    // The prior marginal P(B=1) is 5/8.
-    //
-    // P(B=1 | C=1)
-    //   = (5/8)(3/4) /
-    //     [(5/8)(3/4) + (3/8)(1/2)]
-    //   = 5/7.
     assert_close(
         result.prob_formula(&graph, "b").unwrap(),
         5.0 / 7.0,
@@ -276,7 +223,7 @@ fn exact_assignment_probabilities_normalize_to_one() {
 }
 
 #[test]
-fn current_bp_matches_exact_for_simple_forward_tree() {
+fn bp_matches_exact_for_simple_forward_tree() {
     let mut graph = single_rule_graph("a", "b", 3.0_f64.ln());
     graph.set_evidence("a", 0.7);
 
@@ -296,8 +243,7 @@ fn current_bp_matches_exact_for_simple_forward_tree() {
 }
 
 #[test]
-#[ignore = "documents the backward-message bug in the current BP implementation"]
-fn bp_should_match_exact_for_downstream_evidence_on_tree() {
+fn bp_matches_exact_for_downstream_evidence_on_tree() {
     let mut graph = single_rule_graph("a", "b", 3.0_f64.ln());
     graph.set_evidence("b", 1.0);
 
@@ -317,8 +263,7 @@ fn bp_should_match_exact_for_downstream_evidence_on_tree() {
 }
 
 #[test]
-#[ignore = "documents that current BP does not combine backward evidence from multiple children"]
-fn bp_should_combine_two_children_like_exact() {
+fn bp_combines_two_children_like_exact() {
     let mut graph = two_child_graph(3.0_f64.ln());
     graph.set_evidence("b", 1.0);
     graph.set_evidence("c", 1.0);
@@ -339,8 +284,7 @@ fn bp_should_combine_two_children_like_exact() {
 }
 
 #[test]
-#[ignore = "documents the negated-premise backward-message bug in current BP"]
-fn bp_should_handle_negated_premise_like_exact() {
+fn bp_handles_negated_premise_like_exact() {
     let mut graph =
         single_rule_graph("not a", "b", 3.0_f64.ln());
     graph.set_evidence("b", 1.0);
@@ -361,8 +305,7 @@ fn bp_should_handle_negated_premise_like_exact() {
 }
 
 #[test]
-#[ignore = "documents that current BP does not propagate downstream evidence through a chain"]
-fn bp_should_match_exact_for_multistep_backward_chain() {
+fn bp_matches_exact_for_multistep_backward_chain() {
     let mut graph = three_node_chain(3.0_f64.ln());
     graph.set_evidence("c", 1.0);
 
