@@ -77,7 +77,7 @@ impl std::fmt::Display for SemValue {
 }
 
 /// Generates fresh variable names.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VarGen {
     counter: u32,
 }
@@ -85,6 +85,14 @@ pub struct VarGen {
 impl VarGen {
     pub fn new() -> Self {
         VarGen { counter: 0 }
+    }
+
+    pub(crate) fn position(&self) -> u32 {
+        self.counter
+    }
+
+    pub(crate) fn advance_to(&mut self, position: u32) {
+        self.counter = self.counter.max(position);
     }
 
     /// Generate a fresh variable name: x, x1, x2, ...

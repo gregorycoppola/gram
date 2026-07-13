@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use crate::core::fixture::{Fixture, SentenceInput};
 use crate::core::grammar::compile_rules;
 use crate::core::lexicon::Lexicon;
-use crate::core::matcher::parse_hinted_sentence;
+use crate::core::matcher::{evaluate_gold, parse_hinted_sentence, semantic_count};
 use crate::core::proof::checker::check_proof as proof_check;
 use crate::core::proof::ProofFile;
 use crate::core::proof::StepResult;
@@ -194,6 +194,7 @@ async fn do_parse_fixture(state: AppState, name: &str) -> Result<Vec<ParseResult
     let rules = compile_rules(&fixture.grammar)?;
 
     let mut results = Vec::new();
+
     for input in &fixture.sentences {
         match input {
             SentenceInput::Plain(text) => {
@@ -203,25 +204,40 @@ async fn do_parse_fixture(state: AppState, name: &str) -> Result<Vec<ParseResult
                     tokens,
                     matches: Vec::new(),
                     status: ParseStatus::Failed,
+                    semantic_count: 0,
+                    gold_evaluation: None,
                 });
             }
-            SentenceInput::Hinted(s) => {
-                let (matches, status) = match parse_hinted_sentence(s, &lexicon, &rules) {
-                    Ok(m) => {
-                        let status = ParseStatus::from_matches(&m);
-                        (m, status)
-                    }
-                    Err(e) => (Vec::new(), ParseStatus::Error(e)),
-                };
+            SentenceInput::Hinted(sentence) => {
+                let (matches, status, distinct_semantics, gold_evaluation) =
+                    match parse_hinted_sentence(sentence, &lexicon, &rules) {
+                        Ok(matches) => {
+                            let status = ParseStatus::from_matches(&matches);
+                            let distinct_semantics = semantic_count(&matches);
+                            let gold_evaluation = sentence
+                                .gold
+                                .as_deref()
+                                .map(|gold| evaluate_gold(&matches, gold))
+                                .transpose()
+                                .map_err(anyhow::Error::msg)?;
+
+                            (matches, status, distinct_semantics, gold_evaluation)
+                        }
+                        Err(error) => (Vec::new(), ParseStatus::Error(error), 0, None),
+                    };
+
                 results.push(ParseResult {
-                    sentence: s.tokens.join(" "),
-                    tokens: s.tokens.clone(),
+                    sentence: sentence.tokens.join(" "),
+                    tokens: sentence.tokens.clone(),
                     matches,
                     status,
+                    semantic_count: distinct_semantics,
+                    gold_evaluation,
                 });
             }
         }
     }
+
     Ok(results)
 }
 

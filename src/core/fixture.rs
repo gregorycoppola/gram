@@ -73,6 +73,8 @@ pub struct Span {
 pub struct InputSentence {
     pub tokens: Vec<String>,
     pub spans: Vec<Span>,
+    #[serde(default)]
+    pub gold: Option<String>,
 }
 
 /// Sentences can be plain strings (old format) or structured hints (new format).

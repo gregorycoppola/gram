@@ -3,18 +3,76 @@ mod tree;
 mod types;
 
 pub use tree::build_syntax_tree_for_result;
-pub use types::{Constituent, DebugTrace, Match, SyntaxNode, TokenAnnotation, TokenKind};
+pub use types::{
+    Constituent, DebugTrace, GoldEvaluation, Match, SyntaxNode, TokenAnnotation, TokenKind,
+};
 
 use std::collections::{HashMap, HashSet};
 
 use crate::core::fixture::{InputSentence, Span};
 use crate::core::grammar::Rule;
 use crate::core::lexicon::Lexicon;
-use crate::core::value::VarGen;
+use crate::core::value::{SemValue, VarGen};
 
-use engine::try_pattern_match;
+use engine::try_pattern_matches;
 use tree::span_result_to_match;
-use types::{SpanKey, SpanResult};
+use types::{SpanCache, SpanKey, SpanResult};
+
+// --- Gold evaluation ---
+
+fn matches_semantically_equivalent(left: &Match, right: &Match) -> bool {
+    match (&left.sem_value, &right.sem_value) {
+        (Some(SemValue::Prop(left_expr)), Some(SemValue::Prop(right_expr))) => {
+            crate::core::logic::alpha_equivalent(left_expr, right_expr)
+        }
+        _ => left.output == right.output,
+    }
+}
+
+pub fn semantic_count(matches: &[Match]) -> usize {
+    let mut representatives: Vec<&Match> = Vec::new();
+
+    'candidate: for candidate in matches {
+        for representative in &representatives {
+            if matches_semantically_equivalent(candidate, representative) {
+                continue 'candidate;
+            }
+        }
+
+        representatives.push(candidate);
+    }
+
+    representatives.len()
+}
+
+pub fn evaluate_gold(matches: &[Match], gold: &str) -> Result<GoldEvaluation, String> {
+    let parsed_gold = crate::core::semantics::parse(gold)
+        .map_err(|error| format!("invalid gold logical form {:?}: {}", gold, error))?;
+
+    let matching_parse_indices = matches
+        .iter()
+        .enumerate()
+        .filter_map(|(index, candidate)| match &candidate.sem_value {
+            Some(SemValue::Prop(candidate_expr))
+                if crate::core::logic::alpha_equivalent(candidate_expr, &parsed_gold) =>
+            {
+                Some(index)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    let gold_match_count = matching_parse_indices.len();
+
+    Ok(GoldEvaluation {
+        gold: gold.to_string(),
+        correct: gold_match_count > 0,
+        parse_count: matches.len(),
+        semantic_count: semantic_count(matches),
+        gold_match_count,
+        matching_parse_indices,
+    })
+}
 
 // --- Public API ---
 
@@ -235,7 +293,7 @@ fn parse_bottom_up(
         t.push("");
     }
 
-    let mut cache: HashMap<SpanKey, SpanResult> = HashMap::new();
+    let mut cache: SpanCache = HashMap::new();
 
     for (_orig_idx, span) in &indexed {
         let key = SpanKey {
@@ -245,7 +303,7 @@ fn parse_bottom_up(
         };
         let span_tokens = &sentence.tokens[span.start..span.end];
 
-        let direct_children: Vec<SpanKey> = sentence
+        let mut direct_children: Vec<SpanKey> = sentence
             .spans
             .iter()
             .filter_map(|s| {
@@ -266,6 +324,7 @@ fn parse_bottom_up(
                 }
             })
             .collect();
+        direct_children.sort_by_key(|child| (child.start, child.end, child.label.clone()));
 
         if let Some(t) = &mut trace {
             t.enter(&format!(
@@ -279,10 +338,11 @@ fn parse_bottom_up(
             t.push(&format!("tokens: {:?}", span_tokens));
         }
 
-        let result = match_span(
+        let results = match_span(
             span_tokens,
             span.start,
             span,
+            &direct_children,
             lexicon,
             rules,
             &mut var_gen,
@@ -291,19 +351,22 @@ fn parse_bottom_up(
         )?;
 
         if let Some(t) = &mut trace {
-            t.push(&format!(
-                "→ {} [{}: {}]",
-                result.output, result.rule_name, result.pattern
-            ));
+            t.push(&format!("→ {} derivation(s)", results.len()));
+            for result in &results {
+                t.push(&format!(
+                    "  {} [{}: {}]",
+                    result.output, result.rule_name, result.pattern
+                ));
+            }
             t.leave();
         }
 
-        cache.insert(key, result);
+        cache.insert(key, results);
     }
 
     if top_level_keys.len() == 1 {
         let key = &top_level_keys[0];
-        let result = cache.get(key).unwrap();
+        let results = cache.get(key).unwrap();
         let span = sentence
             .spans
             .iter()
@@ -315,8 +378,11 @@ fn parse_bottom_up(
                 } == *key
             })
             .unwrap();
-        let m = span_result_to_match(result, span, &sentence.tokens);
-        Ok(vec![m])
+
+        Ok(results
+            .iter()
+            .map(|result| span_result_to_match(result, span, &sentence.tokens))
+            .collect())
     } else {
         return Err(format!(
             "expected exactly one top-level span, found {}: {}",
@@ -334,28 +400,33 @@ fn match_span(
     span_tokens: &[String],
     global_start: usize,
     span: &Span,
+    direct_children: &[SpanKey],
     lexicon: &Lexicon,
     rules: &[Rule],
     var_gen: &mut VarGen,
-    cache: &HashMap<SpanKey, SpanResult>,
+    cache: &SpanCache,
     trace: Option<&mut DebugTrace>,
-) -> Result<SpanResult, String> {
-    try_pattern_match(
+) -> Result<Vec<SpanResult>, String> {
+    let results = try_pattern_matches(
         span_tokens,
         global_start,
         span,
+        direct_children,
         lexicon,
         rules,
         var_gen,
         cache,
         trace,
-    )
-    .ok_or_else(|| {
-        format!(
+    )?;
+
+    if results.is_empty() {
+        Err(format!(
             "span [{}] tokens[{}..{}] ({:?}): no matching rule",
             span.label, span.start, span.end, span_tokens
-        )
-    })
+        ))
+    } else {
+        Ok(results)
+    }
 }
 
 #[cfg(test)]
@@ -375,6 +446,7 @@ mod tests {
                     end,
                 })
                 .collect(),
+            gold: None,
         }
     }
 

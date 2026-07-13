@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::core::value::SemValue;
 
@@ -88,6 +88,16 @@ pub struct Match {
     pub sem_value: Option<SemValue>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub span: Option<(usize, usize)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GoldEvaluation {
+    pub gold: String,
+    pub correct: bool,
+    pub parse_count: usize,
+    pub semantic_count: usize,
+    pub gold_match_count: usize,
+    pub matching_parse_indices: Vec<usize>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -187,6 +197,7 @@ pub struct SpanKey {
     pub label: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct SpanResult {
     pub sem_value: SemValue,
     pub output: String,
@@ -196,7 +207,10 @@ pub struct SpanResult {
     pub bindings: BTreeMap<String, (String, String)>,
     pub token_annotations: Vec<TokenAnnotation>,
     pub constituents: Vec<Constituent>,
+    pub derivation_key: String,
 }
+
+pub type SpanCache = HashMap<SpanKey, Vec<SpanResult>>;
 
 // --- Helpers ---
 
