@@ -7,6 +7,7 @@ use super::bp::belief_propagation;
 use super::exact::{exact_inference, ExactConfig};
 use super::factor_graph::QBBNGraph;
 use super::kb::KnowledgeBase;
+use super::topology::{analyze_topology, GraphTopology};
 
 #[derive(Debug, Deserialize)]
 pub struct InferenceFixture {
@@ -221,20 +222,36 @@ pub struct QueryResult {
     /// Approximate result produced by belief propagation.
     pub prob: f64,
 
-    /// Exact marginal under the current graph semantics, when the graph is
-    /// small enough for enumeration.
+    /// Exact marginal under the declared QBBN semantics.
     #[serde(default)]
     pub exact_prob: Option<f64>,
 
-    /// Approximate minus exact.
+    /// Signed BP minus exact difference.
     #[serde(default)]
     pub bp_exact_delta: Option<f64>,
 
     pub expected: Option<f64>,
     pub tolerance: f64,
 
-    /// Existing fixture status: whether BP matches the hand-written expected
-    /// value. Exact comparison is reported separately.
+    /// Whether exact inference matches the handwritten expected value.
+    ///
+    /// This tests the declared model semantics, independently of BP.
+    #[serde(default)]
+    pub expected_ok: Option<bool>,
+
+    /// Whether BP matches exact inference within the BP tolerance.
+    #[serde(default)]
+    pub bp_matches_exact: Option<bool>,
+
+    /// Topology-aware overall status.
+    ///
+    /// Acyclic graph:
+    /// - exact must match any handwritten expectation;
+    /// - BP must match exact.
+    ///
+    /// Loopy graph:
+    /// - exact must match any handwritten expectation;
+    /// - BP versus exact is diagnostic only.
     pub ok: bool,
 }
 
@@ -245,11 +262,11 @@ pub struct InferenceResult {
     pub stats: (usize, usize, usize, usize, usize, usize),
     pub iterations: usize,
 
-    /// Exact partition function when enumeration succeeded.
+    pub topology: GraphTopology,
+
     #[serde(default)]
     pub exact_partition_function: Option<f64>,
 
-    /// Exact inference is diagnostic and may be skipped for oversized graphs.
     #[serde(default)]
     pub exact_error: Option<String>,
 
@@ -303,12 +320,14 @@ pub fn run_inference_fixture_debug(
 
         if debug {
             println!("=== Extracted Horn clause (after convert) ===");
+
             for (index, premise) in premises.iter().enumerate() {
                 println!(
                     "  premise[{}]: {}  AST: {:?}",
                     index, premise, premise
                 );
             }
+
             println!(
                 "  conclusion: {}  AST: {:?}",
                 conclusion, conclusion
@@ -382,9 +401,21 @@ pub fn run_inference_fixture_debug(
         }
     }
 
-    // Run the exact oracle before BP. The oracle does not depend on mutable
-    // beliefs, but doing it here keeps the reference result conceptually
-    // separate from the approximation.
+    let topology = analyze_topology(&graph);
+
+    if debug {
+        println!("=== Factor-graph topology ===");
+        println!("  kind: {}", topology.kind());
+        println!("  acyclic: {}", topology.acyclic);
+        println!(
+            "  components: {}  variables: {}  factors: {}  edges: {}",
+            topology.connected_components,
+            topology.variable_nodes,
+            topology.factor_nodes,
+            topology.edges
+        );
+    }
+
     let exact_attempt = exact_inference(
         &graph,
         ExactConfig {
@@ -393,20 +424,24 @@ pub fn run_inference_fixture_debug(
         },
     );
 
-    let (exact_result, exact_partition_function, exact_error) =
-        match exact_attempt {
-            Ok(result) => {
-                let partition = Some(result.partition_function);
-                (Some(result), partition, None)
+    let (
+        exact_result,
+        exact_partition_function,
+        exact_error,
+    ) = match exact_attempt {
+        Ok(result) => {
+            let partition = Some(result.partition_function);
+            (Some(result), partition, None)
+        }
+        Err(error) => {
+            if debug {
+                println!("=== Exact inference unavailable ===");
+                println!("  {}", error);
             }
-            Err(error) => {
-                if debug {
-                    println!("=== Exact inference unavailable ===");
-                    println!("  {}", error);
-                }
-                (None, None, Some(error.to_string()))
-            }
-        };
+
+            (None, None, Some(error.to_string()))
+        }
+    };
 
     let trace =
         belief_propagation(&mut graph, 50, 0.5, 1e-6, debug);
@@ -434,6 +469,29 @@ pub fn run_inference_fixture_debug(
         let bp_exact_delta =
             exact_prob.map(|exact| bp_prob - exact);
 
+        let expected_ok = query.expected_prob.map(|expected| {
+            exact_prob
+                .map(|exact| {
+                    (exact - expected).abs()
+                        <= query.tolerance + 1e-12
+                })
+                .unwrap_or(false)
+        });
+
+        let bp_matches_exact = exact_prob.map(|exact| {
+            (bp_prob - exact).abs() <= 1e-6
+        });
+
+        let semantic_ok = expected_ok.unwrap_or(true);
+
+        let algorithm_ok = if topology.bp_should_be_exact() {
+            bp_matches_exact.unwrap_or(false)
+        } else {
+            true
+        };
+
+        let ok = semantic_ok && algorithm_ok;
+
         if debug {
             println!("=== Query ===");
             println!("  raw: {}", query.formula);
@@ -445,13 +503,11 @@ pub fn run_inference_fixture_debug(
                 println!("  exact: {:.12}", exact);
                 println!("  BP - exact: {:+.12}", bp_prob - exact);
             }
-        }
 
-        let ok = if let Some(expected) = query.expected_prob {
-            (bp_prob - expected).abs() <= query.tolerance
-        } else {
-            true
-        };
+            println!("  expected_ok: {:?}", expected_ok);
+            println!("  bp_matches_exact: {:?}", bp_matches_exact);
+            println!("  topology-aware ok: {}", ok);
+        }
 
         query_results.push(QueryResult {
             formula: query.formula.clone(),
@@ -460,6 +516,8 @@ pub fn run_inference_fixture_debug(
             bp_exact_delta,
             expected: query.expected_prob,
             tolerance: query.tolerance,
+            expected_ok,
+            bp_matches_exact,
             ok,
         });
     }
@@ -471,6 +529,7 @@ pub fn run_inference_fixture_debug(
         query_results,
         stats: graph.stats(),
         iterations: trace.iterations.len(),
+        topology,
         exact_partition_function,
         exact_error,
         graph: Some(graph_snapshot),

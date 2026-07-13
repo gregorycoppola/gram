@@ -41,6 +41,7 @@ pub fn run_infer(args: InferArgs) -> Result<()> {
             })?;
 
     println!("📊 {}\n", result.title);
+
     println!(
         "  Graph: {} propositions, {} groups, {} AND, {} OR, {} NEG, {} evidence",
         result.stats.0,
@@ -50,6 +51,17 @@ pub fn run_infer(args: InferArgs) -> Result<()> {
         result.stats.4,
         result.stats.5
     );
+
+    println!(
+        "  Topology: {} — {}",
+        result.topology.kind(),
+        if result.topology.bp_should_be_exact() {
+            "BP must equal exact"
+        } else {
+            "loopy BP is approximate"
+        }
+    );
+
     println!("  BP converged in {} iterations", result.iterations);
 
     match (
@@ -63,7 +75,10 @@ pub fn run_infer(args: InferArgs) -> Result<()> {
             );
         }
         (_, Some(error)) => {
-            println!("  Exact enumeration unavailable: {}", error);
+            println!(
+                "  Exact enumeration unavailable: {}",
+                error
+            );
         }
         _ => {}
     }
@@ -73,32 +88,52 @@ pub fn run_infer(args: InferArgs) -> Result<()> {
     for query in &result.query_results {
         let status = if query.ok { "✅" } else { "❌" };
 
-        let exact_text = match query.exact_prob {
-            Some(exact) => format!("{:.6}", exact),
-            None => "—".to_string(),
-        };
+        let exact_text = query
+            .exact_prob
+            .map(|value| format!("{value:.6}"))
+            .unwrap_or_else(|| "—".to_string());
 
-        let delta_text = match query.bp_exact_delta {
-            Some(delta) => format!("{:+.6}", delta),
-            None => "—".to_string(),
-        };
+        let delta_text = query
+            .bp_exact_delta
+            .map(|value| format!("{value:+.6}"))
+            .unwrap_or_else(|| "—".to_string());
 
-        let expected_text = match query.expected {
-            Some(expected) => format!(
-                "  expected={:.6} ± {:.6}",
-                expected, query.tolerance
-            ),
-            None => String::new(),
-        };
+        let expected_text =
+            match (query.expected, query.expected_ok) {
+                (Some(expected), Some(true)) => {
+                    format!("expected={expected:.6} ✓")
+                }
+                (Some(expected), Some(false)) => {
+                    format!("expected={expected:.6} ✗")
+                }
+                (Some(expected), None) => {
+                    format!("expected={expected:.6} ?")
+                }
+                (None, _) => {
+                    "no hand expectation".to_string()
+                }
+            };
+
+        let bp_contract =
+            if result.topology.bp_should_be_exact() {
+                match query.bp_matches_exact {
+                    Some(true) => "BP=exact ✓",
+                    Some(false) => "BP=exact ✗",
+                    None => "BP=exact ?",
+                }
+            } else {
+                "loopy diagnostic"
+            };
 
         println!(
-            "  {} P({})  BP={:.6}  exact={}  Δ={}{}",
+            "  {} P({}) exact={}  {}  |  BP={:.6}  Δ={}  {}",
             status,
             query.formula,
-            query.prob,
             exact_text,
+            expected_text,
+            query.prob,
             delta_text,
-            expected_text
+            bp_contract
         );
     }
 
@@ -106,9 +141,13 @@ pub fn run_infer(args: InferArgs) -> Result<()> {
         result.query_results.iter().all(|query| query.ok);
 
     if all_ok {
-        println!("\n  🎯 All BP expectations passed");
+        println!(
+            "\n  🎯 All topology-appropriate checks passed"
+        );
     } else {
-        println!("\n  ⚠️  Some BP expectations failed");
+        println!(
+            "\n  ⚠️  Some topology-appropriate checks failed"
+        );
     }
 
     Ok(())
