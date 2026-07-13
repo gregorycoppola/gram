@@ -15,8 +15,8 @@ use crate::core::proof::StepResult;
 
 use super::error::{AppError, AppResult};
 use super::types::{
-    CheckProofRequest, CheckProofResponse, CheckProofStep, FixtureSummary, ParseRequest,
-    ParseResult, ParseStatus,
+    CheckProofRequest, CheckProofResponse, CheckProofStep, CoverageArticleSummary,
+    CoverageExampleSummary, FixtureSummary, ParseRequest, ParseResult, ParseStatus,
 };
 use super::AppState;
 
@@ -164,6 +164,222 @@ fn walk_dir(
     }
 }
 
+pub async fn list_coverage(
+    State(state): State<AppState>,
+) -> AppResult<Json<Vec<CoverageArticleSummary>>> {
+    let news_dir = state.data_dir.join("news");
+
+    if !news_dir.is_dir() {
+        return Err(AppError(anyhow::anyhow!(
+            "coverage news directory not found: {}",
+            news_dir.display()
+        )));
+    }
+
+    let mut article_dirs = std::fs::read_dir(&news_dir)
+        .map_err(|error| {
+            AppError(anyhow::anyhow!(
+                "reading coverage directory {}: {}",
+                news_dir.display(),
+                error
+            ))
+        })?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().is_dir())
+        .collect::<Vec<_>>();
+
+    article_dirs.sort_by_key(|entry| entry.file_name());
+
+    let mut articles = Vec::new();
+
+    for article_entry in article_dirs {
+        let article_name = match article_entry.file_name().to_str() {
+            Some(name) if !name.starts_with('.') => name.to_string(),
+            _ => continue,
+        };
+
+        let parses_dir = article_entry.path().join("parses");
+
+        if !parses_dir.is_dir() {
+            continue;
+        }
+
+        let mut fixture_paths = std::fs::read_dir(&parses_dir)
+            .map_err(|error| {
+                AppError(anyhow::anyhow!(
+                    "reading article parses {}: {}",
+                    parses_dir.display(),
+                    error
+                ))
+            })?
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.extension().and_then(|value| value.to_str()) == Some("json")
+            })
+            .collect::<Vec<_>>();
+
+        fixture_paths.sort();
+
+        let mut examples = Vec::new();
+
+        for fixture_path in fixture_paths {
+            let example_name = match fixture_path
+                .file_stem()
+                .and_then(|value| value.to_str())
+            {
+                Some(name) => name.to_string(),
+                None => continue,
+            };
+
+            let fixture_name = format!(
+                "{}/parses/{}",
+                article_name,
+                example_name
+            );
+
+            let fixture = Fixture::from_path(&fixture_path).map_err(|error| {
+                AppError(anyhow::anyhow!(
+                    "loading coverage fixture {}: {}",
+                    fixture_path.display(),
+                    error
+                ))
+            })?;
+
+            let sentence = fixture
+                .sentences
+                .first()
+                .map(|sentence| sentence.tokens.join(" "))
+                .unwrap_or_default();
+
+            let results = parse_fixture_at_path(&fixture_path).map_err(AppError)?;
+            let result = results.into_iter().next();
+
+            let (
+                status,
+                parse_count,
+                semantic_count,
+                gold,
+                gold_correct,
+                gold_match_count,
+                error,
+            ) = match result {
+                Some(result) => {
+                    let status = parse_status_label(&result.status).to_string();
+                    let error = match &result.status {
+                        ParseStatus::Error(message) => Some(message.clone()),
+                        _ => None,
+                    };
+
+                    let gold = result
+                        .gold_evaluation
+                        .as_ref()
+                        .map(|evaluation| evaluation.gold.clone());
+
+                    let gold_correct = result
+                        .gold_evaluation
+                        .as_ref()
+                        .map(|evaluation| evaluation.correct);
+
+                    let gold_match_count = result
+                        .gold_evaluation
+                        .as_ref()
+                        .map(|evaluation| evaluation.gold_match_count);
+
+                    (
+                        status,
+                        result.matches.len(),
+                        result.semantic_count,
+                        gold,
+                        gold_correct,
+                        gold_match_count,
+                        error,
+                    )
+                }
+                None => (
+                    "empty".to_string(),
+                    0,
+                    0,
+                    None,
+                    None,
+                    None,
+                    Some("fixture has no sentences".to_string()),
+                ),
+            };
+
+            examples.push(CoverageExampleSummary {
+                name: example_name,
+                fixture: fixture_name,
+                sentence,
+                status,
+                parse_count,
+                semantic_count,
+                gold,
+                gold_correct,
+                gold_match_count,
+                error,
+            });
+        }
+
+        articles.push(CoverageArticleSummary {
+            title: article_name.replace('_', " "),
+            name: article_name,
+            examples,
+        });
+    }
+
+    Ok(Json(articles))
+}
+
+pub async fn handle_coverage(
+    State(state): State<AppState>,
+    Path(path): Path<String>,
+) -> AppResult<Json<Value>> {
+    let root = state.data_dir.join("news");
+
+    if let Some(name) = path.strip_suffix("/parse") {
+        let fixture_path = fixture_path(&root, name)?;
+        let results = parse_fixture_at_path(&fixture_path)?;
+        let value = serde_json::to_value(results)
+            .map_err(|error| {
+                anyhow::anyhow!(
+                    "serializing coverage parse results: {}",
+                    error
+                )
+            })?;
+
+        Ok(Json(value))
+    } else {
+        let fixture_path = fixture_path(&root, &path)?;
+        let raw = std::fs::read_to_string(&fixture_path).map_err(|error| {
+            anyhow::anyhow!(
+                "reading coverage fixture {}: {}",
+                fixture_path.display(),
+                error
+            )
+        })?;
+
+        let value: Value = serde_json::from_str(&raw)
+            .map_err(|error| {
+                anyhow::anyhow!(
+                    "parsing coverage fixture JSON: {}",
+                    error
+                )
+            })?;
+
+        Ok(Json(value))
+    }
+}
+
+fn parse_status_label(status: &ParseStatus) -> &'static str {
+    match status {
+        ParseStatus::Parsed => "parsed",
+        ParseStatus::Ambiguous => "ambiguous",
+        ParseStatus::Failed => "failed",
+        ParseStatus::Error(_) => "error",
+    }
+}
+
 pub async fn handle_fixture(
     State(state): State<AppState>,
     Path(path): Path<String>,
@@ -186,9 +402,18 @@ async fn do_get_fixture(state: AppState, name: &str) -> Result<String, anyhow::E
     std::fs::read_to_string(&path).map_err(|e| anyhow::anyhow!("reading {}: {}", path.display(), e))
 }
 
-async fn do_parse_fixture(state: AppState, name: &str) -> Result<Vec<ParseResult>, anyhow::Error> {
+async fn do_parse_fixture(
+    state: AppState,
+    name: &str,
+) -> Result<Vec<ParseResult>, anyhow::Error> {
     let path = fixture_path(state.fixtures_dir.as_ref(), name)?;
-    let fixture = Fixture::from_path(&path)?;
+    parse_fixture_at_path(&path)
+}
+
+fn parse_fixture_at_path(
+    path: &std::path::Path,
+) -> Result<Vec<ParseResult>, anyhow::Error> {
+    let fixture = Fixture::from_path(path)?;
     let lexicon = Lexicon::from_fixture(&fixture);
     let rules = compile_rules(&fixture.grammar)?;
 
@@ -207,9 +432,19 @@ async fn do_parse_fixture(state: AppState, name: &str) -> Result<Vec<ParseResult
                         .transpose()
                         .map_err(anyhow::Error::msg)?;
 
-                    (matches, status, distinct_semantics, gold_evaluation)
+                    (
+                        matches,
+                        status,
+                        distinct_semantics,
+                        gold_evaluation,
+                    )
                 }
-                Err(error) => (Vec::new(), ParseStatus::Error(error), 0, None),
+                Err(error) => (
+                    Vec::new(),
+                    ParseStatus::Error(error),
+                    0,
+                    None,
+                ),
             };
 
         results.push(ParseResult {
