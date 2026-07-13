@@ -1,6 +1,10 @@
 use crate::core::logic::Expr;
 use crate::core::proof::{ProofFile, ProofResult, ProofStep, StepResult};
 use crate::core::semantics;
+use crate::core::substitution::{
+    substitute_formula_placeholder as shared_substitute_formula_placeholder,
+    substitute_var_with_entity as shared_substitute_var_with_entity,
+};
 
 #[derive(Default)]
 struct PriorSteps {
@@ -168,9 +172,9 @@ fn check_universal_elim(
 
     let substituted = if var_type == "s" {
         let parsed = parse_formula(term)?;
-        substitute_var(*body.clone(), var, parsed)
+        shared_substitute_formula_placeholder(body, var, &parsed)
     } else {
-        substitute_var_to_entity(*body.clone(), var, term)
+        shared_substitute_var_with_entity(body, var, term)
     };
 
     if expr_eq(formula, &substituted) {
@@ -257,7 +261,7 @@ fn check_existential_intro(
         .get(var)
         .ok_or(format!("substitution must map variable '{}'", var))?;
 
-    let substituted = substitute_var_to_entity(*body.clone(), var, term);
+    let substituted = shared_substitute_var_with_entity(body, var, term);
     if expr_eq(source, &substituted) {
         Ok(formula.clone())
     } else {
@@ -715,183 +719,6 @@ fn check_quantifier_weaken(
     Ok(formula.clone())
 }
 
-/// Substitute all occurrences of `Var { name: var }` or `Entity(var)` with `Entity(term)`.
-fn substitute_var_to_entity(expr: Expr, var: &str, term: &str) -> Expr {
-    match expr {
-        Expr::Var { name, .. } if name == var => Expr::Entity(term.to_string()),
-        Expr::Entity(name) if name == var => Expr::Entity(term.to_string()),
-        Expr::Var { name, typ } => Expr::Var { name, typ },
-        Expr::Entity(s) => Expr::Entity(s),
-        Expr::Pred { name, roles } => Expr::Pred {
-            name,
-            roles: roles
-                .into_iter()
-                .map(|(r, e)| (r, substitute_var_to_entity(e, var, term)))
-                .collect(),
-        },
-        Expr::Not(e) => Expr::Not(Box::new(substitute_var_to_entity(*e, var, term))),
-        Expr::And(l, r) => Expr::And(
-            Box::new(substitute_var_to_entity(*l, var, term)),
-            Box::new(substitute_var_to_entity(*r, var, term)),
-        ),
-        Expr::Implies { ante, cons } => Expr::Implies {
-            ante: Box::new(substitute_var_to_entity(*ante, var, term)),
-            cons: Box::new(substitute_var_to_entity(*cons, var, term)),
-        },
-        Expr::ForAll {
-            var: v,
-            var_type,
-            body,
-        } => Expr::ForAll {
-            var: v,
-            var_type,
-            body: Box::new(substitute_var_to_entity(*body, var, term)),
-        },
-        Expr::The {
-            var: v,
-            var_type,
-            body,
-        } => Expr::The {
-            var: v,
-            var_type,
-            body: Box::new(substitute_var_to_entity(*body, var, term)),
-        },
-        Expr::This {
-            var: v,
-            var_type,
-            body,
-        } => Expr::This {
-            var: v,
-            var_type,
-            body: Box::new(substitute_var_to_entity(*body, var, term)),
-        },
-        Expr::That {
-            var: v,
-            var_type,
-            body,
-        } => Expr::That {
-            var: v,
-            var_type,
-            body: Box::new(substitute_var_to_entity(*body, var, term)),
-        },
-        Expr::Exists {
-            var: v,
-            var_type,
-            body,
-            count,
-        } => Expr::Exists {
-            var: v,
-            var_type,
-            body: Box::new(substitute_var_to_entity(*body, var, term)),
-            count,
-        },
-        Expr::ExistsMany {
-            var: v,
-            var_type,
-            count,
-            body,
-        } => Expr::ExistsMany {
-            var: v,
-            var_type,
-            count,
-            body: Box::new(substitute_var_to_entity(*body, var, term)),
-        },
-        Expr::Question { label, body } => Expr::Question {
-            label,
-            body: Box::new(substitute_var_to_entity(*body, var, term)),
-        },
-    }
-}
-
-/// Substitute all occurrences of `Var { name: var }` or `Entity(var)` with `replacement` Expr.
-/// Used for s-typed (sentence-level) universal elimination.
-fn substitute_var(expr: Expr, var: &str, replacement: Expr) -> Expr {
-    match expr {
-        Expr::Var { name, .. } if name == var => replacement.clone(),
-        Expr::Entity(name) if name == var => replacement,
-        Expr::Var { name, typ } => Expr::Var { name, typ },
-        Expr::Entity(s) => Expr::Entity(s),
-        Expr::Pred { name, roles } => Expr::Pred {
-            name,
-            roles: roles
-                .into_iter()
-                .map(|(r, e)| (r, substitute_var(e, var, replacement.clone())))
-                .collect(),
-        },
-        Expr::Not(e) => Expr::Not(Box::new(substitute_var(*e, var, replacement))),
-        Expr::And(l, r) => Expr::And(
-            Box::new(substitute_var(*l, var, replacement.clone())),
-            Box::new(substitute_var(*r, var, replacement)),
-        ),
-        Expr::Implies { ante, cons } => Expr::Implies {
-            ante: Box::new(substitute_var(*ante, var, replacement.clone())),
-            cons: Box::new(substitute_var(*cons, var, replacement)),
-        },
-        Expr::ForAll {
-            var: v,
-            var_type,
-            body,
-        } => Expr::ForAll {
-            var: v,
-            var_type,
-            body: Box::new(substitute_var(*body, var, replacement)),
-        },
-        Expr::The {
-            var: v,
-            var_type,
-            body,
-        } => Expr::The {
-            var: v,
-            var_type,
-            body: Box::new(substitute_var(*body, var, replacement)),
-        },
-        Expr::This {
-            var: v,
-            var_type,
-            body,
-        } => Expr::This {
-            var: v,
-            var_type,
-            body: Box::new(substitute_var(*body, var, replacement)),
-        },
-        Expr::That {
-            var: v,
-            var_type,
-            body,
-        } => Expr::That {
-            var: v,
-            var_type,
-            body: Box::new(substitute_var(*body, var, replacement)),
-        },
-        Expr::Exists {
-            var: v,
-            var_type,
-            body,
-            count,
-        } => Expr::Exists {
-            var: v,
-            var_type,
-            body: Box::new(substitute_var(*body, var, replacement)),
-            count,
-        },
-        Expr::ExistsMany {
-            var: v,
-            var_type,
-            count,
-            body,
-        } => Expr::ExistsMany {
-            var: v,
-            var_type,
-            count,
-            body: Box::new(substitute_var(*body, var, replacement)),
-        },
-        Expr::Question { label, body } => Expr::Question {
-            label,
-            body: Box::new(substitute_var(*body, var, replacement)),
-        },
-    }
-}
-
 /// Structural equality on Expr.
 fn expr_eq(a: &Expr, b: &Expr) -> bool {
     match (a, b) {
@@ -1123,7 +950,7 @@ mod tests {
             name: "happy".to_string(),
             roles: vec![("theme".to_string(), Expr::Entity("john".to_string()))],
         };
-        let result = substitute_var(body, "P", replacement);
+        let result = shared_substitute_formula_placeholder(&body, "P", &replacement);
         match result {
             Expr::Pred { name, roles } => {
                 assert_eq!(name, "certain");
@@ -1144,7 +971,7 @@ mod tests {
             name: "happy".to_string(),
             roles: vec![("theme".to_string(), Expr::Entity("john".to_string()))],
         };
-        let result = substitute_var(body, "P", replacement);
+        let result = shared_substitute_formula_placeholder(&body, "P", &replacement);
         match result {
             Expr::Not(inner) => match *inner {
                 Expr::Pred { name, .. } => assert_eq!(name, "happy"),
