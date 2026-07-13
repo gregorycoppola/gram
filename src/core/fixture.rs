@@ -1,5 +1,5 @@
 use anyhow::Result;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -7,8 +7,8 @@ use std::path::Path;
 pub struct Fixture {
     pub lexicon: FixtureLexicon,
     pub grammar: Vec<FixtureRule>,
-    #[serde(default)]
-    pub sentences: Vec<SentenceInput>,
+    #[serde(default, deserialize_with = "deserialize_sentences")]
+    pub sentences: Vec<InputSentence>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -75,12 +75,29 @@ pub struct InputSentence {
     pub gold: Option<String>,
 }
 
-/// Sentences can be plain strings (old format) or structured hints (new format).
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
-pub enum SentenceInput {
-    Plain(String),
-    Hinted(InputSentence),
+fn deserialize_sentences<'de, D>(deserializer: D) -> Result<Vec<InputSentence>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let values = Vec::<serde_json::Value>::deserialize(deserializer)?;
+
+    values
+        .into_iter()
+        .enumerate()
+        .map(|(index, value)| {
+            if value.is_string() {
+                return Err(<D::Error as serde::de::Error>::custom(format!(
+                    "sentences[{index}] is a legacy plain string; use an object with tokens and spans"
+                )));
+            }
+
+            serde_json::from_value(value).map_err(|error| {
+                <D::Error as serde::de::Error>::custom(format!(
+                    "invalid sentences[{index}]: {error}"
+                ))
+            })
+        })
+        .collect()
 }
 
 impl Fixture {
@@ -88,5 +105,26 @@ impl Fixture {
         let text = std::fs::read_to_string(path)?;
         let fixture: Fixture = serde_json::from_str(&text)?;
         Ok(fixture)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_legacy_plain_sentence_string() {
+        let json = r#"{
+            "lexicon": {},
+            "grammar": [],
+            "sentences": ["Sue is happy"]
+        }"#;
+
+        let error = serde_json::from_str::<Fixture>(json)
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("legacy plain string"), "{error}");
+        assert!(error.contains("object with tokens and spans"), "{error}");
     }
 }
