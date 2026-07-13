@@ -6,7 +6,6 @@ use crate::core::fixture::Span;
 use crate::core::grammar::{is_punctuation, matches_keyword, Rule, Slot};
 use crate::core::lexicon::{clean_token, Lexicon};
 use crate::core::sem_dsl::SemArg;
-use crate::core::template::apply_template;
 use crate::core::value::{SemValue, VarGen};
 
 use super::tree::{build_syntax_tree_for_result, offset_constituents};
@@ -98,19 +97,19 @@ pub fn try_pattern_matches(
             let global_constituents = offset_constituents(&constituents, global_offset);
             let mut branch_var_gen = base_var_gen.clone();
 
-            let (output, sem_value) = if let Some(ref sem_spec) = rule.sem {
-                match resolve_and_construct(sem_spec, &bindings, &constituents, &mut branch_var_gen)
-                {
-                    Ok((sem_value, output)) => (output, Some(sem_value)),
-                    Err(error) => {
-                        if let Some(t) = &mut trace {
-                            t.push(&format!("  ✗ sem construct failed: {}", error));
-                        }
-                        continue;
+            let (sem_value, output) = match resolve_and_construct(
+                &rule.sem,
+                &bindings,
+                &constituents,
+                &mut branch_var_gen,
+            ) {
+                Ok(result) => result,
+                Err(error) => {
+                    if let Some(t) = &mut trace {
+                        t.push(&format!("  ✗ sem construct failed: {}", error));
                     }
+                    continue;
                 }
-            } else {
-                (apply_template(&rule.template, &bindings), None)
             };
 
             maximum_position = maximum_position.max(branch_var_gen.position());
@@ -125,9 +124,7 @@ pub fn try_pattern_matches(
             }
 
             results.push(SpanResult {
-                sem_value: sem_value.unwrap_or_else(|| {
-                    SemValue::Prop(crate::core::logic::Expr::Entity("_no_sem".into()))
-                }),
+                sem_value,
                 output,
                 rule_name: rule.name.clone(),
                 pattern: rule.pattern_str.clone(),

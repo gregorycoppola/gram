@@ -7,19 +7,25 @@
           "agent": "e",
           "patient": "e"
         },
-        "forms": ["loves"]
+        "forms": [
+          "loves"
+        ]
       }
     ],
     "entities": [
       {
         "name": "sue",
         "type": "e",
-        "forms": ["Sue"]
+        "forms": [
+          "Sue"
+        ]
       },
       {
         "name": "tom",
         "type": "e",
-        "forms": ["Tom"]
+        "forms": [
+          "Tom"
+        ]
       }
     ]
   },
@@ -39,17 +45,33 @@
     {
       "name": "incorrect_transitive",
       "pattern": "SUB:dp[$x:e] $V:{agent:e,patient:e} SUB:dp",
-      "template": "incorrect_reading",
-      "kind": "s"
+      "kind": "s",
+      "sem": "s_transitive($SUB1, $SUB, $V, agent, patient)"
     }
   ],
   "sentences": [
     {
-      "tokens": ["sue", "loves", "tom"],
+      "tokens": [
+        "sue",
+        "loves",
+        "tom"
+      ],
       "spans": [
-        ["dp", 0, 1],
-        ["dp", 2, 3],
-        ["s", 0, 3]
+        [
+          "dp",
+          0,
+          1
+        ],
+        [
+          "dp",
+          2,
+          3
+        ],
+        [
+          "s",
+          0,
+          3
+        ]
       ],
       "gold": "loves(agent: sue, patient: tom)"
     }

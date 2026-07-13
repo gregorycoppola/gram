@@ -23,9 +23,8 @@ pub struct Rule {
     pub name: String,
     pub pattern: Vec<Slot>,
     pub pattern_str: String,
-    pub template: String,
     pub kind: String,
-    pub sem: Option<SemSpec>,
+    pub sem: SemSpec,
 }
 
 pub fn compile_rules(rules: &[FixtureRule]) -> Result<Vec<Rule>> {
@@ -38,15 +37,23 @@ fn compile_rule(r: &FixtureRule) -> Result<Rule> {
         .split_whitespace()
         .map(parse_slot)
         .collect::<Result<Vec<_>>>()?;
-    let sem = match &r.sem {
-        Some(s) => Some(crate::core::sem_dsl::parse_sem(s).map_err(|e| anyhow!(e))?),
-        None => None,
-    };
+    let sem_source = r
+        .sem
+        .as_deref()
+        .ok_or_else(|| anyhow!("rule {:?} is missing required sem", r.name))?;
+    let sem = crate::core::sem_dsl::parse_sem(sem_source).map_err(|error| {
+        anyhow!(
+            "rule {:?} has invalid sem {:?}: {}",
+            r.name,
+            sem_source,
+            error
+        )
+    })?;
+
     Ok(Rule {
         name: r.name.clone(),
         pattern,
         pattern_str: r.pattern.clone(),
-        template: r.template.clone(),
         kind: r.kind.clone(),
         sem,
     })
@@ -207,4 +214,50 @@ pub fn pronouns() -> &'static [&'static str] {
 
 pub fn is_pronoun(token: &str) -> bool {
     pronouns().iter().any(|p| p.eq_ignore_ascii_case(token))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture_rule(name: &str, sem: Option<&str>) -> FixtureRule {
+        FixtureRule {
+            name: name.to_string(),
+            pattern: "$x:e".to_string(),
+            kind: "dp".to_string(),
+            sem: sem.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn compile_rejects_rule_without_typed_semantics() {
+        let error = compile_rules(&[fixture_rule("missing_sem", None)])
+            .unwrap_err()
+            .to_string();
+
+        assert!(
+            error.contains("missing_sem") && error.contains("missing required sem"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn compile_reports_rule_name_for_malformed_semantics() {
+        let error = compile_rules(&[fixture_rule("broken_sem", Some("bare_dp($x"))])
+            .unwrap_err()
+            .to_string();
+
+        assert!(
+            error.contains("broken_sem") && error.contains("invalid sem"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn compile_accepts_rule_with_typed_semantics() {
+        let rules = compile_rules(&[fixture_rule("typed_rule", Some("bare_dp($x)"))]).unwrap();
+
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].sem.constructor, "bare_dp");
+    }
 }

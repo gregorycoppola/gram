@@ -48,8 +48,6 @@ fn default_entity_type() -> String {
 pub struct FixtureRule {
     pub name: String,
     pub pattern: String,
-    #[serde(default)]
-    pub template: String,
     #[serde(default = "default_kind")]
     pub kind: String,
     #[serde(default)]

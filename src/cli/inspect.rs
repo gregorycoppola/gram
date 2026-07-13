@@ -41,7 +41,16 @@ pub fn run_inspect(args: InspectArgs) -> Result<()> {
     for r in &rules {
         println!("  {} [{}]", r.name, r.kind);
         println!("    pattern: {:?}", r.pattern);
-        println!("    template: {}", r.template);
+        println!(
+            "    sem: {}({})",
+            r.sem.constructor,
+            r.sem
+                .args
+                .iter()
+                .map(|argument| format!("{:?}", argument))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
     }
     println!();
 
