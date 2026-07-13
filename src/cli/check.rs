@@ -39,10 +39,15 @@ pub fn run_check(args: CheckArgs) -> Result<()> {
     }
 
     println!();
-    if result.conclusion_reached {
-        println!("  🎯 Conclusion verified: {}", result.conclusion);
+    if result.proof_valid {
+        println!("  🎯 Proof valid: {}", result.conclusion);
+    } else if result.conclusion_derived {
+        println!(
+            "  ⚠️  Conclusion was derived, but the proof is invalid: {}",
+            result.conclusion
+        );
     } else {
-        println!("  ⚠️  Conclusion NOT reached: {}", result.conclusion);
+        println!("  ❌ Conclusion not derived: {}", result.conclusion);
     }
 
     Ok(())

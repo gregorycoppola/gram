@@ -36,5 +36,8 @@ pub struct ProofResult {
     pub title: String,
     pub conclusion: String,
     pub steps: Vec<(ProofStep, StepResult)>,
-    pub conclusion_reached: bool,
+    pub all_steps_valid: bool,
+    pub conclusion_derived: bool,
+    pub final_step_is_conclusion: bool,
+    pub proof_valid: bool,
 }
