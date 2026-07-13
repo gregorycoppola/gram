@@ -1017,15 +1017,15 @@ fn construct_s_gap(
                 typ: "e".to_string(),
             },
             Expr::Var {
-                name: other_var,
-                typ: other_type,
+                name: other_var.clone(),
+                typ: other_type.clone(),
             },
         )
     } else {
         (
             Expr::Var {
-                name: other_var,
-                typ: other_type,
+                name: other_var.clone(),
+                typ: other_type.clone(),
             },
             Expr::Var {
                 name: gap_var.clone(),
