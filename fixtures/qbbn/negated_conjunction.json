@@ -1,0 +1,26 @@
+{
+  "title": "Conjunction with a negated premise",
+  "rules": [
+    {
+      "formula": "active(theme: switch) and not broken(theme: lamp) -> lit(theme: lamp)",
+      "weight": 2
+    }
+  ],
+  "evidence": [
+    {
+      "formula": "active(theme: switch)",
+      "prob": 0.8
+    },
+    {
+      "formula": "broken(theme: lamp)",
+      "prob": 0.25
+    }
+  ],
+  "queries": [
+    {
+      "formula": "lit(theme: lamp)",
+      "expected_prob": 0.728478,
+      "tolerance": 0.000001
+    }
+  ]
+}
