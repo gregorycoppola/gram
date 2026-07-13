@@ -8,6 +8,7 @@ pub mod proof;
 pub mod qbbn;
 pub mod sem_dsl;
 pub mod semantics;
+pub mod substitution;
 pub mod template;
 pub mod tokenize;
 pub mod value;

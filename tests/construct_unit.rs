@@ -1,5 +1,6 @@
-use gram::core::construct::{apply_constructor, substitute_var_name, Arg};
+use gram::core::construct::{apply_constructor, Arg};
 use gram::core::logic::Expr;
+use gram::core::substitution::rename_free_var;
 use gram::core::value::{DpQuant, GapProp, SemValue, VarGen};
 
 #[test]
@@ -721,7 +722,7 @@ fn test_substitute_var_name() {
             ("patient".into(), Expr::Entity("sue".into())),
         ],
     };
-    let result = substitute_var_name(expr, "y", "x");
+    let result = rename_free_var(&expr, "y", "x");
     assert_eq!(format!("{}", result), "loves(agent: x, patient: sue)");
 
     let expr2 = Expr::Pred {
@@ -731,7 +732,7 @@ fn test_substitute_var_name() {
             ("patient".into(), Expr::Entity("sue".into())),
         ],
     };
-    let result2 = substitute_var_name(expr2, "y", "x");
+    let result2 = rename_free_var(&expr2, "y", "x");
     assert_eq!(format!("{}", result2), "loves(agent: john, patient: sue)");
 
     let expr3 = Expr::ForAll {
@@ -763,7 +764,7 @@ fn test_substitute_var_name() {
             }),
         }),
     };
-    let result3 = substitute_var_name(expr3, "y", "x");
+    let result3 = rename_free_var(&expr3, "y", "x");
     assert_eq!(
         format!("{}", result3),
         "always [z:e]: man(theme: x) -> loves(agent: x, patient: sue)"

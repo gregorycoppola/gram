@@ -1,4 +1,5 @@
 use crate::core::logic::Expr;
+use crate::core::substitution::{rename_free_var, substitute_var_with_entity};
 use crate::core::value::{DpQuant, GapProp, SemValue, VarGen};
 
 #[derive(Debug, Clone)]
@@ -533,7 +534,7 @@ fn construct_s_copula_adj_n(args: &[Arg]) -> Result<SemValue, String> {
         _ => return Err("s_copula_adj_n: third arg must be a literal role name".into()),
     };
 
-    let body = substitute_var_name(n_restriction, &n_var, &subj_var);
+    let body = rename_free_var(&n_restriction, &n_var, &subj_var);
     let expr = expand_quant(subj_var, subj_type, &subj_quant, body)?;
     Ok(SemValue::Prop(expr))
 }
@@ -614,7 +615,7 @@ fn construct_s_equative(args: &[Arg]) -> Result<SemValue, String> {
         _ => return Err("s_equative: second arg must be a quantified DP".into()),
     };
 
-    let body = substitute_var_name(obj_restriction, &obj_var, &subj_var);
+    let body = rename_free_var(&obj_restriction, &obj_var, &subj_var);
     let expr = expand_quant(subj_var, subj_type, &subj_quant, body)?;
     Ok(SemValue::Prop(expr))
 }
@@ -700,7 +701,7 @@ fn construct_s_as_copula(args: &[Arg]) -> Result<SemValue, String> {
         _ => return Err("s_as_copula: fourth arg must be literal".into()),
     };
 
-    let as_body = substitute_var_name(as_restriction, &as_var, &subj_var);
+    let as_body = rename_free_var(&as_restriction, &as_var, &subj_var);
     let copula_body = Expr::Pred {
         name: pred_name,
         roles: vec![(
@@ -1057,7 +1058,7 @@ fn construct_rel_dp(
     let head_var = var_gen.fresh();
     let head_var_type = "e".to_string();
 
-    let substituted_body = substitute_var_name(gap_body, &gap_var, &head_var);
+    let substituted_body = rename_free_var(&gap_body, &gap_var, &head_var);
 
     let head_restriction = Expr::Pred {
         name: head_pred,
@@ -1108,7 +1109,7 @@ fn expand_quant(
                 cons: Box::new(body),
             }),
         }),
-        DpQuant::Bare => Ok(substitute_var_to_entity(body, &var)),
+        DpQuant::Bare => Ok(substitute_var_with_entity(&body, &var, &var)),
     }
 }
 
