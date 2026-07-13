@@ -120,6 +120,14 @@ fn test_beach_conflict() {
 }
 
 #[test]
+fn test_negated_premise_and_conclusion() {
+    run_fixture(
+        "negated_premise_conclusion.json",
+        true,
+    );
+}
+
+#[test]
 fn test_traffic_cross() {
     run_fixture("traffic_cross.json", false);
 }

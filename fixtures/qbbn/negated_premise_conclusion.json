@@ -1,0 +1,22 @@
+{
+  "title": "Negated premise and negated conclusion",
+  "rules": [
+    {
+      "formula": "not active(theme: switch) -> not lit(theme: lamp)",
+      "weight": 2
+    }
+  ],
+  "evidence": [
+    {
+      "formula": "active(theme: switch)",
+      "prob": 0.25
+    }
+  ],
+  "queries": [
+    {
+      "formula": "lit(theme: lamp)",
+      "expected_prob": 0.214402,
+      "tolerance": 0.000001
+    }
+  ]
+}
