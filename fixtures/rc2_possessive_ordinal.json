@@ -4,7 +4,8 @@
       {
         "name": "first",
         "roles": {
-          "theme": "e"
+          "theme": "e",
+          "interval": "n"
         },
         "forms": [
           "first"
@@ -14,7 +15,6 @@
         "name": "nba_championship",
         "roles": {
           "theme": "e",
-          "interval": "n",
           "team": "e"
         },
         "forms": [
@@ -72,9 +72,15 @@
       "kind": "dp"
     },
     {
+      "name": "bare_n",
+      "pattern": "$N:{team:e,theme:e}",
+      "sem": "bare_n($N, theme)",
+      "kind": "n"
+    },
+    {
       "name": "ordinal_interval_n",
-      "pattern": "$A:{theme:e} $N:{interval:n,team:e,theme:e} LIT:in SUB:dp",
-      "sem": "adj_of_n($A, $N, $SUB, theme, interval)",
+      "pattern": "$A:{interval:n,theme:e} SUB:n LIT:in SUB:dp",
+      "sem": "adj_arg_n($A, $SUB, $SUB1, theme, interval)",
       "kind": "n"
     },
     {
@@ -126,6 +132,11 @@
         ],
         [
           "n",
+          7,
+          9
+        ],
+        [
+          "n",
           6,
           12
         ],
@@ -145,7 +156,7 @@
           14
         ]
       ],
-      "gold": "the [x:e]: first(theme: x) ∧ nba_championship(theme: x, interval: years_53, team: new_york_knicks) -> clinch(agent: new_york_knicks, patient: x, at_time: last_month)"
+      "gold": "the [x:e]: first(theme: x, interval: years_53) ∧ nba_championship(theme: x, team: new_york_knicks) -> clinch(agent: new_york_knicks, patient: x, at_time: last_month)"
     }
   ]
 }

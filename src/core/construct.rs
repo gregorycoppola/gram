@@ -38,6 +38,7 @@ pub fn constructor_signature(name: &str) -> Option<&'static [ConstructorArgKind]
         "the_dp" | "exists_dp" | "forall_dp" | "bare_n" | "a_dp" => Some(&[Lexical, Literal]),
         "bare_dp" => Some(&[Lexical]),
         "adj_n" => Some(&[Lexical, Literal, Sub]),
+        "adj_arg_n" => Some(&[Lexical, Sub, Sub, Literal, Literal]),
         "the_n_dp" | "a_n_dp" => Some(&[Sub]),
         "possessive_the_n_dp" => Some(&[Sub, Sub, Literal]),
         "the_of_dp" | "a_of_dp" => Some(&[Lexical, Sub, Literal, Literal]),
@@ -69,6 +70,7 @@ pub fn apply_constructor(
         "bare_dp" => construct_bare_dp(args),
         "bare_n" => construct_bare_n(args, var_gen),
         "adj_n" => construct_adj_n(args, var_gen),
+        "adj_arg_n" => construct_adj_arg_n(args),
         "the_n_dp" => construct_the_n_dp(args),
         "a_n_dp" => construct_a_n_dp(args),
         "possessive_the_n_dp" => construct_possessive_the_n_dp(args),
@@ -223,6 +225,68 @@ fn construct_adj_n(args: &[Arg], _var_gen: &mut VarGen) -> Result<SemValue, Stri
     Ok(SemValue::N {
         var: n_var,
         restriction,
+    })
+}
+
+fn construct_adj_arg_n(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 5 {
+        return Err(format!(
+            "adj_arg_n expects 5 args, got {}",
+            args.len()
+        ));
+    }
+
+    let modifier_name = match &args[0] {
+        Arg::Lexical(name, _) => name.clone(),
+        _ => return Err("adj_arg_n: first arg must be lexical".into()),
+    };
+
+    let (noun_var, noun_restriction) = match &args[1] {
+        Arg::Sub(SemValue::N { var, restriction }) => {
+            (var.clone(), restriction.clone())
+        }
+        _ => return Err("adj_arg_n: second arg must be an N".into()),
+    };
+
+    let argument = match &args[2] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::Bare,
+            ..
+        }) => var.clone(),
+        _ => return Err("adj_arg_n: third arg must be a bare DP".into()),
+    };
+
+    let theme_role = match &args[3] {
+        Arg::Literal(role) => role.clone(),
+        _ => return Err("adj_arg_n: fourth arg must be a literal role".into()),
+    };
+
+    let argument_role = match &args[4] {
+        Arg::Literal(role) => role.clone(),
+        _ => return Err("adj_arg_n: fifth arg must be a literal role".into()),
+    };
+
+    let modifier_restriction = Expr::Pred {
+        name: modifier_name,
+        roles: vec![
+            (
+                theme_role,
+                Expr::Var {
+                    name: noun_var.clone(),
+                    typ: "e".to_string(),
+                },
+            ),
+            (argument_role, Expr::Entity(argument)),
+        ],
+    };
+
+    Ok(SemValue::N {
+        var: noun_var,
+        restriction: Expr::And(
+            Box::new(modifier_restriction),
+            Box::new(noun_restriction),
+        ),
     })
 }
 

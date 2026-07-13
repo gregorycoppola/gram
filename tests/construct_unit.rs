@@ -1040,7 +1040,7 @@ fn test_possessive_the_n_dp_enriches_composed_head() {
     assert_eq!(var, "x");
     assert_eq!(
         format!("{}", restriction),
-        "first(theme: x) ∧ nba_championship(theme: x, interval: years_53, team: new_york_knicks)"
+        "first(theme: x, interval: years_53) ∧ nba_championship(theme: x, team: new_york_knicks)"
     );
 }
 
@@ -1083,4 +1083,43 @@ fn test_possessive_the_n_dp_rejects_quantified_possessor() {
         apply_constructor("possessive_the_n_dp", &args, &mut VarGen::new()).unwrap_err();
 
     assert!(error.contains("bare possessor DP"), "got: {error}");
+}
+
+
+#[test]
+fn test_adj_arg_n_attaches_argument_to_modifier() {
+    let args = vec![
+        Arg::Lexical("first".into(), "{interval:n,theme:e}".into()),
+        Arg::Sub(SemValue::N {
+            var: "x".into(),
+            restriction: Expr::Pred {
+                name: "nba_championship".into(),
+                roles: vec![(
+                    "theme".into(),
+                    Expr::Var {
+                        name: "x".into(),
+                        typ: "e".into(),
+                    },
+                )],
+            },
+        }),
+        Arg::Sub(SemValue::Dp {
+            var: "years_53".into(),
+            var_type: "n".into(),
+            quant: DpQuant::Bare,
+        }),
+        Arg::Literal("theme".into()),
+        Arg::Literal("interval".into()),
+    ];
+
+    let result = apply_constructor("adj_arg_n", &args, &mut VarGen::new()).unwrap();
+
+    let SemValue::N { restriction, .. } = result else {
+        panic!("expected N");
+    };
+
+    assert_eq!(
+        format!("{}", restriction),
+        "first(theme: x, interval: years_53) ∧ nba_championship(theme: x)"
+    );
 }
