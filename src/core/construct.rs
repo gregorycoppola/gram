@@ -9,6 +9,53 @@ pub enum Arg {
     Literal(String),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstructorArgKind {
+    Lexical,
+    Sub,
+    Literal,
+}
+
+impl ConstructorArgKind {
+    pub fn description(self) -> &'static str {
+        match self {
+            ConstructorArgKind::Lexical => "lexical slot",
+            ConstructorArgKind::Sub => "constituent slot",
+            ConstructorArgKind::Literal => "literal",
+        }
+    }
+}
+
+/// Return the compile-time argument signature for a semantic constructor.
+///
+/// This is the structural contract checked while compiling grammar rules.
+/// Runtime constructors retain their more specific semantic checks, such as
+/// requiring a DP, N, proposition, or gap proposition.
+pub fn constructor_signature(name: &str) -> Option<&'static [ConstructorArgKind]> {
+    use ConstructorArgKind::{Lexical, Literal, Sub};
+
+    match name {
+        "the_dp" | "exists_dp" | "forall_dp" | "bare_n" | "a_dp" => Some(&[Lexical, Literal]),
+        "bare_dp" => Some(&[Lexical]),
+        "adj_n" => Some(&[Lexical, Literal, Sub]),
+        "the_n_dp" | "a_n_dp" => Some(&[Sub]),
+        "the_of_dp" | "a_of_dp" => Some(&[Lexical, Sub, Literal, Literal]),
+        "the_pp_dp" => Some(&[Lexical, Literal, Sub, Literal, Literal]),
+        "adj_of_n" => Some(&[Lexical, Lexical, Sub, Literal, Literal]),
+        "s_copula" => Some(&[Sub, Lexical, Literal]),
+        "s_copula_adj_n" => Some(&[Sub, Sub, Literal]),
+        "s_copula_degree" => Some(&[Sub, Lexical, Lexical, Literal, Literal]),
+        "s_equative" | "s_identity" | "s_when" => Some(&[Sub, Sub]),
+        "s_as_copula" => Some(&[Sub, Sub, Lexical, Literal]),
+        "s_transitive" | "s_complement" => Some(&[Sub, Sub, Lexical, Literal, Literal]),
+        "s_ditransitive" => Some(&[Sub, Sub, Sub, Lexical, Literal, Literal, Literal]),
+        "s_gap_agent" | "s_gap_patient" => Some(&[Lexical, Literal, Literal, Sub]),
+        "s_gap_theme" => Some(&[Lexical, Literal]),
+        "rel_dp_agent" | "rel_dp_patient" | "rel_dp_theme" => Some(&[Lexical, Literal, Sub]),
+        _ => None,
+    }
+}
+
 pub fn apply_constructor(
     name: &str,
     args: &[Arg],
