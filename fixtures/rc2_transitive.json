@@ -23,15 +23,15 @@
     {"name": "s_transitive", "pattern": "SUB:dp[$x:e] $V:{agent:e,patient:e} SUB:dp", "sem": "s_transitive($SUB, $SUB1, $V, agent, patient)", "kind": "s"}
   ],
   "sentences": [
-    {"tokens": ["the", "man", "is", "happy"], "spans": [["dp", 0, 2], ["s", 0, 4]]},
-    {"tokens": ["a", "man", "is", "happy"], "spans": [["dp", 0, 2], ["s", 0, 4]]},
-    {"tokens": ["every", "man", "is", "happy"], "spans": [["dp", 0, 2], ["s", 0, 4]]},
-    {"tokens": ["the", "man", "loves", "the", "woman"], "spans": [["dp", 0, 2], ["dp", 3, 5], ["s", 0, 5]]},
-    {"tokens": ["a", "man", "loves", "a", "woman"], "spans": [["dp", 0, 2], ["dp", 3, 5], ["s", 0, 5]]},
-    {"tokens": ["every", "man", "loves", "a", "woman"], "spans": [["dp", 0, 2], ["dp", 3, 5], ["s", 0, 5]]},
-    {"tokens": ["sue", "loves", "tom"], "spans": [["dp", 0, 1], ["dp", 2, 3], ["s", 0, 3]]},
-    {"tokens": ["the", "man", "loves", "sue"], "spans": [["dp", 0, 2], ["dp", 3, 4], ["s", 0, 4]]},
-    {"tokens": ["sue", "loves", "the", "woman"], "spans": [["dp", 0, 1], ["dp", 2, 4], ["s", 0, 4]]},
-    {"tokens": ["you", "want", "apples"], "spans": [["dp", 0, 1], ["dp", 2, 3], ["s", 0, 3]]}
+    {"tokens": ["the", "man", "is", "happy"], "spans": [["dp", 0, 2], ["s", 0, 4]], "gold": "the [person:e]: man(theme: person) -> happy(theme: person)"},
+    {"tokens": ["a", "man", "is", "happy"], "spans": [["dp", 0, 2], ["s", 0, 4]], "gold": "exists [person:e]: man(theme: person) ∧ happy(theme: person)"},
+    {"tokens": ["every", "man", "is", "happy"], "spans": [["dp", 0, 2], ["s", 0, 4]], "gold": "always [person:e]: man(theme: person) -> happy(theme: person)"},
+    {"tokens": ["the", "man", "loves", "the", "woman"], "spans": [["dp", 0, 2], ["dp", 3, 5], ["s", 0, 5]], "gold": "the [person:e]: man(theme: person) -> (the [other:e]: woman(theme: other) -> loves(agent: person, patient: other))"},
+    {"tokens": ["a", "man", "loves", "a", "woman"], "spans": [["dp", 0, 2], ["dp", 3, 5], ["s", 0, 5]], "gold": "exists [person:e]: man(theme: person) ∧ exists [other:e]: woman(theme: other) ∧ loves(agent: person, patient: other)"},
+    {"tokens": ["every", "man", "loves", "a", "woman"], "spans": [["dp", 0, 2], ["dp", 3, 5], ["s", 0, 5]], "gold": "always [person:e]: man(theme: person) -> (exists [other:e]: woman(theme: other) ∧ loves(agent: person, patient: other))"},
+    {"tokens": ["sue", "loves", "tom"], "spans": [["dp", 0, 1], ["dp", 2, 3], ["s", 0, 3]], "gold": "loves(agent: sue, patient: tom)"},
+    {"tokens": ["the", "man", "loves", "sue"], "spans": [["dp", 0, 2], ["dp", 3, 4], ["s", 0, 4]], "gold": "the [person:e]: man(theme: person) -> loves(agent: person, patient: sue)"},
+    {"tokens": ["sue", "loves", "the", "woman"], "spans": [["dp", 0, 1], ["dp", 2, 4], ["s", 0, 4]], "gold": "the [person:e]: woman(theme: person) -> loves(agent: sue, patient: person)"},
+    {"tokens": ["you", "want", "apples"], "spans": [["dp", 0, 1], ["dp", 2, 3], ["s", 0, 3]], "gold": "want(agent: you, patient: apples)"}
   ]
 }
