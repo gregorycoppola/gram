@@ -26,10 +26,10 @@
     {"name": "rel_dp_theme", "pattern": "THE $N:{theme:e} LIT:who SUB:s\\theme", "sem": "rel_dp_theme($N, theme, $SUB)", "kind": "dp"}
   ],
   "sentences": [
-    {"tokens": ["the", "man", "who", "loves", "sue", "is", "happy"], "spans": [["s", 0, 7], ["dp", 0, 5], ["s\\agent", 3, 5], ["dp", 4, 5], ["dp", 0, 2]]},
-    {"tokens": ["the", "man", "who", "sue", "loves", "is", "happy"], "spans": [["s", 0, 7], ["dp", 0, 5], ["s\\patient", 3, 5], ["dp", 3, 4], ["dp", 0, 2]]},
-    {"tokens": ["the", "woman", "who", "is", "happy", "said", "that", "sue", "is", "happy"], "spans": [["s", 0, 10], ["dp", 0, 5], ["s\\theme", 3, 5], ["dp", 0, 2], ["s", 7, 10], ["dp", 7, 8]]},
-    {"tokens": ["the", "man", "who", "is", "happy", "loves", "sue"], "spans": [["s", 0, 7], ["dp", 0, 5], ["s\\theme", 3, 5], ["dp", 0, 2], ["dp", 6, 7]]},
-    {"tokens": ["sue", "loves", "the", "man", "who", "loves", "tom"], "spans": [["s", 0, 7], ["dp", 0, 1], ["dp", 2, 7], ["s\\agent", 5, 7], ["dp", 6, 7], ["dp", 2, 4]]}
+    {"tokens": ["the", "man", "who", "loves", "sue", "is", "happy"], "spans": [["s", 0, 7], ["dp", 0, 5], ["s\\agent", 3, 5], ["dp", 4, 5], ["dp", 0, 2]], "gold": "the [person:e]: man(theme: person) ∧ loves(agent: person, patient: sue) -> happy(theme: person)"},
+    {"tokens": ["the", "man", "who", "sue", "loves", "is", "happy"], "spans": [["s", 0, 7], ["dp", 0, 5], ["s\\patient", 3, 5], ["dp", 3, 4], ["dp", 0, 2]], "gold": "the [person:e]: man(theme: person) ∧ loves(agent: sue, patient: person) -> happy(theme: person)"},
+    {"tokens": ["the", "woman", "who", "is", "happy", "said", "that", "sue", "is", "happy"], "spans": [["s", 0, 10], ["dp", 0, 5], ["s\\theme", 3, 5], ["dp", 0, 2], ["s", 7, 10], ["dp", 7, 8]], "gold": "the [person:e]: woman(theme: person) ∧ happy(theme: person) -> said(agent: person, theme: happy(theme: sue))"},
+    {"tokens": ["the", "man", "who", "is", "happy", "loves", "sue"], "spans": [["s", 0, 7], ["dp", 0, 5], ["s\\theme", 3, 5], ["dp", 0, 2], ["dp", 6, 7]], "gold": "the [person:e]: man(theme: person) ∧ happy(theme: person) -> loves(agent: person, patient: sue)"},
+    {"tokens": ["sue", "loves", "the", "man", "who", "loves", "tom"], "spans": [["s", 0, 7], ["dp", 0, 1], ["dp", 2, 7], ["s\\agent", 5, 7], ["dp", 6, 7], ["dp", 2, 4]], "gold": "the [person:e]: man(theme: person) ∧ loves(agent: person, patient: tom) -> loves(agent: sue, patient: person)"}
   ]
 }

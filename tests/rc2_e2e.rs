@@ -3,79 +3,111 @@ use std::path::Path;
 use gram::core::fixture::{Fixture, SentenceInput};
 use gram::core::grammar::compile_rules;
 use gram::core::lexicon::Lexicon;
-use gram::core::matcher::parse_hinted_sentence;
+use gram::core::matcher::{evaluate_gold, parse_hinted_sentence};
 
-fn parse_fixture(name: &str) -> Vec<(String, Result<Vec<gram::core::matcher::Match>, String>)> {
+fn assert_fixture_semantics(name: &str, expected_sentences: usize) {
     let path = Path::new("fixtures").join(format!("{}.json", name));
-    let fixture = Fixture::from_path(&path).unwrap();
+    let fixture = Fixture::from_path(&path)
+        .unwrap_or_else(|error| panic!("failed to load {}: {}", name, error));
     let lexicon = Lexicon::from_fixture(&fixture);
-    let rules = compile_rules(&fixture.grammar).unwrap();
+    let rules = compile_rules(&fixture.grammar)
+        .unwrap_or_else(|error| panic!("failed to compile {}: {}", name, error));
 
-    fixture
-        .sentences
-        .iter()
-        .filter_map(|sent| match sent {
-            SentenceInput::Hinted(s) => {
-                let display = s.tokens.join(" ");
-                Some((display, parse_hinted_sentence(s, &lexicon, &rules)))
+    let mut checked = 0;
+
+    for input in &fixture.sentences {
+        let sentence = match input {
+            SentenceInput::Hinted(sentence) => sentence,
+            SentenceInput::Plain(text) => {
+                panic!(
+                    "{} contains an unexpected legacy plain sentence: {:?}",
+                    name, text
+                );
             }
-            SentenceInput::Plain(_) => None,
-        })
-        .collect()
+        };
+
+        checked += 1;
+        let display = sentence.tokens.join(" ");
+        let gold = sentence.gold.as_deref().unwrap_or_else(|| {
+            panic!(
+                "{} sentence is missing a gold logical form: {:?}",
+                name, display
+            )
+        });
+
+        let matches = parse_hinted_sentence(sentence, &lexicon, &rules).unwrap_or_else(|error| {
+            panic!(
+                "{} failed to parse\nsentence: {}\ngold: {}\nerror: {}",
+                name, display, gold, error
+            )
+        });
+
+        let evaluation = evaluate_gold(&matches, gold).unwrap_or_else(|error| {
+            panic!(
+                "{} has invalid gold semantics\nsentence: {}\ngold: {}\nerror: {}",
+                name, display, gold, error
+            )
+        });
+
+        if !evaluation.correct {
+            let candidates = matches
+                .iter()
+                .enumerate()
+                .map(|(index, matched)| format!("  {}. {}", index + 1, matched.output))
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            panic!(
+                "{} semantic mismatch\n\
+                 sentence: {}\n\
+                 gold: {}\n\
+                 parses: {}\n\
+                 distinct semantics: {}\n\
+                 candidates:\n{}",
+                name,
+                display,
+                gold,
+                evaluation.parse_count,
+                evaluation.semantic_count,
+                if candidates.is_empty() {
+                    "  <none>"
+                } else {
+                    &candidates
+                }
+            );
+        }
+
+        assert!(
+            evaluation.gold_match_count >= 1,
+            "{} reported correct without a matching parse for {:?}",
+            name,
+            display
+        );
+    }
+
+    assert_eq!(
+        checked, expected_sentences,
+        "{} sentence-count regression",
+        name
+    );
 }
 
 #[test]
-fn transitive_all_parse() {
-    let results = parse_fixture("rc2_transitive");
-    for (sentence, result) in &results {
-        assert!(
-            result.is_ok(),
-            "transitive failed on \"{}\": {}",
-            sentence,
-            result.as_ref().unwrap_err()
-        );
-    }
-    assert_eq!(results.len(), 10);
+fn transitive_semantics_match_gold() {
+    assert_fixture_semantics("rc2_transitive", 10);
 }
 
 #[test]
-fn nested_all_parse() {
-    let results = parse_fixture("rc2_nested");
-    for (sentence, result) in &results {
-        assert!(
-            result.is_ok(),
-            "nested failed on \"{}\": {}",
-            sentence,
-            result.as_ref().unwrap_err()
-        );
-    }
-    assert_eq!(results.len(), 6);
+fn nested_semantics_match_gold() {
+    assert_fixture_semantics("rc2_nested", 6);
 }
 
 #[test]
-fn relative_all_parse() {
-    let results = parse_fixture("rc2_relative");
-    for (sentence, result) in &results {
-        assert!(
-            result.is_ok(),
-            "relative failed on \"{}\": {}",
-            sentence,
-            result.as_ref().unwrap_err()
-        );
-    }
-    assert_eq!(results.len(), 5);
+fn relative_semantics_match_gold() {
+    assert_fixture_semantics("rc2_relative", 5);
 }
 
 #[test]
-fn wh_all_parse() {
-    let results = parse_fixture("rc2_wh");
-    for (sentence, result) in &results {
-        assert!(
-            result.is_ok(),
-            "wh failed on \"{}\": {}",
-            sentence,
-            result.as_ref().unwrap_err()
-        );
-    }
-    assert_eq!(results.len(), 1);
+fn wh_semantics_match_gold() {
+    assert_fixture_semantics("rc2_wh", 1);
 }

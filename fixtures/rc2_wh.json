@@ -17,6 +17,6 @@
     {"name": "wh_dp_patient", "pattern": "$N:{theme:e} SUB:s\\patient", "sem": "rel_dp_patient($N, theme, $SUB)", "kind": "dp"}
   ],
   "sentences": [
-    {"tokens": ["i", "know", "what", "you", "want"], "spans": [["dp", 0, 1], ["dp", 2, 5], ["s\\patient", 3, 5], ["dp", 3, 4], ["s", 0, 5]]}
+    {"tokens": ["i", "know", "what", "you", "want"], "spans": [["dp", 0, 1], ["dp", 2, 5], ["s\\patient", 3, 5], ["dp", 3, 4], ["s", 0, 5]], "gold": "the [answer:e]: what(theme: answer) ∧ want(agent: you, patient: answer) -> know(agent: i, patient: answer)"}
   ]
 }
