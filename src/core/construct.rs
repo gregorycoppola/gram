@@ -300,21 +300,21 @@ fn construct_the_of_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, S
         Arg::Lexical(name, _) => name.clone(),
         _ => return Err("the_of_dp: first arg must be lexical".into()),
     };
+    let obj_var = match &args[1] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::Bare,
+            ..
+        }) => var.clone(),
+        _ => return Err("the_of_dp: second arg must be a bare DP".into()),
+    };
     let theme_role = match &args[2] {
-        Arg::Literal(s) => s.clone(),
+        Arg::Literal(role) => role.clone(),
         _ => return Err("the_of_dp: third arg must be literal".into()),
     };
     let loc_role = match &args[3] {
-        Arg::Literal(s) => s.clone(),
+        Arg::Literal(role) => role.clone(),
         _ => return Err("the_of_dp: fourth arg must be literal".into()),
-    };
-    let (obj_var, obj_type) = match &args[1] {
-        Arg::Sub(SemValue::Dp {
-            var,
-            var_type,
-            quant: DpQuant::Bare,
-        }) => (var.clone(), var_type.clone()),
-        _ => return Err("the_of_dp: second arg must be a bare DP".into()),
     };
 
     let var = var_gen.fresh();
@@ -328,13 +328,7 @@ fn construct_the_of_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, S
                     typ: "e".to_string(),
                 },
             ),
-            (
-                loc_role,
-                Expr::Var {
-                    name: obj_var,
-                    typ: obj_type,
-                },
-            ),
+            (loc_role, Expr::Entity(obj_var)),
         ],
     };
 
@@ -353,21 +347,21 @@ fn construct_a_of_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, Str
         Arg::Lexical(name, _) => name.clone(),
         _ => return Err("a_of_dp: first arg must be lexical".into()),
     };
+    let obj_var = match &args[1] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::Bare,
+            ..
+        }) => var.clone(),
+        _ => return Err("a_of_dp: second arg must be a bare DP".into()),
+    };
     let theme_role = match &args[2] {
-        Arg::Literal(s) => s.clone(),
+        Arg::Literal(role) => role.clone(),
         _ => return Err("a_of_dp: third arg must be literal".into()),
     };
     let loc_role = match &args[3] {
-        Arg::Literal(s) => s.clone(),
+        Arg::Literal(role) => role.clone(),
         _ => return Err("a_of_dp: fourth arg must be literal".into()),
-    };
-    let (obj_var, obj_type) = match &args[1] {
-        Arg::Sub(SemValue::Dp {
-            var,
-            var_type,
-            quant: DpQuant::Bare,
-        }) => (var.clone(), var_type.clone()),
-        _ => return Err("a_of_dp: second arg must be a bare DP".into()),
     };
 
     let var = var_gen.fresh();
@@ -381,13 +375,7 @@ fn construct_a_of_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, Str
                     typ: "e".to_string(),
                 },
             ),
-            (
-                loc_role,
-                Expr::Var {
-                    name: obj_var,
-                    typ: obj_type,
-                },
-            ),
+            (loc_role, Expr::Entity(obj_var)),
         ],
     };
 
@@ -407,19 +395,23 @@ fn construct_the_pp_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, S
         _ => return Err("the_pp_dp: first arg must be lexical".into()),
     };
     let prep_name = match &args[1] {
-        Arg::Literal(s) => s.clone(),
+        Arg::Literal(name) => name.clone(),
         _ => return Err("the_pp_dp: second arg must be literal".into()),
     };
-    let (obj_var, obj_type) = match &args[2] {
-        Arg::Sub(SemValue::Dp { var, var_type, .. }) => (var.clone(), var_type.clone()),
-        _ => return Err("the_pp_dp: third arg must be DP".into()),
+    let obj_var = match &args[2] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::Bare,
+            ..
+        }) => var.clone(),
+        _ => return Err("the_pp_dp: third arg must be a bare DP".into()),
     };
     let theme_role = match &args[3] {
-        Arg::Literal(s) => s.clone(),
+        Arg::Literal(role) => role.clone(),
         _ => return Err("the_pp_dp: fourth arg must be literal".into()),
     };
     let comp_role = match &args[4] {
-        Arg::Literal(s) => s.clone(),
+        Arg::Literal(role) => role.clone(),
         _ => return Err("the_pp_dp: fifth arg must be literal".into()),
     };
 
@@ -444,13 +436,7 @@ fn construct_the_pp_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, S
                     typ: "e".to_string(),
                 },
             ),
-            (
-                comp_role,
-                Expr::Var {
-                    name: obj_var,
-                    typ: obj_type,
-                },
-            ),
+            (comp_role, Expr::Entity(obj_var)),
         ],
     };
 
@@ -475,16 +461,20 @@ fn construct_adj_of_n(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, St
         Arg::Lexical(name, _) => name.clone(),
         _ => return Err("adj_of_n: second arg must be lexical".into()),
     };
-    let (obj_var, obj_type) = match &args[2] {
-        Arg::Sub(SemValue::Dp { var, var_type, .. }) => (var.clone(), var_type.clone()),
-        _ => return Err("adj_of_n: third arg must be DP".into()),
+    let obj_var = match &args[2] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::Bare,
+            ..
+        }) => var.clone(),
+        _ => return Err("adj_of_n: third arg must be a bare DP".into()),
     };
     let theme_role = match &args[3] {
-        Arg::Literal(s) => s.clone(),
+        Arg::Literal(role) => role.clone(),
         _ => return Err("adj_of_n: fourth arg must be literal".into()),
     };
     let loc_role = match &args[4] {
-        Arg::Literal(s) => s.clone(),
+        Arg::Literal(role) => role.clone(),
         _ => return Err("adj_of_n: fifth arg must be literal".into()),
     };
 
@@ -499,13 +489,7 @@ fn construct_adj_of_n(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, St
                     typ: "e".to_string(),
                 },
             ),
-            (
-                loc_role,
-                Expr::Var {
-                    name: obj_var,
-                    typ: obj_type,
-                },
-            ),
+            (loc_role, Expr::Entity(obj_var)),
         ],
     };
     let adj_restriction = Expr::Pred {

@@ -17,7 +17,7 @@
     {"name": "s_copula", "pattern": "SUB:dp[$x:e] COP $P:{theme:e}", "sem": "s_copula($SUB, $P, theme)", "kind": "s"}
   ],
   "sentences": [
-    {"tokens": ["the", "man", "from", "Nantucket", "is", "happy"], "spans": [["dp", 3, 4], ["dp", 0, 4], ["s", 0, 6]]},
-    {"tokens": ["the", "girl", "with", "doll", "is", "happy"], "spans": [["dp", 3, 4], ["dp", 0, 4], ["s", 0, 6]]}
+    {"tokens": ["the", "man", "from", "Nantucket", "is", "happy"], "spans": [["dp", 3, 4], ["dp", 0, 4], ["s", 0, 6]], "gold": "the [person:e]: man(theme: person) ∧ from(theme: person, complement: nantucket) -> happy(theme: person)"},
+    {"tokens": ["the", "girl", "with", "doll", "is", "happy"], "spans": [["dp", 3, 4], ["dp", 0, 4], ["s", 0, 6]], "gold": "the [person:e]: girl(theme: person) ∧ with(theme: person, complement: doll) -> happy(theme: person)"}
   ]
 }

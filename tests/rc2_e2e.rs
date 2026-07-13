@@ -111,3 +111,38 @@ fn relative_semantics_match_gold() {
 fn wh_semantics_match_gold() {
     assert_fixture_semantics("rc2_wh", 1);
 }
+
+#[test]
+fn adjective_semantics_match_gold() {
+    assert_fixture_semantics("rc2_adjectives", 2);
+}
+
+#[test]
+fn comparative_semantics_match_gold() {
+    assert_fixture_semantics("rc2_comparatives", 2);
+}
+
+#[test]
+fn ditransitive_semantics_match_gold() {
+    assert_fixture_semantics("rc2_ditransitive", 2);
+}
+
+#[test]
+fn of_semantics_match_gold() {
+    assert_fixture_semantics("rc2_of", 2);
+}
+
+#[test]
+fn extended_of_semantics_match_gold() {
+    assert_fixture_semantics("rc2_of_extended", 2);
+}
+
+#[test]
+fn pp_semantics_match_gold() {
+    assert_fixture_semantics("rc2_pp", 2);
+}
+
+#[test]
+fn temporal_semantics_match_gold() {
+    assert_fixture_semantics("rc2_temporal", 2);
+}

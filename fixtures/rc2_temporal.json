@@ -19,7 +19,7 @@
     {"name": "s_when", "pattern": "LIT:when SUB:s SUB:s", "sem": "s_when($SUB, $SUB1)", "kind": "s"}
   ],
   "sentences": [
-    {"tokens": ["when", "Sophie", "got", "home", "Tom", "baked", "a", "cake"], "spans": [["dp", 1, 2], ["dp", 3, 4], ["s", 1, 4], ["dp", 4, 5], ["dp", 6, 8], ["s", 4, 8], ["s", 0, 8]]},
-    {"tokens": ["when", "Sophie", "got", "home", "Sophie", "baked", "a", "cake"], "spans": [["dp", 1, 2], ["dp", 3, 4], ["s", 1, 4], ["dp", 4, 5], ["dp", 6, 8], ["s", 4, 8], ["s", 0, 8]]}
+    {"tokens": ["when", "Sophie", "got", "home", "Tom", "baked", "a", "cake"], "spans": [["dp", 1, 2], ["dp", 3, 4], ["s", 1, 4], ["dp", 4, 5], ["dp", 6, 8], ["s", 4, 8], ["s", 0, 8]], "gold": "when(event: got(agent: sophie, theme: home), main: exists [cake:e]: cake(theme: cake) ∧ baked(agent: tom, patient: cake))"},
+    {"tokens": ["when", "Sophie", "got", "home", "Sophie", "baked", "a", "cake"], "spans": [["dp", 1, 2], ["dp", 3, 4], ["s", 1, 4], ["dp", 4, 5], ["dp", 6, 8], ["s", 4, 8], ["s", 0, 8]], "gold": "when(event: got(agent: sophie, theme: home), main: exists [cake:e]: cake(theme: cake) ∧ baked(agent: sophie, patient: cake))"}
   ]
 }

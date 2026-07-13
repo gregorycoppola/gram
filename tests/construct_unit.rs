@@ -840,3 +840,145 @@ fn test_s_gap_preserves_quantified_other_dp() {
         "exists [y:e]: woman(theme: y) ∧ loves(agent: x, patient: y)"
     );
 }
+
+#[test]
+fn test_the_of_dp_bare_complement_is_entity() {
+    let args = vec![
+        Arg::Lexical("mayor_of".into(), "{theme:e,location:e}".into()),
+        Arg::Sub(SemValue::Dp {
+            var: "london".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        }),
+        Arg::Literal("theme".into()),
+        Arg::Literal("location".into()),
+    ];
+
+    let mut gen = VarGen::new();
+    let result = apply_constructor("the_of_dp", &args, &mut gen).unwrap();
+
+    let SemValue::Dp {
+        quant: DpQuant::The { restriction },
+        ..
+    } = result
+    else {
+        panic!("expected The DP");
+    };
+
+    let Expr::Pred { roles, .. } = restriction else {
+        panic!("expected relational restriction");
+    };
+
+    assert!(matches!(
+        &roles[0].1,
+        Expr::Var { name, typ } if name == "x" && typ == "e"
+    ));
+    assert!(matches!(
+        &roles[1].1,
+        Expr::Entity(name) if name == "london"
+    ));
+}
+
+#[test]
+fn test_the_pp_dp_bare_complement_is_entity() {
+    let args = vec![
+        Arg::Lexical("man".into(), "{theme:e}".into()),
+        Arg::Literal("from".into()),
+        Arg::Sub(SemValue::Dp {
+            var: "nantucket".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        }),
+        Arg::Literal("theme".into()),
+        Arg::Literal("complement".into()),
+    ];
+
+    let mut gen = VarGen::new();
+    let result = apply_constructor("the_pp_dp", &args, &mut gen).unwrap();
+
+    let SemValue::Dp {
+        quant: DpQuant::The { restriction },
+        ..
+    } = result
+    else {
+        panic!("expected The DP");
+    };
+
+    let Expr::And(_, pp_restriction) = restriction else {
+        panic!("expected noun and PP restriction");
+    };
+    let Expr::Pred { roles, .. } = *pp_restriction else {
+        panic!("expected PP predicate");
+    };
+
+    assert!(matches!(
+        &roles[1].1,
+        Expr::Entity(name) if name == "nantucket"
+    ));
+}
+
+#[test]
+fn test_adj_of_n_bare_complement_is_entity() {
+    let args = vec![
+        Arg::Lexical("american".into(), "{theme:e}".into()),
+        Arg::Lexical("edition_of".into(), "{theme:e,location:e}".into()),
+        Arg::Sub(SemValue::Dp {
+            var: "show".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        }),
+        Arg::Literal("theme".into()),
+        Arg::Literal("location".into()),
+    ];
+
+    let mut gen = VarGen::new();
+    let result = apply_constructor("adj_of_n", &args, &mut gen).unwrap();
+
+    let SemValue::N { restriction, .. } = result else {
+        panic!("expected N");
+    };
+    let Expr::And(_, noun_restriction) = restriction else {
+        panic!("expected adjective and noun restriction");
+    };
+    let Expr::Pred { roles, .. } = *noun_restriction else {
+        panic!("expected relational noun predicate");
+    };
+
+    assert!(matches!(
+        &roles[1].1,
+        Expr::Entity(name) if name == "show"
+    ));
+}
+
+#[test]
+fn test_the_pp_dp_rejects_quantified_complement() {
+    let complement_restriction = Expr::Pred {
+        name: "island".into(),
+        roles: vec![(
+            "theme".into(),
+            Expr::Var {
+                name: "y".into(),
+                typ: "e".into(),
+            },
+        )],
+    };
+
+    let args = vec![
+        Arg::Lexical("man".into(), "{theme:e}".into()),
+        Arg::Literal("from".into()),
+        Arg::Sub(SemValue::Dp {
+            var: "y".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Exists {
+                restriction: complement_restriction,
+            },
+        }),
+        Arg::Literal("theme".into()),
+        Arg::Literal("complement".into()),
+    ];
+
+    let mut gen = VarGen::new();
+    let error = apply_constructor("the_pp_dp", &args, &mut gen).unwrap_err();
+
+    assert!(error.contains("bare DP"), "got: {error}");
+}

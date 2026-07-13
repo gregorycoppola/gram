@@ -15,7 +15,7 @@
     {"name": "s_equative", "pattern": "SUB:dp[$x:e] COP SUB:dp", "sem": "s_equative($SUB, $SUB1)", "kind": "s"}
   ],
   "sentences": [
-    {"tokens": ["John", "is", "the", "mayor", "of", "London"], "spans": [["dp", 0, 1], ["dp", 5, 6], ["dp", 2, 6], ["s", 0, 6]]},
-    {"tokens": ["John", "is", "the", "mayor", "of", "New", "York"], "spans": [["dp", 0, 1], ["dp", 5, 7], ["dp", 2, 7], ["s", 0, 7]]}
+    {"tokens": ["John", "is", "the", "mayor", "of", "London"], "spans": [["dp", 0, 1], ["dp", 5, 6], ["dp", 2, 6], ["s", 0, 6]], "gold": "mayor_of(theme: john, location: london)"},
+    {"tokens": ["John", "is", "the", "mayor", "of", "New", "York"], "spans": [["dp", 0, 1], ["dp", 5, 7], ["dp", 2, 7], ["s", 0, 7]], "gold": "mayor_of(theme: john, location: new_york)"}
   ]
 }
