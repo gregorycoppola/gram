@@ -592,6 +592,16 @@ mod tests {
         }
     }
 
+    fn prior_steps(expressions: Vec<Expr>) -> PriorSteps {
+        let mut prior = PriorSteps::default();
+
+        for expression in expressions {
+            prior.push(Some(expression));
+        }
+
+        prior
+    }
+
     #[test]
     fn failed_step_does_not_shift_later_step_identity() {
         let file = ProofFile {
@@ -727,7 +737,7 @@ mod tests {
     fn exists_many_weaken_3_to_2() {
         let source = semantics::parse("exists_many [x:e, 3]: man(theme: x) ∧ in(theme: x, location: the_house)").unwrap();
         let target = semantics::parse("exists_many [x:e, 2]: man(theme: x) ∧ in(theme: x, location: the_house)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, 2]: man(theme: x) ∧ in(theme: x, location: the_house)".to_string(),
@@ -743,7 +753,7 @@ mod tests {
     fn exists_many_weaken_rejects_equal() {
         let source = semantics::parse("exists_many [x:e, 3]: man(theme: x)").unwrap();
         let target = semantics::parse("exists_many [x:e, 3]: man(theme: x)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, 3]: man(theme: x)".to_string(),
@@ -759,7 +769,7 @@ mod tests {
     fn exists_many_weaken_rejects_greater() {
         let source = semantics::parse("exists_many [x:e, 2]: man(theme: x)").unwrap();
         let target = semantics::parse("exists_many [x:e, 3]: man(theme: x)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, 3]: man(theme: x)".to_string(),
@@ -775,7 +785,7 @@ mod tests {
     fn quantifier_weaken_most_to_many() {
         let source = semantics::parse("exists_many [x:e, most]: man(theme: x) ∧ mortal(theme: x)").unwrap();
         let target = semantics::parse("exists_many [x:e, many]: man(theme: x) ∧ mortal(theme: x)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, many]: man(theme: x) ∧ mortal(theme: x)".to_string(),
@@ -791,7 +801,7 @@ mod tests {
     fn quantifier_weaken_most_to_some() {
         let source = semantics::parse("exists_many [x:e, most]: happy(theme: x)").unwrap();
         let target = semantics::parse("exists_many [x:e, some]: happy(theme: x)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, some]: happy(theme: x)".to_string(),
@@ -807,7 +817,7 @@ mod tests {
     fn quantifier_weaken_rejects_same() {
         let source = semantics::parse("exists_many [x:e, many]: happy(theme: x)").unwrap();
         let target = semantics::parse("exists_many [x:e, many]: happy(theme: x)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, many]: happy(theme: x)".to_string(),
@@ -823,7 +833,7 @@ mod tests {
     fn quantifier_weaken_rejects_stronger() {
         let source = semantics::parse("exists_many [x:e, some]: happy(theme: x)").unwrap();
         let target = semantics::parse("exists_many [x:e, many]: happy(theme: x)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, many]: happy(theme: x)".to_string(),
