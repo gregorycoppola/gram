@@ -9,6 +9,11 @@ use super::factor_graph::QBBNGraph;
 use super::kb::KnowledgeBase;
 use super::topology::{analyze_topology, GraphTopology};
 
+const BP_MAX_ITERATIONS: usize = 100;
+const BP_DAMPING: f64 = 0.5;
+const BP_CONVERGENCE_TOLERANCE: f64 = 1e-10;
+const BP_EXACT_TOLERANCE: f64 = 1e-8;
+
 #[derive(Debug, Deserialize)]
 pub struct InferenceFixture {
     pub title: String,
@@ -127,10 +132,10 @@ fn convert_bound_entities(
             name: name.clone(),
             roles: roles
                 .iter()
-                .map(|(role, arg)| {
+                .map(|(role, argument)| {
                     (
                         role.clone(),
-                        convert_bound_entities(arg, vars),
+                        convert_bound_entities(argument, vars),
                     )
                 })
                 .collect(),
@@ -235,21 +240,21 @@ pub struct QueryResult {
 
     /// Whether exact inference matches the handwritten expected value.
     ///
-    /// This tests the declared model semantics, independently of BP.
+    /// This tests the declared model semantics independently of BP.
     #[serde(default)]
     pub expected_ok: Option<bool>,
 
-    /// Whether BP matches exact inference within the BP tolerance.
+    /// Whether BP matches exact inference within BP_EXACT_TOLERANCE.
     #[serde(default)]
     pub bp_matches_exact: Option<bool>,
 
     /// Topology-aware overall status.
     ///
-    /// Acyclic graph:
+    /// On an acyclic graph:
     /// - exact must match any handwritten expectation;
     /// - BP must match exact.
     ///
-    /// Loopy graph:
+    /// On a loopy graph:
     /// - exact must match any handwritten expectation;
     /// - BP versus exact is diagnostic only.
     pub ok: bool,
@@ -261,7 +266,6 @@ pub struct InferenceResult {
     pub query_results: Vec<QueryResult>,
     pub stats: (usize, usize, usize, usize, usize, usize),
     pub iterations: usize,
-
     pub topology: GraphTopology,
 
     #[serde(default)]
@@ -291,8 +295,8 @@ pub fn run_inference_fixture_debug(
     }
 
     for rule in &fixture.rules {
-        let expr = semantics::parse(&rule.formula)
-            .map_err(|error| {
+        let expr =
+            semantics::parse(&rule.formula).map_err(|error| {
                 format!(
                     "parse error in '{}': {}",
                     rule.formula, error
@@ -319,7 +323,9 @@ pub fn run_inference_fixture_debug(
             convert_bound_entities(&conclusion, &variables);
 
         if debug {
-            println!("=== Extracted Horn clause (after convert) ===");
+            println!(
+                "=== Extracted Horn clause (after convert) ==="
+            );
 
             for (index, premise) in premises.iter().enumerate() {
                 println!(
@@ -375,8 +381,8 @@ pub fn run_inference_fixture_debug(
     let mut graph = QBBNGraph::from_kb(&kb);
 
     for evidence in &fixture.evidence {
-        let parsed = semantics::parse(&evidence.formula)
-            .map_err(|error| {
+        let parsed =
+            semantics::parse(&evidence.formula).map_err(|error| {
                 format!(
                     "parse error in evidence '{}': {}",
                     evidence.formula, error
@@ -443,14 +449,19 @@ pub fn run_inference_fixture_debug(
         }
     };
 
-    let trace =
-        belief_propagation(&mut graph, 50, 0.5, 1e-6, debug);
+    let trace = belief_propagation(
+        &mut graph,
+        BP_MAX_ITERATIONS,
+        BP_DAMPING,
+        BP_CONVERGENCE_TOLERANCE,
+        debug,
+    );
 
     let mut query_results = Vec::new();
 
     for query in &fixture.queries {
-        let parsed = semantics::parse(&query.formula)
-            .map_err(|error| {
+        let parsed =
+            semantics::parse(&query.formula).map_err(|error| {
                 format!(
                     "parse error in query '{}': {}",
                     query.formula, error
@@ -473,13 +484,13 @@ pub fn run_inference_fixture_debug(
             exact_prob
                 .map(|exact| {
                     (exact - expected).abs()
-                        <= query.tolerance + 1e-12
+                        <= query.tolerance + f64::EPSILON
                 })
                 .unwrap_or(false)
         });
 
         let bp_matches_exact = exact_prob.map(|exact| {
-            (bp_prob - exact).abs() <= 1e-6
+            (bp_prob - exact).abs() <= BP_EXACT_TOLERANCE
         });
 
         let semantic_ok = expected_ok.unwrap_or(true);
@@ -501,11 +512,18 @@ pub fn run_inference_fixture_debug(
 
             if let Some(exact) = exact_prob {
                 println!("  exact: {:.12}", exact);
-                println!("  BP - exact: {:+.12}", bp_prob - exact);
+                println!(
+                    "  BP - exact: {:+.12}",
+                    bp_prob - exact
+                );
             }
 
             println!("  expected_ok: {:?}", expected_ok);
-            println!("  bp_matches_exact: {:?}", bp_matches_exact);
+            println!(
+                "  bp_matches_exact: {:?} (tolerance={:.1e})",
+                bp_matches_exact,
+                BP_EXACT_TOLERANCE
+            );
             println!("  topology-aware ok: {}", ok);
         }
 
