@@ -45,8 +45,8 @@ fn test_rain_inference() {
 
     let mut graph = QBBNGraph::from_kb(&kb);
 
-    graph.set_evidence("weather_said(theme: rain)", true);
-    graph.set_evidence("no_clouds()", true);
+    graph.set_evidence("weather_said(theme: rain)", 1.0);
+    graph.set_evidence("no_clouds()", 1.0);
 
     graph.set_query("rain(theme: today)");
 

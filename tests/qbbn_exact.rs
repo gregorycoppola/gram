@@ -49,6 +49,22 @@ fn single_rule_graph(
     graph
 }
 
+fn two_child_graph(weight: f64) -> QBBNGraph {
+    let mut graph = QBBNGraph::new();
+    add_rule(&mut graph, &["a"], "b", weight);
+    add_rule(&mut graph, &["a"], "c", weight);
+    graph.build_or_factors();
+    graph
+}
+
+fn three_node_chain(weight: f64) -> QBBNGraph {
+    let mut graph = QBBNGraph::new();
+    add_rule(&mut graph, &["a"], "b", weight);
+    add_rule(&mut graph, &["b"], "c", weight);
+    graph.build_or_factors();
+    graph
+}
+
 #[test]
 fn soft_evidence_on_uniform_root_produces_requested_posterior() {
     let mut graph = QBBNGraph::new();
@@ -121,11 +137,7 @@ fn exact_combines_evidence_from_two_children() {
     // P(A=1 | B=1,C=1)
     //   = 0.75² / (0.75² + 0.50²)
     //   = 9/13.
-    let mut graph = QBBNGraph::new();
-    add_rule(&mut graph, &["a"], "b", 3.0_f64.ln());
-    add_rule(&mut graph, &["a"], "c", 3.0_f64.ln());
-    graph.build_or_factors();
-
+    let mut graph = two_child_graph(3.0_f64.ln());
     graph.set_evidence("b", 1.0);
     graph.set_evidence("c", 1.0);
 
@@ -162,6 +174,48 @@ fn exact_handles_negated_premise_in_backward_direction() {
     assert_close(
         result.prob_formula(&graph, "not a").unwrap(),
         0.6,
+        1e-12,
+    );
+}
+
+#[test]
+fn exact_multistep_backward_chain_matches_hand_calculation() {
+    // A -> B -> C, with the same CPT at both links:
+    //
+    // P(child=1 | parent=0) = 0.50
+    // P(child=1 | parent=1) = 0.75
+    //
+    // P(C=1 | A=0)
+    //   = 0.5(0.75) + 0.5(0.50)
+    //   = 10/16.
+    //
+    // P(C=1 | A=1)
+    //   = 0.75(0.75) + 0.25(0.50)
+    //   = 11/16.
+    //
+    // Therefore:
+    //
+    // P(A=1 | C=1) = 11 / (11 + 10) = 11/21.
+    let mut graph = three_node_chain(3.0_f64.ln());
+    graph.set_evidence("c", 1.0);
+
+    let result = exact(&graph);
+
+    assert_close(
+        result.prob_formula(&graph, "a").unwrap(),
+        11.0 / 21.0,
+        1e-12,
+    );
+
+    // The prior marginal P(B=1) is 5/8.
+    //
+    // P(B=1 | C=1)
+    //   = (5/8)(3/4) /
+    //     [(5/8)(3/4) + (3/8)(1/2)]
+    //   = 5/7.
+    assert_close(
+        result.prob_formula(&graph, "b").unwrap(),
+        5.0 / 7.0,
         1e-12,
     );
 }
@@ -260,4 +314,71 @@ fn bp_should_match_exact_for_downstream_evidence_on_tree() {
     );
 
     assert_close(bp_graph.prob("a"), exact_a, 1e-6);
+}
+
+#[test]
+#[ignore = "documents that current BP does not combine backward evidence from multiple children"]
+fn bp_should_combine_two_children_like_exact() {
+    let mut graph = two_child_graph(3.0_f64.ln());
+    graph.set_evidence("b", 1.0);
+    graph.set_evidence("c", 1.0);
+
+    let exact_result = exact(&graph);
+    let exact_a = exact_result.prob_formula(&graph, "a").unwrap();
+
+    let mut bp_graph = graph.clone();
+    belief_propagation(
+        &mut bp_graph,
+        100,
+        0.5,
+        1e-10,
+        false,
+    );
+
+    assert_close(bp_graph.prob("a"), exact_a, 1e-6);
+}
+
+#[test]
+#[ignore = "documents the negated-premise backward-message bug in current BP"]
+fn bp_should_handle_negated_premise_like_exact() {
+    let mut graph =
+        single_rule_graph("not a", "b", 3.0_f64.ln());
+    graph.set_evidence("b", 1.0);
+
+    let exact_result = exact(&graph);
+    let exact_a = exact_result.prob_formula(&graph, "a").unwrap();
+
+    let mut bp_graph = graph.clone();
+    belief_propagation(
+        &mut bp_graph,
+        100,
+        0.5,
+        1e-10,
+        false,
+    );
+
+    assert_close(bp_graph.prob("a"), exact_a, 1e-6);
+}
+
+#[test]
+#[ignore = "documents that current BP does not propagate downstream evidence through a chain"]
+fn bp_should_match_exact_for_multistep_backward_chain() {
+    let mut graph = three_node_chain(3.0_f64.ln());
+    graph.set_evidence("c", 1.0);
+
+    let exact_result = exact(&graph);
+    let exact_a = exact_result.prob_formula(&graph, "a").unwrap();
+    let exact_b = exact_result.prob_formula(&graph, "b").unwrap();
+
+    let mut bp_graph = graph.clone();
+    belief_propagation(
+        &mut bp_graph,
+        100,
+        0.5,
+        1e-10,
+        false,
+    );
+
+    assert_close(bp_graph.prob("a"), exact_a, 1e-6);
+    assert_close(bp_graph.prob("b"), exact_b, 1e-6);
 }
