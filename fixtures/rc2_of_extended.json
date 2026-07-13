@@ -21,7 +21,7 @@
     {"name": "s_copula", "pattern": "SUB:dp[$x:e] COP $P:{theme:e}", "sem": "s_copula($SUB, $P, theme)", "kind": "s"}
   ],
   "sentences": [
-    {"tokens": ["the", "mayor", "of", "New", "York", "is", "charming"], "spans": [["dp", 3, 5], ["dp", 0, 5], ["s", 0, 7]]},
-    {"tokens": ["the", "American", "edition", "of", "show", "is", "good"], "spans": [["dp", 4, 5], ["n", 1, 5], ["dp", 0, 5], ["s", 0, 7]]}
+    {"tokens": ["the", "mayor", "of", "New", "York", "is", "charming"], "spans": [["dp", 3, 5], ["dp", 0, 5], ["s", 0, 7]], "gold": "the [officeholder:e]: mayor_of(theme: officeholder, location: new_york) -> charming(theme: officeholder)"},
+    {"tokens": ["the", "American", "edition", "of", "show", "is", "good"], "spans": [["dp", 4, 5], ["n", 1, 5], ["dp", 0, 5], ["s", 0, 7]], "gold": "the [edition:e]: american(theme: edition) ∧ edition_of(theme: edition, location: show) -> good(theme: edition)"}
   ]
 }
