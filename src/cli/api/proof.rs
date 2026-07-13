@@ -32,10 +32,15 @@ fn print_check_result(r: &crate::server::CheckProofResponse) {
     println!("\n════════════════════════════════════════════════════════");
     println!("  {}", r.title);
     println!("════════════════════════════════════════════════════════\n");
-    if r.conclusion_reached {
-        println!("  ✅ conclusion reached: {}\n", r.conclusion);
+    if r.proof_valid {
+        println!("  ✅ proof valid: {}\n", r.conclusion);
+    } else if r.conclusion_derived {
+        println!(
+            "  ⚠️  conclusion derived, but proof invalid: {}\n",
+            r.conclusion
+        );
     } else {
-        println!("  ❌ conclusion NOT reached: {}\n", r.conclusion);
+        println!("  ❌ conclusion not derived: {}\n", r.conclusion);
     }
     for step in &r.steps {
         let status = if step.ok { "✓" } else { "✗" };

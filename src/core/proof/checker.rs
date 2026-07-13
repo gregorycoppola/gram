@@ -1,35 +1,100 @@
 use crate::core::logic::Expr;
-use crate::core::semantics;
 use crate::core::proof::{ProofFile, ProofResult, ProofStep, StepResult};
+use crate::core::semantics;
+
+#[derive(Default)]
+struct PriorSteps {
+    formulas: Vec<Option<Expr>>,
+}
+
+impl PriorSteps {
+    fn push(&mut self, formula: Option<Expr>) {
+        self.formulas.push(formula);
+    }
+
+    fn get(&self, index: usize) -> Option<&Expr> {
+        self.formulas.get(index).and_then(Option::as_ref)
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &Expr> {
+        self.formulas.iter().filter_map(Option::as_ref)
+    }
+
+    fn last(&self) -> Option<&Expr> {
+        self.formulas.last().and_then(Option::as_ref)
+    }
+}
+
+fn validate_proof_structure(steps: &[ProofStep]) -> Result<(), String> {
+    for (index, step) in steps.iter().enumerate() {
+        let expected = index + 1;
+        if step.step != expected {
+            return Err(format!(
+                "proof steps must be sequential and 1-based: expected step {}, got {}",
+                expected, step.step
+            ));
+        }
+
+        for source in &step.from {
+            if *source == 0 {
+                return Err(format!("step {} references invalid step 0", step.step));
+            }
+            if *source >= step.step {
+                return Err(format!(
+                    "step {} references step {}, which is not an earlier step",
+                    step.step, source
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
 
 /// Check a proof file against the inference rules.
 pub fn check_proof(file: &ProofFile) -> Result<ProofResult, String> {
+    validate_proof_structure(&file.proof)?;
+
     let mut checked_steps: Vec<(ProofStep, StepResult)> = Vec::new();
-    let mut formulas: Vec<Expr> = Vec::new();
+    let mut formulas = PriorSteps::default();
 
     for step in &file.proof {
         let result = match check_step(step, &file.premises, &formulas) {
             Ok(expr) => {
-                formulas.push(expr);
+                formulas.push(Some(expr));
                 StepResult::Ok
             }
-            Err(e) => StepResult::Err(e),
+            Err(error) => {
+                formulas.push(None);
+                StepResult::Err(error)
+            }
         };
         checked_steps.push((step.clone(), result));
     }
 
     let conclusion = parse_formula(&file.conclusion)?;
-    let conclusion_reached = formulas.last().map(|e| expr_eq(e, &conclusion)).unwrap_or(false);
+    let all_steps_valid = checked_steps
+        .iter()
+        .all(|(_, status)| matches!(status, StepResult::Ok));
+    let conclusion_derived = formulas.iter().any(|expr| expr_eq(expr, &conclusion));
+    let final_step_is_conclusion = formulas
+        .last()
+        .map(|expr| expr_eq(expr, &conclusion))
+        .unwrap_or(false);
+    let proof_valid = all_steps_valid && final_step_is_conclusion;
 
     Ok(ProofResult {
         title: file.title.clone(),
         conclusion: file.conclusion.clone(),
         steps: checked_steps,
-        conclusion_reached,
+        all_steps_valid,
+        conclusion_derived,
+        final_step_is_conclusion,
+        proof_valid,
     })
 }
 
-fn check_step(step: &ProofStep, premises: &[String], prior: &[Expr]) -> Result<Expr, String> {
+fn check_step(step: &ProofStep, premises: &[String], prior: &PriorSteps) -> Result<Expr, String> {
     let formula = parse_formula(&step.formula)?;
 
     match step.justification.as_str() {
@@ -64,7 +129,7 @@ fn check_premise(formula: &Expr, premises: &[String]) -> Result<Expr, String> {
     Err(format!("formula not found in premises: {}", formula))
 }
 
-fn check_universal_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+fn check_universal_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step.from.get(0).copied()
         .ok_or("universal_elim requires a source step")?;
     let source = prior.get(source_idx.saturating_sub(1))
@@ -94,7 +159,7 @@ fn check_universal_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Res
     }
 }
 
-fn check_modus_ponens(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+fn check_modus_ponens(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     if step.from.len() != 2 {
         return Err("modus_ponens requires exactly 2 source steps".into());
     }
@@ -119,7 +184,7 @@ fn check_modus_ponens(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Resul
     }
 }
 
-fn check_existential_intro(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+fn check_existential_intro(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step.from.get(0).copied()
         .ok_or("existential_intro requires a source step")?;
     let source = prior.get(source_idx.saturating_sub(1))
@@ -143,7 +208,7 @@ fn check_existential_intro(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> 
     }
 }
 
-fn check_and_intro(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+fn check_and_intro(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     if step.from.len() != 2 {
         return Err("and_intro requires exactly 2 source steps".into());
     }
@@ -160,7 +225,7 @@ fn check_and_intro(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<E
     }
 }
 
-fn check_and_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+fn check_and_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step.from.get(0).copied()
         .ok_or("and_elim requires a source step")?;
     let source = prior.get(source_idx.saturating_sub(1))
@@ -180,7 +245,7 @@ fn check_and_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Ex
     }
 }
 
-fn check_and_elim_l(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+fn check_and_elim_l(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step.from.get(0).copied()
         .ok_or("and_elim_l requires a source step")?;
     let source = prior.get(source_idx.saturating_sub(1))
@@ -198,7 +263,7 @@ fn check_and_elim_l(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<
     }
 }
 
-fn check_and_elim_r(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+fn check_and_elim_r(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step.from.get(0).copied()
         .ok_or("and_elim_r requires a source step")?;
     let source = prior.get(source_idx.saturating_sub(1))
@@ -216,7 +281,7 @@ fn check_and_elim_r(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<
     }
 }
 
-fn check_belief_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+fn check_belief_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     if step.from.len() != 2 {
         return Err("belief_elim requires exactly 2 source steps".into());
     }
@@ -255,7 +320,7 @@ fn check_belief_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result
     }
 }
 
-fn check_of_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+fn check_of_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step.from.get(0).copied()
         .ok_or("of_elim requires a source step")?;
     let source = prior.get(source_idx.saturating_sub(1))
@@ -294,7 +359,7 @@ fn check_of_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Exp
     }
 }
 
-fn check_apply_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+fn check_apply_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step.from.get(0).copied()
         .ok_or("apply_elim requires a source step")?;
     let source = prior.get(source_idx.saturating_sub(1))
@@ -327,7 +392,7 @@ fn check_apply_elim(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<
     }
 }
 
-fn check_exists_many_weaken(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+fn check_exists_many_weaken(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step.from.get(0).copied()
         .ok_or("exists_many_weaken requires a source step")?;
     let source = prior.get(source_idx.saturating_sub(1))
@@ -363,7 +428,7 @@ fn check_exists_many_weaken(formula: &Expr, step: &ProofStep, prior: &[Expr]) ->
     Ok(formula.clone())
 }
 
-fn check_quantifier_weaken(formula: &Expr, step: &ProofStep, prior: &[Expr]) -> Result<Expr, String> {
+fn check_quantifier_weaken(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let hierarchy = ["most", "many", "several", "some", "few"];
     
     let source_idx = step.from.get(0).copied()
@@ -512,6 +577,121 @@ fn expr_eq(a: &Expr, b: &Expr) -> bool {
 mod tests {
     use super::*;
 
+    fn proof_step(
+        step: usize,
+        formula: &str,
+        justification: &str,
+        from: Vec<usize>,
+    ) -> ProofStep {
+        ProofStep {
+            step,
+            formula: formula.to_string(),
+            justification: justification.to_string(),
+            from,
+            substitution: None,
+        }
+    }
+
+    fn prior_steps(expressions: Vec<Expr>) -> PriorSteps {
+        let mut prior = PriorSteps::default();
+
+        for expression in expressions {
+            prior.push(Some(expression));
+        }
+
+        prior
+    }
+
+    #[test]
+    fn failed_step_does_not_shift_later_step_identity() {
+        let file = ProofFile {
+            title: "failed identity".to_string(),
+            premises: vec![
+                "man(theme: socrates)".to_string(),
+                "mortal(theme: socrates)".to_string(),
+            ],
+            conclusion: "man(theme: socrates) ∧ mortal(theme: socrates)".to_string(),
+            proof: vec![
+                proof_step(1, "man(theme: socrates)", "premise", vec![]),
+                proof_step(2, "happy(theme: socrates)", "premise", vec![]),
+                proof_step(3, "mortal(theme: socrates)", "premise", vec![]),
+                proof_step(
+                    4,
+                    "man(theme: socrates) ∧ mortal(theme: socrates)",
+                    "and_intro",
+                    vec![1, 2],
+                ),
+            ],
+        };
+
+        let result = check_proof(&file).unwrap();
+
+        assert!(matches!(result.steps[1].1, StepResult::Err(_)));
+        assert!(matches!(result.steps[3].1, StepResult::Err(_)));
+        assert!(!result.all_steps_valid);
+        assert!(!result.proof_valid);
+    }
+
+    #[test]
+    fn proof_structure_requires_sequential_step_ids() {
+        let file = ProofFile {
+            title: "bad numbering".to_string(),
+            premises: vec!["man(theme: socrates)".to_string()],
+            conclusion: "man(theme: socrates)".to_string(),
+            proof: vec![proof_step(
+                2,
+                "man(theme: socrates)",
+                "premise",
+                vec![],
+            )],
+        };
+
+        let error = check_proof(&file).unwrap_err();
+        assert!(error.contains("expected step 1, got 2"));
+    }
+
+    #[test]
+    fn conclusion_can_be_derived_without_a_valid_proof() {
+        let file = ProofFile {
+            title: "derived but invalid".to_string(),
+            premises: vec!["man(theme: socrates)".to_string()],
+            conclusion: "man(theme: socrates)".to_string(),
+            proof: vec![
+                proof_step(1, "man(theme: socrates)", "premise", vec![]),
+                proof_step(2, "mortal(theme: socrates)", "premise", vec![]),
+            ],
+        };
+
+        let result = check_proof(&file).unwrap();
+
+        assert!(result.conclusion_derived);
+        assert!(!result.final_step_is_conclusion);
+        assert!(!result.all_steps_valid);
+        assert!(!result.proof_valid);
+    }
+
+    #[test]
+    fn valid_proof_sets_all_validity_flags() {
+        let file = ProofFile {
+            title: "valid".to_string(),
+            premises: vec!["man(theme: socrates)".to_string()],
+            conclusion: "man(theme: socrates)".to_string(),
+            proof: vec![proof_step(
+                1,
+                "man(theme: socrates)",
+                "premise",
+                vec![],
+            )],
+        };
+
+        let result = check_proof(&file).unwrap();
+
+        assert!(result.all_steps_valid);
+        assert!(result.conclusion_derived);
+        assert!(result.final_step_is_conclusion);
+        assert!(result.proof_valid);
+    }
+
     #[test]
     fn substitute_var_replaces_entity_with_expr() {
         let body = Expr::Pred {
@@ -557,7 +737,7 @@ mod tests {
     fn exists_many_weaken_3_to_2() {
         let source = semantics::parse("exists_many [x:e, 3]: man(theme: x) ∧ in(theme: x, location: the_house)").unwrap();
         let target = semantics::parse("exists_many [x:e, 2]: man(theme: x) ∧ in(theme: x, location: the_house)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, 2]: man(theme: x) ∧ in(theme: x, location: the_house)".to_string(),
@@ -573,7 +753,7 @@ mod tests {
     fn exists_many_weaken_rejects_equal() {
         let source = semantics::parse("exists_many [x:e, 3]: man(theme: x)").unwrap();
         let target = semantics::parse("exists_many [x:e, 3]: man(theme: x)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, 3]: man(theme: x)".to_string(),
@@ -589,7 +769,7 @@ mod tests {
     fn exists_many_weaken_rejects_greater() {
         let source = semantics::parse("exists_many [x:e, 2]: man(theme: x)").unwrap();
         let target = semantics::parse("exists_many [x:e, 3]: man(theme: x)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, 3]: man(theme: x)".to_string(),
@@ -605,7 +785,7 @@ mod tests {
     fn quantifier_weaken_most_to_many() {
         let source = semantics::parse("exists_many [x:e, most]: man(theme: x) ∧ mortal(theme: x)").unwrap();
         let target = semantics::parse("exists_many [x:e, many]: man(theme: x) ∧ mortal(theme: x)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, many]: man(theme: x) ∧ mortal(theme: x)".to_string(),
@@ -621,7 +801,7 @@ mod tests {
     fn quantifier_weaken_most_to_some() {
         let source = semantics::parse("exists_many [x:e, most]: happy(theme: x)").unwrap();
         let target = semantics::parse("exists_many [x:e, some]: happy(theme: x)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, some]: happy(theme: x)".to_string(),
@@ -637,7 +817,7 @@ mod tests {
     fn quantifier_weaken_rejects_same() {
         let source = semantics::parse("exists_many [x:e, many]: happy(theme: x)").unwrap();
         let target = semantics::parse("exists_many [x:e, many]: happy(theme: x)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, many]: happy(theme: x)".to_string(),
@@ -653,7 +833,7 @@ mod tests {
     fn quantifier_weaken_rejects_stronger() {
         let source = semantics::parse("exists_many [x:e, some]: happy(theme: x)").unwrap();
         let target = semantics::parse("exists_many [x:e, many]: happy(theme: x)").unwrap();
-        let prior = vec![source];
+        let prior = prior_steps(vec![source]);
         let step = ProofStep {
             step: 2,
             formula: "exists_many [x:e, many]: happy(theme: x)".to_string(),

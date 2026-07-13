@@ -82,7 +82,10 @@ pub async fn check_proof(Json(req): Json<CheckProofRequest>) -> AppResult<Json<C
     Ok(Json(CheckProofResponse {
         title: result.title,
         conclusion: result.conclusion,
-        conclusion_reached: result.conclusion_reached,
+        all_steps_valid: result.all_steps_valid,
+        conclusion_derived: result.conclusion_derived,
+        final_step_is_conclusion: result.final_step_is_conclusion,
+        proof_valid: result.proof_valid,
         steps,
     }))
 }
