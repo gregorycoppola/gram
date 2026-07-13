@@ -1,6 +1,10 @@
 use crate::core::logic::Expr;
 use crate::core::proof::{ProofFile, ProofResult, ProofStep, StepResult};
 use crate::core::semantics;
+use crate::core::substitution::{
+    substitute_formula_placeholder as shared_substitute_formula_placeholder,
+    substitute_var_with_entity as shared_substitute_var_with_entity,
+};
 
 #[derive(Default)]
 struct PriorSteps {
@@ -168,9 +172,9 @@ fn check_universal_elim(
 
     let substituted = if var_type == "s" {
         let parsed = parse_formula(term)?;
-        substitute_var(*body.clone(), var, parsed)
+        shared_substitute_formula_placeholder(body, var, &parsed)
     } else {
-        substitute_var_to_entity(*body.clone(), var, term)
+        shared_substitute_var_with_entity(body, var, term)
     };
 
     if expr_eq(formula, &substituted) {
@@ -257,7 +261,8 @@ fn check_existential_intro(
         .get(var)
         .ok_or(format!("substitution must map variable '{}'", var))?;
 
-    let substituted = substitute_var_to_entity(*body.clone(), var, term);
+    let substituted =
+        shared_substitute_var_with_entity(body, var, term);
     if expr_eq(source, &substituted) {
         Ok(formula.clone())
     } else {
