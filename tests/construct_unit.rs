@@ -770,3 +770,73 @@ fn test_substitute_var_name() {
         "always [z:e]: man(theme: x) -> loves(agent: x, patient: sue)"
     );
 }
+
+#[test]
+fn test_s_gap_bare_other_dp_becomes_entity() {
+    let args = vec![
+        Arg::Lexical("loves".into(), "{agent:e,patient:e}".into()),
+        Arg::Literal("agent".into()),
+        Arg::Literal("patient".into()),
+        Arg::Sub(SemValue::Dp {
+            var: "sue".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Bare,
+        }),
+    ];
+
+    let mut gen = VarGen::new();
+    let result = apply_constructor("s_gap_agent", &args, &mut gen).unwrap();
+
+    let SemValue::GapProp(gap) = result else {
+        panic!("expected GapProp");
+    };
+    let Expr::Pred { roles, .. } = gap.body else {
+        panic!("expected predicate body");
+    };
+
+    assert!(matches!(
+        &roles[0].1,
+        Expr::Var { name, typ } if name == "x" && typ == "e"
+    ));
+    assert!(matches!(
+        &roles[1].1,
+        Expr::Entity(name) if name == "sue"
+    ));
+}
+
+#[test]
+fn test_s_gap_preserves_quantified_other_dp() {
+    let restriction = Expr::Pred {
+        name: "woman".into(),
+        roles: vec![(
+            "theme".into(),
+            Expr::Var {
+                name: "y".into(),
+                typ: "e".into(),
+            },
+        )],
+    };
+
+    let args = vec![
+        Arg::Lexical("loves".into(), "{agent:e,patient:e}".into()),
+        Arg::Literal("agent".into()),
+        Arg::Literal("patient".into()),
+        Arg::Sub(SemValue::Dp {
+            var: "y".into(),
+            var_type: "e".into(),
+            quant: DpQuant::Exists { restriction },
+        }),
+    ];
+
+    let mut gen = VarGen::new();
+    let result = apply_constructor("s_gap_agent", &args, &mut gen).unwrap();
+
+    let SemValue::GapProp(gap) = result else {
+        panic!("expected GapProp");
+    };
+
+    assert_eq!(
+        format!("{}", gap.body),
+        "exists [y:e]: woman(theme: y) ∧ loves(agent: x, patient: y)"
+    );
+}

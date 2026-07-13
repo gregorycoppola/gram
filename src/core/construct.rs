@@ -999,8 +999,12 @@ fn construct_s_gap(
         Arg::Literal(s) => s.clone(),
         _ => return Err("s_gap: third arg must be a literal role name".into()),
     };
-    let (other_var, other_type) = match &args[3] {
-        Arg::Sub(SemValue::Dp { var, var_type, .. }) => (var.clone(), var_type.clone()),
+    let (other_var, other_type, other_quant) = match &args[3] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
         _ => return Err("s_gap: fourth arg must be a DP".into()),
     };
 
@@ -1034,6 +1038,7 @@ fn construct_s_gap(
         name: verb_name,
         roles: vec![(role1, gap_role_expr), (role2, other_role_expr)],
     };
+    let body = expand_quant(other_var, other_type, &other_quant, body)?;
 
     Ok(SemValue::GapProp(GapProp {
         var: gap_var,
