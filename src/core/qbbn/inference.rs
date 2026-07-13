@@ -2,9 +2,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::logic::Expr;
 use crate::core::semantics;
-use super::kb::KnowledgeBase;
-use super::factor_graph::QBBNGraph;
+
 use super::bp::belief_propagation;
+use super::exact::{exact_inference, ExactConfig};
+use super::factor_graph::QBBNGraph;
+use super::kb::KnowledgeBase;
 
 #[derive(Debug, Deserialize)]
 pub struct InferenceFixture {
@@ -56,9 +58,15 @@ fn default_tolerance() -> f64 {
     0.01
 }
 
-fn extract_horn_clause(expr: &Expr) -> Result<(Vec<Expr>, Expr, Vec<(String, String)>), String> {
+fn extract_horn_clause(
+    expr: &Expr,
+) -> Result<(Vec<Expr>, Expr, Vec<(String, String)>), String> {
     match expr {
-        Expr::ForAll { var, var_type, body } => {
+        Expr::ForAll {
+            var,
+            var_type,
+            body,
+        } => {
             let (premises, conclusion, mut vars) = extract_impl(body)?;
             vars.insert(0, (var.clone(), var_type.clone()));
             Ok((premises, conclusion, vars))
@@ -67,88 +75,138 @@ fn extract_horn_clause(expr: &Expr) -> Result<(Vec<Expr>, Expr, Vec<(String, Str
             let premises = flatten_and(ante);
             Ok((premises, *cons.clone(), Vec::new()))
         }
-        _ => {
-            Ok((Vec::new(), expr.clone(), Vec::new()))
-        }
+        _ => Ok((Vec::new(), expr.clone(), Vec::new())),
     }
 }
 
-fn extract_impl(expr: &Expr) -> Result<(Vec<Expr>, Expr, Vec<(String, String)>), String> {
+fn extract_impl(
+    expr: &Expr,
+) -> Result<(Vec<Expr>, Expr, Vec<(String, String)>), String> {
     match expr {
         Expr::Implies { ante, cons } => {
             let premises = flatten_and(ante);
             Ok((premises, *cons.clone(), Vec::new()))
         }
-        other => Err(format!("expected implication inside ForAll, got: {}", other)),
+        other => Err(format!(
+            "expected implication inside ForAll, got: {}",
+            other
+        )),
     }
 }
 
 fn flatten_and(expr: &Expr) -> Vec<Expr> {
     match expr {
-        Expr::And(l, r) => {
-            let mut left = flatten_and(l);
-            left.extend(flatten_and(r));
-            left
+        Expr::And(left, right) => {
+            let mut flattened = flatten_and(left);
+            flattened.extend(flatten_and(right));
+            flattened
         }
         other => vec![other.clone()],
     }
 }
 
-fn convert_bound_entities(expr: &Expr, vars: &[(String, String)]) -> Expr {
+fn convert_bound_entities(
+    expr: &Expr,
+    vars: &[(String, String)],
+) -> Expr {
     match expr {
         Expr::Entity(name) => {
-            if let Some((_, typ)) = vars.iter().find(|(v, _)| v == name) {
-                Expr::Var { name: name.clone(), typ: typ.clone() }
+            if let Some((_, typ)) =
+                vars.iter().find(|(var, _)| var == name)
+            {
+                Expr::Var {
+                    name: name.clone(),
+                    typ: typ.clone(),
+                }
             } else {
                 Expr::Entity(name.clone())
             }
         }
         Expr::Pred { name, roles } => Expr::Pred {
             name: name.clone(),
-            roles: roles.iter().map(|(r, a)| (r.clone(), convert_bound_entities(a, vars))).collect(),
+            roles: roles
+                .iter()
+                .map(|(role, arg)| {
+                    (
+                        role.clone(),
+                        convert_bound_entities(arg, vars),
+                    )
+                })
+                .collect(),
         },
-        Expr::Not(e) => Expr::Not(Box::new(convert_bound_entities(e, vars))),
-        Expr::And(l, r) => Expr::And(
-            Box::new(convert_bound_entities(l, vars)),
-            Box::new(convert_bound_entities(r, vars)),
+        Expr::Not(inner) => {
+            Expr::Not(Box::new(convert_bound_entities(inner, vars)))
+        }
+        Expr::And(left, right) => Expr::And(
+            Box::new(convert_bound_entities(left, vars)),
+            Box::new(convert_bound_entities(right, vars)),
         ),
         Expr::Implies { ante, cons } => Expr::Implies {
             ante: Box::new(convert_bound_entities(ante, vars)),
             cons: Box::new(convert_bound_entities(cons, vars)),
         },
-        Expr::ForAll { var, var_type, body } => Expr::ForAll {
+        Expr::ForAll {
+            var,
+            var_type,
+            body,
+        } => Expr::ForAll {
             var: var.clone(),
             var_type: var_type.clone(),
             body: Box::new(convert_bound_entities(body, vars)),
         },
-        Expr::The { var, var_type, body } => Expr::The {
+        Expr::The {
+            var,
+            var_type,
+            body,
+        } => Expr::The {
             var: var.clone(),
             var_type: var_type.clone(),
             body: Box::new(convert_bound_entities(body, vars)),
         },
-        Expr::This { var, var_type, body } => Expr::This {
+        Expr::This {
+            var,
+            var_type,
+            body,
+        } => Expr::This {
             var: var.clone(),
             var_type: var_type.clone(),
             body: Box::new(convert_bound_entities(body, vars)),
         },
-        Expr::That { var, var_type, body } => Expr::That {
+        Expr::That {
+            var,
+            var_type,
+            body,
+        } => Expr::That {
             var: var.clone(),
             var_type: var_type.clone(),
             body: Box::new(convert_bound_entities(body, vars)),
         },
-        Expr::Exists { var, var_type, body, count } => Expr::Exists {
+        Expr::Exists {
+            var,
+            var_type,
+            body,
+            count,
+        } => Expr::Exists {
             var: var.clone(),
             var_type: var_type.clone(),
             body: Box::new(convert_bound_entities(body, vars)),
             count: count.clone(),
         },
-        Expr::ExistsMany { var, var_type, count, body } => Expr::ExistsMany {
+        Expr::ExistsMany {
+            var,
+            var_type,
+            count,
+            body,
+        } => Expr::ExistsMany {
             var: var.clone(),
             var_type: var_type.clone(),
             count: count.clone(),
             body: Box::new(convert_bound_entities(body, vars)),
         },
-        Expr::Var { name, typ } => Expr::Var { name: name.clone(), typ: typ.clone() },
+        Expr::Var { name, typ } => Expr::Var {
+            name: name.clone(),
+            typ: typ.clone(),
+        },
         Expr::Question { label, body } => Expr::Question {
             label: label.clone(),
             body: Box::new(convert_bound_entities(body, vars)),
@@ -159,9 +217,24 @@ fn convert_bound_entities(expr: &Expr, vars: &[(String, String)]) -> Expr {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QueryResult {
     pub formula: String,
+
+    /// Approximate result produced by belief propagation.
     pub prob: f64,
+
+    /// Exact marginal under the current graph semantics, when the graph is
+    /// small enough for enumeration.
+    #[serde(default)]
+    pub exact_prob: Option<f64>,
+
+    /// Approximate minus exact.
+    #[serde(default)]
+    pub bp_exact_delta: Option<f64>,
+
     pub expected: Option<f64>,
     pub tolerance: f64,
+
+    /// Existing fixture status: whether BP matches the hand-written expected
+    /// value. Exact comparison is reported separately.
     pub ok: bool,
 }
 
@@ -171,100 +244,222 @@ pub struct InferenceResult {
     pub query_results: Vec<QueryResult>,
     pub stats: (usize, usize, usize, usize, usize, usize),
     pub iterations: usize,
-    pub graph: Option<crate::core::qbbn::factor_graph::GraphSnapshot>,
+
+    /// Exact partition function when enumeration succeeded.
+    #[serde(default)]
+    pub exact_partition_function: Option<f64>,
+
+    /// Exact inference is diagnostic and may be skipped for oversized graphs.
+    #[serde(default)]
+    pub exact_error: Option<String>,
+
+    pub graph:
+        Option<crate::core::qbbn::factor_graph::GraphSnapshot>,
 }
 
-pub fn run_inference_fixture(fixture: &InferenceFixture) -> Result<InferenceResult, String> {
+pub fn run_inference_fixture(
+    fixture: &InferenceFixture,
+) -> Result<InferenceResult, String> {
     run_inference_fixture_debug(fixture, false)
 }
 
-pub fn run_inference_fixture_debug(fixture: &InferenceFixture, debug: bool) -> Result<InferenceResult, String> {
+pub fn run_inference_fixture_debug(
+    fixture: &InferenceFixture,
+    debug: bool,
+) -> Result<InferenceResult, String> {
     let mut kb = KnowledgeBase::new();
 
-    for ent in &fixture.entities {
-        kb.add_entity(ent.name.clone(), ent.typ.clone());
+    for entity in &fixture.entities {
+        kb.add_entity(entity.name.clone(), entity.typ.clone());
     }
 
     for rule in &fixture.rules {
         let expr = semantics::parse(&rule.formula)
-            .map_err(|e| format!("parse error in '{}': {}", rule.formula, e))?;
+            .map_err(|error| {
+                format!(
+                    "parse error in '{}': {}",
+                    rule.formula, error
+                )
+            })?;
+
         if debug {
             println!("=== Parsed rule ===");
             println!("  AST: {:?}", expr);
             println!("  to_string: {}", expr);
         }
-        let (premises, conclusion, variables) = extract_horn_clause(&expr)?;
-        let premises: Vec<Expr> = premises.iter().map(|p| convert_bound_entities(p, &variables)).collect();
-        let conclusion = convert_bound_entities(&conclusion, &variables);
+
+        let (premises, conclusion, variables) =
+            extract_horn_clause(&expr)?;
+
+        let premises: Vec<Expr> = premises
+            .iter()
+            .map(|premise| {
+                convert_bound_entities(premise, &variables)
+            })
+            .collect();
+
+        let conclusion =
+            convert_bound_entities(&conclusion, &variables);
+
         if debug {
             println!("=== Extracted Horn clause (after convert) ===");
-            for (i, p) in premises.iter().enumerate() {
-                println!("  premise[{}]: {}  AST: {:?}", i, p, p);
+            for (index, premise) in premises.iter().enumerate() {
+                println!(
+                    "  premise[{}]: {}  AST: {:?}",
+                    index, premise, premise
+                );
             }
-            println!("  conclusion: {}  AST: {:?}", conclusion, conclusion);
+            println!(
+                "  conclusion: {}  AST: {:?}",
+                conclusion, conclusion
+            );
             println!("  variables: {:?}", variables);
         }
-        kb.add_rule(premises, conclusion, variables, rule.weight);
+
+        kb.add_rule(
+            premises,
+            conclusion,
+            variables,
+            rule.weight,
+        );
     }
 
     if debug {
         println!("=== KB state ===");
         println!("  entities: {:?}", kb.entities);
         println!("  types: {:?}", kb.types);
+
         let grounded = kb.ground_all();
         println!("  grounded clauses ({}):", grounded.len());
-        for (i, c) in grounded.iter().enumerate() {
-            println!("    clause {}:", i);
-            for (j, p) in c.premises.iter().enumerate() {
-                println!("      premise[{}]: {}  AST: {:?}", j, p, p);
+
+        for (index, clause) in grounded.iter().enumerate() {
+            println!("    clause {}:", index);
+
+            for (premise_index, premise) in
+                clause.premises.iter().enumerate()
+            {
+                println!(
+                    "      premise[{}]: {}  AST: {:?}",
+                    premise_index, premise, premise
+                );
             }
-            println!("      conclusion: {}  AST: {:?}", c.conclusion, c.conclusion);
-            println!("      variables: {:?}", c.variables);
-            println!("      is_fact: {}", c.is_fact());
+
+            println!(
+                "      conclusion: {}  AST: {:?}",
+                clause.conclusion, clause.conclusion
+            );
+            println!("      variables: {:?}", clause.variables);
+            println!("      is_fact: {}", clause.is_fact());
         }
     }
 
     let mut graph = QBBNGraph::from_kb(&kb);
 
-    for ev in &fixture.evidence {
-        let parsed = semantics::parse(&ev.formula)
-            .map_err(|e| format!("parse error in evidence '{}': {}", ev.formula, e))?;
+    for evidence in &fixture.evidence {
+        let parsed = semantics::parse(&evidence.formula)
+            .map_err(|error| {
+                format!(
+                    "parse error in evidence '{}': {}",
+                    evidence.formula, error
+                )
+            })?;
+
         let canonical = parsed.to_string();
+
         if debug {
             println!("=== Evidence ===");
-            println!("  raw: {}", ev.formula);
+            println!("  raw: {}", evidence.formula);
             println!("  parsed: {}  AST: {:?}", parsed, parsed);
             println!("  canonical: {}", canonical);
+            println!("  likelihood: {:.6}", evidence.prob);
         }
-        if !graph.set_evidence(&canonical, ev.prob) {
-            return Err(format!("evidence formula '{}' (canonical: '{}') not found in graph", ev.formula, canonical));
+
+        if !graph.set_evidence(&canonical, evidence.prob) {
+            return Err(format!(
+                "evidence formula '{}' (canonical: '{}') not found in graph",
+                evidence.formula, canonical
+            ));
         }
     }
 
-    let trace = belief_propagation(&mut graph, 50, 0.5, 1e-6, debug);
+    // Run the exact oracle before BP. The oracle does not depend on mutable
+    // beliefs, but doing it here keeps the reference result conceptually
+    // separate from the approximation.
+    let exact_attempt = exact_inference(
+        &graph,
+        ExactConfig {
+            retain_assignments: false,
+            ..ExactConfig::default()
+        },
+    );
+
+    let (exact_result, exact_partition_function, exact_error) =
+        match exact_attempt {
+            Ok(result) => {
+                let partition = Some(result.partition_function);
+                (Some(result), partition, None)
+            }
+            Err(error) => {
+                if debug {
+                    println!("=== Exact inference unavailable ===");
+                    println!("  {}", error);
+                }
+                (None, None, Some(error.to_string()))
+            }
+        };
+
+    let trace =
+        belief_propagation(&mut graph, 50, 0.5, 1e-6, debug);
 
     let mut query_results = Vec::new();
-    for q in &fixture.queries {
-        let parsed = semantics::parse(&q.formula)
-            .map_err(|e| format!("parse error in query '{}': {}", q.formula, e))?;
+
+    for query in &fixture.queries {
+        let parsed = semantics::parse(&query.formula)
+            .map_err(|error| {
+                format!(
+                    "parse error in query '{}': {}",
+                    query.formula, error
+                )
+            })?;
+
         let canonical = parsed.to_string();
+        let bp_prob = graph.prob(&canonical);
+
+        let exact_prob = exact_result
+            .as_ref()
+            .and_then(|result| {
+                result.prob_formula(&graph, &canonical).ok()
+            });
+
+        let bp_exact_delta =
+            exact_prob.map(|exact| bp_prob - exact);
+
         if debug {
             println!("=== Query ===");
-            println!("  raw: {}", q.formula);
+            println!("  raw: {}", query.formula);
             println!("  parsed: {}  AST: {:?}", parsed, parsed);
             println!("  canonical: {}", canonical);
+            println!("  BP: {:.12}", bp_prob);
+
+            if let Some(exact) = exact_prob {
+                println!("  exact: {:.12}", exact);
+                println!("  BP - exact: {:+.12}", bp_prob - exact);
+            }
         }
-        let prob = graph.prob(&canonical);
-        let ok = if let Some(expected) = q.expected_prob {
-            (prob - expected).abs() <= q.tolerance
+
+        let ok = if let Some(expected) = query.expected_prob {
+            (bp_prob - expected).abs() <= query.tolerance
         } else {
             true
         };
+
         query_results.push(QueryResult {
-            formula: q.formula.clone(),
-            prob,
-            expected: q.expected_prob,
-            tolerance: q.tolerance,
+            formula: query.formula.clone(),
+            prob: bp_prob,
+            exact_prob,
+            bp_exact_delta,
+            expected: query.expected_prob,
+            tolerance: query.tolerance,
             ok,
         });
     }
@@ -276,6 +471,8 @@ pub fn run_inference_fixture_debug(fixture: &InferenceFixture, debug: bool) -> R
         query_results,
         stats: graph.stats(),
         iterations: trace.iterations.len(),
+        exact_partition_function,
+        exact_error,
         graph: Some(graph_snapshot),
     })
 }
