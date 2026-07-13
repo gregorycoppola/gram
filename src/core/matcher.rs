@@ -14,7 +14,7 @@ use crate::core::value::VarGen;
 
 use engine::try_pattern_match;
 use tree::span_result_to_match;
-use types::{SpanKey, SpanResult};
+use types::{SpanCache, SpanKey, SpanResult};
 
 // --- Public API ---
 
@@ -235,7 +235,7 @@ fn parse_bottom_up(
         t.push("");
     }
 
-    let mut cache: HashMap<SpanKey, SpanResult> = HashMap::new();
+    let mut cache: SpanCache = HashMap::new();
 
     for (_orig_idx, span) in &indexed {
         let key = SpanKey {
@@ -298,12 +298,12 @@ fn parse_bottom_up(
             t.leave();
         }
 
-        cache.insert(key, result);
+        cache.insert(key, vec![result]);
     }
 
     if top_level_keys.len() == 1 {
         let key = &top_level_keys[0];
-        let result = cache.get(key).unwrap();
+        let result = cache.get(key).unwrap().first().unwrap();
         let span = sentence
             .spans
             .iter()
@@ -337,7 +337,7 @@ fn match_span(
     lexicon: &Lexicon,
     rules: &[Rule],
     var_gen: &mut VarGen,
-    cache: &HashMap<SpanKey, SpanResult>,
+    cache: &SpanCache,
     trace: Option<&mut DebugTrace>,
 ) -> Result<SpanResult, String> {
     try_pattern_match(

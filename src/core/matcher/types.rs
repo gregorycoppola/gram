@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::core::value::SemValue;
 
@@ -187,6 +187,7 @@ pub struct SpanKey {
     pub label: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct SpanResult {
     pub sem_value: SemValue,
     pub output: String,
@@ -196,7 +197,10 @@ pub struct SpanResult {
     pub bindings: BTreeMap<String, (String, String)>,
     pub token_annotations: Vec<TokenAnnotation>,
     pub constituents: Vec<Constituent>,
+    pub derivation_key: String,
 }
+
+pub type SpanCache = HashMap<SpanKey, Vec<SpanResult>>;
 
 // --- Helpers ---
 
