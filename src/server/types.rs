@@ -51,6 +51,43 @@ pub struct FixtureSummary {
     pub sentences: usize,
 }
 
+#[derive(Debug, Serialize)]
+pub struct CoverageExampleSummary {
+    /// Example name within the article, such as "00".
+    pub name: String,
+
+    /// Path used by the coverage fixture endpoints.
+    pub fixture: String,
+
+    pub sentence: String,
+    pub status: String,
+    pub parse_count: usize,
+    pub semantic_count: usize,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gold: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gold_correct: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gold_match_count: Option<usize>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CoverageArticleSummary {
+    /// Filesystem-safe article identifier.
+    pub name: String,
+
+    /// Human-readable label derived from the directory name.
+    pub title: String,
+
+    pub examples: Vec<CoverageExampleSummary>,
+}
+
 /// POST /proof/check request body.
 #[derive(Debug, Deserialize)]
 pub struct CheckProofRequest {
