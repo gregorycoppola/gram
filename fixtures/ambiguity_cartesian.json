@@ -1,0 +1,56 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "loves",
+        "roles": {
+          "agent": "e",
+          "patient": "e"
+        },
+        "forms": ["loves"]
+      }
+    ],
+    "entities": [
+      {
+        "name": "sue",
+        "type": "e",
+        "forms": ["Sue"]
+      },
+      {
+        "name": "tom",
+        "type": "e",
+        "forms": ["Tom"]
+      }
+    ]
+  },
+  "grammar": [
+    {
+      "name": "bare_dp_a",
+      "pattern": "$x:e",
+      "sem": "bare_dp($x)",
+      "kind": "dp"
+    },
+    {
+      "name": "bare_dp_b",
+      "pattern": "$x:e",
+      "sem": "bare_dp($x)",
+      "kind": "dp"
+    },
+    {
+      "name": "s_transitive",
+      "pattern": "SUB:dp[$x:e] $V:{agent:e,patient:e} SUB:dp",
+      "sem": "s_transitive($SUB, $SUB1, $V, agent, patient)",
+      "kind": "s"
+    }
+  ],
+  "sentences": [
+    {
+      "tokens": ["sue", "loves", "tom"],
+      "spans": [
+        ["dp", 0, 1],
+        ["dp", 2, 3],
+        ["s", 0, 3]
+      ]
+    }
+  ]
+}

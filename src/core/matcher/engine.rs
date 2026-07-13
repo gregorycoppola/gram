@@ -74,7 +74,6 @@ pub fn try_pattern_matches(
             0,
             Vec::new(),
             Vec::new(),
-            0,
             direct_children,
             cache,
             global_offset,
@@ -181,7 +180,6 @@ fn match_pattern(
     sub_count: usize,
     constituents: Vec<Constituent>,
     child_derivation_keys: Vec<String>,
-    next_child_index: usize,
     direct_children: &[SpanKey],
     cache: &SpanCache,
     global_offset: usize,
@@ -201,12 +199,6 @@ fn match_pattern(
         }
     }
 
-    if let Some(child) = direct_children.get(next_child_index) {
-        if child.start < global_offset + token_index {
-            return Vec::new();
-        }
-    }
-
     if pattern_index >= pattern.len() {
         while token_index < tokens.len() && is_punctuation(&clean_token(&tokens[token_index])) {
             log.push(Consumption::Skipped {
@@ -215,7 +207,7 @@ fn match_pattern(
             token_index += 1;
         }
 
-        if token_index == tokens.len() && next_child_index == direct_children.len() {
+        if token_index == tokens.len() {
             return vec![PatternMatch {
                 bindings,
                 log,
@@ -233,14 +225,6 @@ fn match_pattern(
 
     let slot = &pattern[pattern_index];
     let token = clean_token(&tokens[token_index]);
-
-    if !matches!(slot, Slot::Sub { .. }) {
-        if let Some(child) = direct_children.get(next_child_index) {
-            if child.start == global_offset + token_index {
-                return Vec::new();
-            }
-        }
-    }
 
     match slot {
         Slot::Literal(literal) => {
@@ -261,7 +245,6 @@ fn match_pattern(
                     sub_count,
                     constituents,
                     child_derivation_keys,
-                    next_child_index,
                     direct_children,
                     cache,
                     global_offset,
@@ -283,7 +266,6 @@ fn match_pattern(
                     sub_count,
                     constituents,
                     child_derivation_keys,
-                    next_child_index,
                     direct_children,
                     cache,
                     global_offset,
@@ -311,7 +293,6 @@ fn match_pattern(
                     sub_count,
                     constituents,
                     child_derivation_keys,
-                    next_child_index,
                     direct_children,
                     cache,
                     global_offset,
@@ -333,7 +314,6 @@ fn match_pattern(
                     sub_count,
                     constituents,
                     child_derivation_keys,
-                    next_child_index,
                     direct_children,
                     cache,
                     global_offset,
@@ -347,51 +327,42 @@ fn match_pattern(
             type_constraint,
         } => {
             if let Some((canonical, _category, consumed)) = lexicon.lookup_at(tokens, token_index) {
-                let consumed_end = global_offset + token_index + consumed;
-                let crosses_child = direct_children
-                    .get(next_child_index)
-                    .is_some_and(|child| child.start < consumed_end);
+                let actual_type = lexicon.get_type(&canonical).unwrap_or_default();
+                let type_ok = type_constraint
+                    .as_ref()
+                    .is_none_or(|expected| actual_type == *expected);
 
-                if !crosses_child {
-                    let actual_type = lexicon.get_type(&canonical).unwrap_or_default();
-                    let type_ok = type_constraint
-                        .as_ref()
-                        .is_none_or(|expected| actual_type == *expected);
+                if type_ok {
+                    let mut next_bindings = bindings.clone();
+                    let mut next_log = log.clone();
 
-                    if type_ok {
-                        let mut next_bindings = bindings.clone();
-                        let mut next_log = log.clone();
+                    next_bindings.insert(name.clone(), (canonical.clone(), actual_type.clone()));
+                    next_log.push(Consumption::Var {
+                        variable: name.clone(),
+                        canonical,
+                        typ: actual_type,
+                        start: token_index,
+                        end: token_index + consumed,
+                    });
 
-                        next_bindings
-                            .insert(name.clone(), (canonical.clone(), actual_type.clone()));
-                        next_log.push(Consumption::Var {
-                            variable: name.clone(),
-                            canonical,
-                            typ: actual_type,
-                            start: token_index,
-                            end: token_index + consumed,
-                        });
+                    let results = match_pattern(
+                        pattern,
+                        pattern_index + 1,
+                        tokens,
+                        token_index + consumed,
+                        next_bindings,
+                        next_log,
+                        lexicon,
+                        sub_count,
+                        constituents.clone(),
+                        child_derivation_keys.clone(),
+                        direct_children,
+                        cache,
+                        global_offset,
+                    );
 
-                        let results = match_pattern(
-                            pattern,
-                            pattern_index + 1,
-                            tokens,
-                            token_index + consumed,
-                            next_bindings,
-                            next_log,
-                            lexicon,
-                            sub_count,
-                            constituents.clone(),
-                            child_derivation_keys.clone(),
-                            next_child_index,
-                            direct_children,
-                            cache,
-                            global_offset,
-                        );
-
-                        if !results.is_empty() {
-                            return results;
-                        }
+                    if !results.is_empty() {
+                        return results;
                     }
                 }
             }
@@ -413,7 +384,6 @@ fn match_pattern(
                     sub_count,
                     constituents,
                     child_derivation_keys,
-                    next_child_index,
                     direct_children,
                     cache,
                     global_offset,
@@ -425,13 +395,12 @@ fn match_pattern(
         Slot::Sub {
             label, delimiter, ..
         } => {
-            let Some(child) = direct_children.get(next_child_index) else {
+            let Some(child) = direct_children
+                .iter()
+                .find(|child| child.start == global_offset + token_index && child.label == *label)
+            else {
                 return Vec::new();
             };
-
-            if child.start != global_offset + token_index || child.label != *label {
-                return Vec::new();
-            }
 
             let local_end = child.end.saturating_sub(global_offset);
             if local_end > tokens.len() || local_end <= token_index {
@@ -505,7 +474,6 @@ fn match_pattern(
                     sub_count + 1,
                     next_constituents,
                     next_child_keys,
-                    next_child_index + 1,
                     direct_children,
                     cache,
                     global_offset,
