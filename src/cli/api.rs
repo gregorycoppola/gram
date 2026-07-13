@@ -13,9 +13,7 @@ pub enum ApiCommand {
     /// GET /fixtures — list all fixtures
     Fixtures,
     /// GET /fixtures/:name — raw fixture JSON
-    Fixture {
-        name: String,
-    },
+    Fixture { name: String },
     /// GET /fixtures/:name/parse — parse all sentences
     Parse {
         name: String,
@@ -36,9 +34,7 @@ pub enum ApiCommand {
     /// GET /proofs — list all proof names
     Proofs,
     /// GET /proofs/:name — show a proof file
-    Proof {
-        name: String,
-    },
+    Proof { name: String },
     /// POST /proof/check — check a proof
     CheckProof {
         /// Path to a proof JSON file.
@@ -81,17 +77,26 @@ async fn run_api_async(args: ApiArgs) -> Result<()> {
     match args.command {
         ApiCommand::Health => {
             let url = format!("{}/health", base);
-            let resp = client.get(&url).send().await.with_context(|| format!("GET {}", url))?;
-            let body = resp.json::<serde_json::Value>().await.context("parsing health response")?;
+            let resp = client
+                .get(&url)
+                .send()
+                .await
+                .with_context(|| format!("GET {}", url))?;
+            let body = resp
+                .json::<serde_json::Value>()
+                .await
+                .context("parsing health response")?;
             println!("{}", serde_json::to_string_pretty(&body)?);
             Ok(())
         }
         ApiCommand::Fixtures => parse::run_fixtures(&client, base).await,
         ApiCommand::Fixture { name } => parse::run_fixture(&client, base, &name).await,
         ApiCommand::Parse { name, pretty } => parse::run_parse(&client, base, &name, pretty).await,
-        ApiCommand::ParseOne { fixture, sentence, pretty } => {
-            parse::run_parse_one(&client, base, &fixture, &sentence, pretty).await
-        }
+        ApiCommand::ParseOne {
+            fixture,
+            sentence,
+            pretty,
+        } => parse::run_parse_one(&client, base, &fixture, &sentence, pretty).await,
         ApiCommand::Proofs => proof::run_list(&client, base).await,
         ApiCommand::Proof { name } => proof::run_show(&client, base, &name).await,
         ApiCommand::CheckProof { proof } => proof::run_check(&client, base, &proof).await,

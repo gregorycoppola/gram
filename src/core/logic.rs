@@ -1,4 +1,3 @@
-
 /// Core logical form AST.
 /// Represents the semantic output of the grammar.
 
@@ -14,10 +13,7 @@ pub enum Expr {
     /// Conjunction: expr ∧ expr
     And(Box<Expr>, Box<Expr>),
     /// Implication: ante -> cons
-    Implies {
-        ante: Box<Expr>,
-        cons: Box<Expr>,
-    },
+    Implies { ante: Box<Expr>, cons: Box<Expr> },
     /// Universal: always [var:type]: body
     ForAll {
         var: String,
@@ -59,10 +55,7 @@ pub enum Expr {
         body: Box<Expr>,
     },
     /// Variable reference: name:type
-    Var {
-        name: String,
-        typ: String,
-    },
+    Var { name: String, typ: String },
     /// Named entity: socrates, the_meeting
     Entity(String),
     /// Question: ? [label:] body
@@ -97,7 +90,9 @@ impl std::fmt::Display for Expr {
             Expr::Pred { name, roles } => {
                 write!(f, "{}(", name)?;
                 for (i, (r, a)) in roles.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}: {}", r, a)?;
                 }
                 write!(f, ")")
@@ -112,7 +107,11 @@ impl std::fmt::Display for Expr {
                     write!(f, "{}", cons)
                 }
             }
-            Expr::ForAll { var, var_type, body } => {
+            Expr::ForAll {
+                var,
+                var_type,
+                body,
+            } => {
                 write!(f, "always [{}:{}]: ", var, var_type)?;
                 if is_quantifier(body) {
                     write!(f, "({})", body)
@@ -120,7 +119,11 @@ impl std::fmt::Display for Expr {
                     write!(f, "{}", body)
                 }
             }
-            Expr::The { var, var_type, body } => {
+            Expr::The {
+                var,
+                var_type,
+                body,
+            } => {
                 write!(f, "the [{}:{}]: ", var, var_type)?;
                 if is_quantifier(body) {
                     write!(f, "({})", body)
@@ -128,7 +131,11 @@ impl std::fmt::Display for Expr {
                     write!(f, "{}", body)
                 }
             }
-            Expr::This { var, var_type, body } => {
+            Expr::This {
+                var,
+                var_type,
+                body,
+            } => {
                 write!(f, "this [{}:{}]: ", var, var_type)?;
                 if is_quantifier(body) {
                     write!(f, "({})", body)
@@ -136,7 +143,11 @@ impl std::fmt::Display for Expr {
                     write!(f, "{}", body)
                 }
             }
-            Expr::That { var, var_type, body } => {
+            Expr::That {
+                var,
+                var_type,
+                body,
+            } => {
                 write!(f, "that [{}:{}]: ", var, var_type)?;
                 if is_quantifier(body) {
                     write!(f, "({})", body)
@@ -144,14 +155,24 @@ impl std::fmt::Display for Expr {
                     write!(f, "{}", body)
                 }
             }
-            Expr::Exists { var, var_type, body, count } => {
+            Expr::Exists {
+                var,
+                var_type,
+                body,
+                count,
+            } => {
                 write!(f, "exists [{}:{}]: {}", var, var_type, body)?;
                 if let Some(c) = count {
                     write!(f, ", |{}| = {}", var, c)?;
                 }
                 Ok(())
             }
-            Expr::ExistsMany { var, var_type, count, body } => {
+            Expr::ExistsMany {
+                var,
+                var_type,
+                count,
+                body,
+            } => {
                 write!(f, "exists_many [{}:{}, {}]: ", var, var_type, count)?;
                 if is_quantifier(body) {
                     write!(f, "({})", body)
@@ -163,7 +184,9 @@ impl std::fmt::Display for Expr {
             Expr::Entity(s) => write!(f, "{}", s),
             Expr::Question { label, body } => {
                 write!(f, "? ")?;
-                if let Some(l) = label { write!(f, "{}: ", l)?; }
+                if let Some(l) = label {
+                    write!(f, "{}: ", l)?;
+                }
                 write!(f, "{}", body)
             }
         }

@@ -47,7 +47,11 @@ pub fn apply_constructor(
     }
 }
 
-enum DpQuantKind { The, Exists, ForAll }
+enum DpQuantKind {
+    The,
+    Exists,
+    ForAll,
+}
 
 fn construct_quant_dp(
     kind: DpQuantKind,
@@ -70,10 +74,13 @@ fn construct_quant_dp(
     let var_type: String = "e".to_string();
     let restriction = Expr::Pred {
         name: pred_name,
-        roles: vec![(role, Expr::Var {
-            name: var.clone(),
-            typ: var_type.clone(),
-        })],
+        roles: vec![(
+            role,
+            Expr::Var {
+                name: var.clone(),
+                typ: var_type.clone(),
+            },
+        )],
     };
 
     let quant = match kind {
@@ -82,7 +89,11 @@ fn construct_quant_dp(
         DpQuantKind::ForAll => DpQuant::ForAll { restriction },
     };
 
-    Ok(SemValue::Dp { var, var_type, quant })
+    Ok(SemValue::Dp {
+        var,
+        var_type,
+        quant,
+    })
 }
 
 fn construct_bare_dp(args: &[Arg]) -> Result<SemValue, String> {
@@ -117,10 +128,13 @@ fn construct_bare_n(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, Stri
     let var = var_gen.fresh();
     let restriction = Expr::Pred {
         name: pred_name,
-        roles: vec![(role, Expr::Var {
-            name: var.clone(),
-            typ: "e".to_string(),
-        })],
+        roles: vec![(
+            role,
+            Expr::Var {
+                name: var.clone(),
+                typ: "e".to_string(),
+            },
+        )],
     };
 
     Ok(SemValue::N { var, restriction })
@@ -139,26 +153,27 @@ fn construct_adj_n(args: &[Arg], _var_gen: &mut VarGen) -> Result<SemValue, Stri
         _ => return Err("adj_n: second arg must be a literal role name".into()),
     };
     let (n_var, n_restriction) = match &args[2] {
-        Arg::Sub(SemValue::N { var, restriction }) => {
-            (var.clone(), restriction.clone())
-        }
+        Arg::Sub(SemValue::N { var, restriction }) => (var.clone(), restriction.clone()),
         _ => return Err("adj_n: third arg must be an N".into()),
     };
 
     let adj_restriction = Expr::Pred {
         name: adj_name,
-        roles: vec![(role, Expr::Var {
-            name: n_var.clone(),
-            typ: "e".to_string(),
-        })],
+        roles: vec![(
+            role,
+            Expr::Var {
+                name: n_var.clone(),
+                typ: "e".to_string(),
+            },
+        )],
     };
 
-    let restriction = Expr::And(
-        Box::new(adj_restriction),
-        Box::new(n_restriction),
-    );
+    let restriction = Expr::And(Box::new(adj_restriction), Box::new(n_restriction));
 
-    Ok(SemValue::N { var: n_var, restriction })
+    Ok(SemValue::N {
+        var: n_var,
+        restriction,
+    })
 }
 
 fn construct_the_n_dp(args: &[Arg]) -> Result<SemValue, String> {
@@ -166,16 +181,16 @@ fn construct_the_n_dp(args: &[Arg]) -> Result<SemValue, String> {
         return Err(format!("the_n_dp expects 1 arg, got {}", args.len()));
     }
     let (n_var, n_restriction) = match &args[0] {
-        Arg::Sub(SemValue::N { var, restriction }) => {
-            (var.clone(), restriction.clone())
-        }
+        Arg::Sub(SemValue::N { var, restriction }) => (var.clone(), restriction.clone()),
         _ => return Err("the_n_dp: arg must be an N".into()),
     };
 
     Ok(SemValue::Dp {
         var: n_var,
         var_type: "e".to_string(),
-        quant: DpQuant::The { restriction: n_restriction },
+        quant: DpQuant::The {
+            restriction: n_restriction,
+        },
     })
 }
 
@@ -184,16 +199,16 @@ fn construct_a_n_dp(args: &[Arg]) -> Result<SemValue, String> {
         return Err(format!("a_n_dp expects 1 arg, got {}", args.len()));
     }
     let (n_var, n_restriction) = match &args[0] {
-        Arg::Sub(SemValue::N { var, restriction }) => {
-            (var.clone(), restriction.clone())
-        }
+        Arg::Sub(SemValue::N { var, restriction }) => (var.clone(), restriction.clone()),
         _ => return Err("a_n_dp: arg must be an N".into()),
     };
 
     Ok(SemValue::Dp {
         var: n_var,
         var_type: "e".to_string(),
-        quant: DpQuant::Exists { restriction: n_restriction },
+        quant: DpQuant::Exists {
+            restriction: n_restriction,
+        },
     })
 }
 
@@ -213,10 +228,13 @@ fn construct_a_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, String
     let var = var_gen.fresh();
     let restriction = Expr::Pred {
         name: pred_name,
-        roles: vec![(role, Expr::Var {
-            name: var.clone(),
-            typ: "e".to_string(),
-        })],
+        roles: vec![(
+            role,
+            Expr::Var {
+                name: var.clone(),
+                typ: "e".to_string(),
+            },
+        )],
     };
 
     Ok(SemValue::Dp {
@@ -243,9 +261,11 @@ fn construct_the_of_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, S
         _ => return Err("the_of_dp: fourth arg must be literal".into()),
     };
     let (obj_var, obj_type) = match &args[1] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant: DpQuant::Bare }) => {
-            (var.clone(), var_type.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant: DpQuant::Bare,
+        }) => (var.clone(), var_type.clone()),
         _ => return Err("the_of_dp: second arg must be a bare DP".into()),
     };
 
@@ -253,8 +273,20 @@ fn construct_the_of_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, S
     let restriction = Expr::Pred {
         name: pred_name,
         roles: vec![
-            (theme_role, Expr::Var { name: var.clone(), typ: "e".to_string() }),
-            (loc_role, Expr::Var { name: obj_var, typ: obj_type }),
+            (
+                theme_role,
+                Expr::Var {
+                    name: var.clone(),
+                    typ: "e".to_string(),
+                },
+            ),
+            (
+                loc_role,
+                Expr::Var {
+                    name: obj_var,
+                    typ: obj_type,
+                },
+            ),
         ],
     };
 
@@ -282,9 +314,11 @@ fn construct_a_of_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, Str
         _ => return Err("a_of_dp: fourth arg must be literal".into()),
     };
     let (obj_var, obj_type) = match &args[1] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant: DpQuant::Bare }) => {
-            (var.clone(), var_type.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant: DpQuant::Bare,
+        }) => (var.clone(), var_type.clone()),
         _ => return Err("a_of_dp: second arg must be a bare DP".into()),
     };
 
@@ -292,8 +326,20 @@ fn construct_a_of_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, Str
     let restriction = Expr::Pred {
         name: pred_name,
         roles: vec![
-            (theme_role, Expr::Var { name: var.clone(), typ: "e".to_string() }),
-            (loc_role, Expr::Var { name: obj_var, typ: obj_type }),
+            (
+                theme_role,
+                Expr::Var {
+                    name: var.clone(),
+                    typ: "e".to_string(),
+                },
+            ),
+            (
+                loc_role,
+                Expr::Var {
+                    name: obj_var,
+                    typ: obj_type,
+                },
+            ),
         ],
     };
 
@@ -317,9 +363,7 @@ fn construct_the_pp_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, S
         _ => return Err("the_pp_dp: second arg must be literal".into()),
     };
     let (obj_var, obj_type) = match &args[2] {
-        Arg::Sub(SemValue::Dp { var, var_type, .. }) => {
-            (var.clone(), var_type.clone())
-        }
+        Arg::Sub(SemValue::Dp { var, var_type, .. }) => (var.clone(), var_type.clone()),
         _ => return Err("the_pp_dp: third arg must be DP".into()),
     };
     let theme_role = match &args[3] {
@@ -334,13 +378,31 @@ fn construct_the_pp_dp(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, S
     let var = var_gen.fresh();
     let noun_restriction = Expr::Pred {
         name: pred_name,
-        roles: vec![(theme_role.clone(), Expr::Var { name: var.clone(), typ: "e".to_string() })],
+        roles: vec![(
+            theme_role.clone(),
+            Expr::Var {
+                name: var.clone(),
+                typ: "e".to_string(),
+            },
+        )],
     };
     let pp_restriction = Expr::Pred {
         name: prep_name,
         roles: vec![
-            (theme_role, Expr::Var { name: var.clone(), typ: "e".to_string() }),
-            (comp_role, Expr::Var { name: obj_var, typ: obj_type }),
+            (
+                theme_role,
+                Expr::Var {
+                    name: var.clone(),
+                    typ: "e".to_string(),
+                },
+            ),
+            (
+                comp_role,
+                Expr::Var {
+                    name: obj_var,
+                    typ: obj_type,
+                },
+            ),
         ],
     };
 
@@ -366,9 +428,7 @@ fn construct_adj_of_n(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, St
         _ => return Err("adj_of_n: second arg must be lexical".into()),
     };
     let (obj_var, obj_type) = match &args[2] {
-        Arg::Sub(SemValue::Dp { var, var_type, .. }) => {
-            (var.clone(), var_type.clone())
-        }
+        Arg::Sub(SemValue::Dp { var, var_type, .. }) => (var.clone(), var_type.clone()),
         _ => return Err("adj_of_n: third arg must be DP".into()),
     };
     let theme_role = match &args[3] {
@@ -384,19 +444,34 @@ fn construct_adj_of_n(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue, St
     let noun_restriction = Expr::Pred {
         name: pred_name,
         roles: vec![
-            (theme_role.clone(), Expr::Var { name: var.clone(), typ: "e".to_string() }),
-            (loc_role, Expr::Var { name: obj_var, typ: obj_type }),
+            (
+                theme_role.clone(),
+                Expr::Var {
+                    name: var.clone(),
+                    typ: "e".to_string(),
+                },
+            ),
+            (
+                loc_role,
+                Expr::Var {
+                    name: obj_var,
+                    typ: obj_type,
+                },
+            ),
         ],
     };
     let adj_restriction = Expr::Pred {
         name: adj_name,
-        roles: vec![(theme_role, Expr::Var { name: var.clone(), typ: "e".to_string() })],
+        roles: vec![(
+            theme_role,
+            Expr::Var {
+                name: var.clone(),
+                typ: "e".to_string(),
+            },
+        )],
     };
 
-    let restriction = Expr::And(
-        Box::new(adj_restriction),
-        Box::new(noun_restriction),
-    );
+    let restriction = Expr::And(Box::new(adj_restriction), Box::new(noun_restriction));
 
     Ok(SemValue::N { var, restriction })
 }
@@ -406,9 +481,11 @@ fn construct_s_copula(args: &[Arg]) -> Result<SemValue, String> {
         return Err(format!("s_copula expects 3 args, got {}", args.len()));
     }
     let (var, var_type, quant) = match &args[0] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
-            (var.clone(), var_type.clone(), quant.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
         _ => return Err("s_copula: first arg must be a DP".into()),
     };
     let pred_name = match &args[1] {
@@ -422,10 +499,13 @@ fn construct_s_copula(args: &[Arg]) -> Result<SemValue, String> {
 
     let body = Expr::Pred {
         name: pred_name,
-        roles: vec![(role, Expr::Var {
-            name: var.clone(),
-            typ: var_type.clone(),
-        })],
+        roles: vec![(
+            role,
+            Expr::Var {
+                name: var.clone(),
+                typ: var_type.clone(),
+            },
+        )],
     };
 
     let expr = expand_quant(var, var_type, &quant, body)?;
@@ -437,15 +517,15 @@ fn construct_s_copula_adj_n(args: &[Arg]) -> Result<SemValue, String> {
         return Err(format!("s_copula_adj_n expects 3 args, got {}", args.len()));
     }
     let (subj_var, subj_type, subj_quant) = match &args[0] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
-            (var.clone(), var_type.clone(), quant.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
         _ => return Err("s_copula_adj_n: first arg must be a DP".into()),
     };
     let (n_var, n_restriction) = match &args[1] {
-        Arg::Sub(SemValue::N { var, restriction }) => {
-            (var.clone(), restriction.clone())
-        }
+        Arg::Sub(SemValue::N { var, restriction }) => (var.clone(), restriction.clone()),
         _ => return Err("s_copula_adj_n: second arg must be an N".into()),
     };
     let _role = match &args[2] {
@@ -460,12 +540,17 @@ fn construct_s_copula_adj_n(args: &[Arg]) -> Result<SemValue, String> {
 
 fn construct_s_copula_degree(args: &[Arg]) -> Result<SemValue, String> {
     if args.len() != 5 {
-        return Err(format!("s_copula_degree expects 5 args, got {}", args.len()));
+        return Err(format!(
+            "s_copula_degree expects 5 args, got {}",
+            args.len()
+        ));
     }
     let (var, var_type, quant) = match &args[0] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
-            (var.clone(), var_type.clone(), quant.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
         _ => return Err("s_copula_degree: first arg must be a DP".into()),
     };
     let degree_name = match &args[1] {
@@ -488,7 +573,13 @@ fn construct_s_copula_degree(args: &[Arg]) -> Result<SemValue, String> {
     let body = Expr::Pred {
         name: pred_name,
         roles: vec![
-            (theme_role, Expr::Var { name: var.clone(), typ: var_type.clone() }),
+            (
+                theme_role,
+                Expr::Var {
+                    name: var.clone(),
+                    typ: var_type.clone(),
+                },
+            ),
             (degree_role, Expr::Entity(degree_name)),
         ],
     };
@@ -502,16 +593,24 @@ fn construct_s_equative(args: &[Arg]) -> Result<SemValue, String> {
         return Err(format!("s_equative expects 2 args, got {}", args.len()));
     }
     let (subj_var, subj_type, subj_quant) = match &args[0] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
-            (var.clone(), var_type.clone(), quant.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
         _ => return Err("s_equative: first arg must be a DP".into()),
     };
     let (obj_var, obj_restriction) = match &args[1] {
-        Arg::Sub(SemValue::Dp { var, quant: DpQuant::The { restriction }, .. }) |
-        Arg::Sub(SemValue::Dp { var, quant: DpQuant::Exists { restriction }, .. }) => {
-            (var.clone(), restriction.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::The { restriction },
+            ..
+        })
+        | Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::Exists { restriction },
+            ..
+        }) => (var.clone(), restriction.clone()),
         _ => return Err("s_equative: second arg must be a quantified DP".into()),
     };
 
@@ -525,13 +624,19 @@ fn construct_s_identity(args: &[Arg]) -> Result<SemValue, String> {
         return Err(format!("s_identity expects 2 args, got {}", args.len()));
     }
     let subj_name = match &args[0] {
-        Arg::Sub(SemValue::Dp { var, quant: DpQuant::Bare, .. }) => var.clone(),
+        Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::Bare,
+            ..
+        }) => var.clone(),
         _ => return Err("s_identity: first arg must be a bare DP".into()),
     };
     let (obj_var, obj_restriction) = match &args[1] {
-        Arg::Sub(SemValue::Dp { var, quant: DpQuant::The { restriction }, .. }) => {
-            (var.clone(), restriction.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::The { restriction },
+            ..
+        }) => (var.clone(), restriction.clone()),
         _ => return Err("s_identity: second arg must be a The DP".into()),
     };
 
@@ -539,7 +644,13 @@ fn construct_s_identity(args: &[Arg]) -> Result<SemValue, String> {
         name: "equals".to_string(),
         roles: vec![
             ("left".to_string(), Expr::Entity(subj_name)),
-            ("right".to_string(), Expr::Var { name: obj_var.clone(), typ: "e".to_string() }),
+            (
+                "right".to_string(),
+                Expr::Var {
+                    name: obj_var.clone(),
+                    typ: "e".to_string(),
+                },
+            ),
         ],
     };
 
@@ -560,16 +671,24 @@ fn construct_s_as_copula(args: &[Arg]) -> Result<SemValue, String> {
         return Err(format!("s_as_copula expects 4 args, got {}", args.len()));
     }
     let (as_var, as_restriction) = match &args[0] {
-        Arg::Sub(SemValue::Dp { var, quant: DpQuant::The { restriction }, .. }) |
-        Arg::Sub(SemValue::Dp { var, quant: DpQuant::Exists { restriction }, .. }) => {
-            (var.clone(), restriction.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::The { restriction },
+            ..
+        })
+        | Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::Exists { restriction },
+            ..
+        }) => (var.clone(), restriction.clone()),
         _ => return Err("s_as_copula: first arg must be a quantified DP".into()),
     };
     let (subj_var, subj_type, subj_quant) = match &args[1] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
-            (var.clone(), var_type.clone(), quant.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
         _ => return Err("s_as_copula: second arg must be a DP".into()),
     };
     let pred_name = match &args[2] {
@@ -584,7 +703,13 @@ fn construct_s_as_copula(args: &[Arg]) -> Result<SemValue, String> {
     let as_body = substitute_var_name(as_restriction, &as_var, &subj_var);
     let copula_body = Expr::Pred {
         name: pred_name,
-        roles: vec![(role, Expr::Var { name: subj_var.clone(), typ: subj_type.clone() })],
+        roles: vec![(
+            role,
+            Expr::Var {
+                name: subj_var.clone(),
+                typ: subj_type.clone(),
+            },
+        )],
     };
     let body = Expr::And(Box::new(as_body), Box::new(copula_body));
 
@@ -607,10 +732,7 @@ fn construct_s_when(args: &[Arg]) -> Result<SemValue, String> {
 
     let expr = Expr::Pred {
         name: "when".to_string(),
-        roles: vec![
-            ("event".to_string(), event),
-            ("main".to_string(), main),
-        ],
+        roles: vec![("event".to_string(), event), ("main".to_string(), main)],
     };
     Ok(SemValue::Prop(expr))
 }
@@ -620,15 +742,19 @@ fn construct_s_transitive(args: &[Arg]) -> Result<SemValue, String> {
         return Err(format!("s_transitive expects 5 args, got {}", args.len()));
     }
     let (subj_var, subj_type, subj_quant) = match &args[0] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
-            (var.clone(), var_type.clone(), quant.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
         _ => return Err("s_transitive: first arg must be a DP".into()),
     };
     let (obj_var, obj_type, obj_quant) = match &args[1] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
-            (var.clone(), var_type.clone(), quant.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
         _ => return Err("s_transitive: second arg must be a DP".into()),
     };
     let verb_name = match &args[2] {
@@ -647,8 +773,20 @@ fn construct_s_transitive(args: &[Arg]) -> Result<SemValue, String> {
     let body = Expr::Pred {
         name: verb_name,
         roles: vec![
-            (agent_role, Expr::Var { name: subj_var.clone(), typ: subj_type.clone() }),
-            (patient_role, Expr::Var { name: obj_var.clone(), typ: obj_type.clone() }),
+            (
+                agent_role,
+                Expr::Var {
+                    name: subj_var.clone(),
+                    typ: subj_type.clone(),
+                },
+            ),
+            (
+                patient_role,
+                Expr::Var {
+                    name: obj_var.clone(),
+                    typ: obj_type.clone(),
+                },
+            ),
         ],
     };
 
@@ -665,21 +803,27 @@ fn construct_s_ditransitive(args: &[Arg]) -> Result<SemValue, String> {
         return Err(format!("s_ditransitive expects 7 args, got {}", args.len()));
     }
     let (subj_var, subj_type, subj_quant) = match &args[0] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
-            (var.clone(), var_type.clone(), quant.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
         _ => return Err("s_ditransitive: first arg must be a DP".into()),
     };
     let (obj1_var, obj1_type, obj1_quant) = match &args[1] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
-            (var.clone(), var_type.clone(), quant.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
         _ => return Err("s_ditransitive: second arg must be a DP".into()),
     };
     let (obj2_var, obj2_type, obj2_quant) = match &args[2] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
-            (var.clone(), var_type.clone(), quant.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
         _ => return Err("s_ditransitive: third arg must be a DP".into()),
     };
     let verb_name = match &args[3] {
@@ -702,9 +846,27 @@ fn construct_s_ditransitive(args: &[Arg]) -> Result<SemValue, String> {
     let body = Expr::Pred {
         name: verb_name,
         roles: vec![
-            (role1, Expr::Var { name: subj_var.clone(), typ: subj_type.clone() }),
-            (role2, Expr::Var { name: obj1_var.clone(), typ: obj1_type.clone() }),
-            (role3, Expr::Var { name: obj2_var.clone(), typ: obj2_type.clone() }),
+            (
+                role1,
+                Expr::Var {
+                    name: subj_var.clone(),
+                    typ: subj_type.clone(),
+                },
+            ),
+            (
+                role2,
+                Expr::Var {
+                    name: obj1_var.clone(),
+                    typ: obj1_type.clone(),
+                },
+            ),
+            (
+                role3,
+                Expr::Var {
+                    name: obj2_var.clone(),
+                    typ: obj2_type.clone(),
+                },
+            ),
         ],
     };
 
@@ -722,9 +884,11 @@ fn construct_s_complement(args: &[Arg]) -> Result<SemValue, String> {
         return Err(format!("s_complement expects 5 args, got {}", args.len()));
     }
     let (subj_var, subj_type, subj_quant) = match &args[0] {
-        Arg::Sub(SemValue::Dp { var, var_type, quant }) => {
-            (var.clone(), var_type.clone(), quant.clone())
-        }
+        Arg::Sub(SemValue::Dp {
+            var,
+            var_type,
+            quant,
+        }) => (var.clone(), var_type.clone(), quant.clone()),
         _ => return Err("s_complement: first arg must be a DP".into()),
     };
     let complement = match &args[1] {
@@ -747,7 +911,13 @@ fn construct_s_complement(args: &[Arg]) -> Result<SemValue, String> {
     let body = Expr::Pred {
         name: verb_name,
         roles: vec![
-            (agent_role, Expr::Var { name: subj_var.clone(), typ: subj_type.clone() }),
+            (
+                agent_role,
+                Expr::Var {
+                    name: subj_var.clone(),
+                    typ: subj_type.clone(),
+                },
+            ),
             (theme_role, complement),
         ],
     };
@@ -763,7 +933,11 @@ fn construct_s_gap(
     var_gen: &mut VarGen,
 ) -> Result<SemValue, String> {
     if args.len() != 4 {
-        return Err(format!("s_gap_{} expects 4 args, got {}", gap_role, args.len()));
+        return Err(format!(
+            "s_gap_{} expects 4 args, got {}",
+            gap_role,
+            args.len()
+        ));
     }
     let verb_name = match &args[0] {
         Arg::Lexical(name, _) => name.clone(),
@@ -785,9 +959,27 @@ fn construct_s_gap(
     let gap_var = var_gen.fresh();
 
     let (gap_role_expr, other_role_expr) = if gap_role == role1 {
-        (Expr::Var { name: gap_var.clone(), typ: "e".to_string() }, Expr::Var { name: other_var, typ: other_type })
+        (
+            Expr::Var {
+                name: gap_var.clone(),
+                typ: "e".to_string(),
+            },
+            Expr::Var {
+                name: other_var,
+                typ: other_type,
+            },
+        )
     } else {
-        (Expr::Var { name: other_var, typ: other_type }, Expr::Var { name: gap_var.clone(), typ: "e".to_string() })
+        (
+            Expr::Var {
+                name: other_var,
+                typ: other_type,
+            },
+            Expr::Var {
+                name: gap_var.clone(),
+                typ: "e".to_string(),
+            },
+        )
     };
 
     let body = Expr::Pred {
@@ -820,7 +1012,13 @@ fn construct_s_gap_theme(args: &[Arg], var_gen: &mut VarGen) -> Result<SemValue,
 
     let body = Expr::Pred {
         name: pred_name,
-        roles: vec![(role.clone(), Expr::Var { name: gap_var.clone(), typ: "e".to_string() })],
+        roles: vec![(
+            role.clone(),
+            Expr::Var {
+                name: gap_var.clone(),
+                typ: "e".to_string(),
+            },
+        )],
     };
 
     Ok(SemValue::GapProp(GapProp {
@@ -837,7 +1035,11 @@ fn construct_rel_dp(
     var_gen: &mut VarGen,
 ) -> Result<SemValue, String> {
     if args.len() != 3 {
-        return Err(format!("rel_dp_{} expects 3 args, got {}", gap_role, args.len()));
+        return Err(format!(
+            "rel_dp_{} expects 3 args, got {}",
+            gap_role,
+            args.len()
+        ));
     }
     let head_pred = match &args[0] {
         Arg::Lexical(name, _) => name.clone(),
@@ -859,13 +1061,16 @@ fn construct_rel_dp(
 
     let head_restriction = Expr::Pred {
         name: head_pred,
-        roles: vec![(head_role, Expr::Var { name: head_var.clone(), typ: head_var_type.clone() })],
+        roles: vec![(
+            head_role,
+            Expr::Var {
+                name: head_var.clone(),
+                typ: head_var_type.clone(),
+            },
+        )],
     };
 
-    let restriction = Expr::And(
-        Box::new(head_restriction),
-        Box::new(substituted_body),
-    );
+    let restriction = Expr::And(Box::new(head_restriction), Box::new(substituted_body));
 
     Ok(SemValue::Dp {
         var: head_var,
@@ -892,10 +1097,7 @@ fn expand_quant(
         DpQuant::Exists { restriction } => Ok(Expr::Exists {
             var,
             var_type,
-            body: Box::new(Expr::And(
-                Box::new(restriction.clone()),
-                Box::new(body),
-            )),
+            body: Box::new(Expr::And(Box::new(restriction.clone()), Box::new(body))),
             count: None,
         }),
         DpQuant::The { restriction } => Ok(Expr::The {
@@ -906,16 +1108,11 @@ fn expand_quant(
                 cons: Box::new(body),
             }),
         }),
-        DpQuant::Bare => {
-            Ok(substitute_var_to_entity(body, &var))
-        }
+        DpQuant::Bare => Ok(substitute_var_to_entity(body, &var)),
     }
 }
 
-fn expand_quants(
-    dps: &[(String, String, DpQuant)],
-    body: Expr,
-) -> Result<Expr, String> {
+fn expand_quants(dps: &[(String, String, DpQuant)], body: Expr) -> Result<Expr, String> {
     let mut result = body;
     for (var, var_type, quant) in dps.iter().rev() {
         result = expand_quant(var.clone(), var_type.clone(), quant, result)?;
@@ -943,26 +1140,67 @@ fn substitute_var_to_entity(expr: Expr, target: &str) -> Expr {
             ante: Box::new(substitute_var_to_entity(*ante, target)),
             cons: Box::new(substitute_var_to_entity(*cons, target)),
         },
-        Expr::ForAll { var, var_type, body } => Expr::ForAll {
-            var, var_type, body: Box::new(substitute_var_to_entity(*body, target)),
+        Expr::ForAll {
+            var,
+            var_type,
+            body,
+        } => Expr::ForAll {
+            var,
+            var_type,
+            body: Box::new(substitute_var_to_entity(*body, target)),
         },
-        Expr::The { var, var_type, body } => Expr::The {
-            var, var_type, body: Box::new(substitute_var_to_entity(*body, target)),
+        Expr::The {
+            var,
+            var_type,
+            body,
+        } => Expr::The {
+            var,
+            var_type,
+            body: Box::new(substitute_var_to_entity(*body, target)),
         },
-        Expr::This { var, var_type, body } => Expr::This {
-            var, var_type, body: Box::new(substitute_var_to_entity(*body, target)),
+        Expr::This {
+            var,
+            var_type,
+            body,
+        } => Expr::This {
+            var,
+            var_type,
+            body: Box::new(substitute_var_to_entity(*body, target)),
         },
-        Expr::That { var, var_type, body } => Expr::That {
-            var, var_type, body: Box::new(substitute_var_to_entity(*body, target)),
+        Expr::That {
+            var,
+            var_type,
+            body,
+        } => Expr::That {
+            var,
+            var_type,
+            body: Box::new(substitute_var_to_entity(*body, target)),
         },
-        Expr::Exists { var, var_type, body, count } => Expr::Exists {
-            var, var_type, body: Box::new(substitute_var_to_entity(*body, target)), count,
+        Expr::Exists {
+            var,
+            var_type,
+            body,
+            count,
+        } => Expr::Exists {
+            var,
+            var_type,
+            body: Box::new(substitute_var_to_entity(*body, target)),
+            count,
         },
-        Expr::ExistsMany { var, var_type, count, body } => Expr::ExistsMany {
-            var, var_type, count, body: Box::new(substitute_var_to_entity(*body, target)),
+        Expr::ExistsMany {
+            var,
+            var_type,
+            count,
+            body,
+        } => Expr::ExistsMany {
+            var,
+            var_type,
+            count,
+            body: Box::new(substitute_var_to_entity(*body, target)),
         },
         Expr::Question { label, body } => Expr::Question {
-            label, body: Box::new(substitute_var_to_entity(*body, target)),
+            label,
+            body: Box::new(substitute_var_to_entity(*body, target)),
         },
         Expr::Entity(s) => Expr::Entity(s),
     }
@@ -970,7 +1208,10 @@ fn substitute_var_to_entity(expr: Expr, target: &str) -> Expr {
 
 pub fn substitute_var_name(expr: Expr, old_name: &str, new_name: &str) -> Expr {
     match expr {
-        Expr::Var { name, .. } if name == old_name => Expr::Var { name: new_name.to_string(), typ: "e".to_string() },
+        Expr::Var { name, .. } if name == old_name => Expr::Var {
+            name: new_name.to_string(),
+            typ: "e".to_string(),
+        },
         Expr::Var { name, typ } => Expr::Var { name, typ },
         Expr::Pred { name, roles } => Expr::Pred {
             name,
@@ -988,26 +1229,67 @@ pub fn substitute_var_name(expr: Expr, old_name: &str, new_name: &str) -> Expr {
             ante: Box::new(substitute_var_name(*ante, old_name, new_name)),
             cons: Box::new(substitute_var_name(*cons, old_name, new_name)),
         },
-        Expr::ForAll { var, var_type, body } => Expr::ForAll {
-            var, var_type, body: Box::new(substitute_var_name(*body, old_name, new_name)),
+        Expr::ForAll {
+            var,
+            var_type,
+            body,
+        } => Expr::ForAll {
+            var,
+            var_type,
+            body: Box::new(substitute_var_name(*body, old_name, new_name)),
         },
-        Expr::The { var, var_type, body } => Expr::The {
-            var, var_type, body: Box::new(substitute_var_name(*body, old_name, new_name)),
+        Expr::The {
+            var,
+            var_type,
+            body,
+        } => Expr::The {
+            var,
+            var_type,
+            body: Box::new(substitute_var_name(*body, old_name, new_name)),
         },
-        Expr::This { var, var_type, body } => Expr::This {
-            var, var_type, body: Box::new(substitute_var_name(*body, old_name, new_name)),
+        Expr::This {
+            var,
+            var_type,
+            body,
+        } => Expr::This {
+            var,
+            var_type,
+            body: Box::new(substitute_var_name(*body, old_name, new_name)),
         },
-        Expr::That { var, var_type, body } => Expr::That {
-            var, var_type, body: Box::new(substitute_var_name(*body, old_name, new_name)),
+        Expr::That {
+            var,
+            var_type,
+            body,
+        } => Expr::That {
+            var,
+            var_type,
+            body: Box::new(substitute_var_name(*body, old_name, new_name)),
         },
-        Expr::Exists { var, var_type, body, count } => Expr::Exists {
-            var, var_type, body: Box::new(substitute_var_name(*body, old_name, new_name)), count,
+        Expr::Exists {
+            var,
+            var_type,
+            body,
+            count,
+        } => Expr::Exists {
+            var,
+            var_type,
+            body: Box::new(substitute_var_name(*body, old_name, new_name)),
+            count,
         },
-        Expr::ExistsMany { var, var_type, count, body } => Expr::ExistsMany {
-            var, var_type, count, body: Box::new(substitute_var_name(*body, old_name, new_name)),
+        Expr::ExistsMany {
+            var,
+            var_type,
+            count,
+            body,
+        } => Expr::ExistsMany {
+            var,
+            var_type,
+            count,
+            body: Box::new(substitute_var_name(*body, old_name, new_name)),
         },
         Expr::Question { label, body } => Expr::Question {
-            label, body: Box::new(substitute_var_name(*body, old_name, new_name)),
+            label,
+            body: Box::new(substitute_var_name(*body, old_name, new_name)),
         },
         Expr::Entity(s) => Expr::Entity(s),
     }

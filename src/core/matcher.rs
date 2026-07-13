@@ -1,9 +1,9 @@
-mod types;
-mod tree;
 mod engine;
+mod tree;
+mod types;
 
-pub use types::{DebugTrace, Match, Constituent, SyntaxNode, TokenAnnotation, TokenKind};
 pub use tree::build_syntax_tree_for_result;
+pub use types::{Constituent, DebugTrace, Match, SyntaxNode, TokenAnnotation, TokenKind};
 
 use std::collections::{HashMap, HashSet};
 
@@ -12,9 +12,9 @@ use crate::core::grammar::Rule;
 use crate::core::lexicon::Lexicon;
 use crate::core::value::VarGen;
 
-use types::{SpanKey, SpanResult};
-use tree::span_result_to_match;
 use engine::try_pattern_match;
+use tree::span_result_to_match;
+use types::{SpanKey, SpanResult};
 
 // --- Public API ---
 
@@ -52,12 +52,8 @@ fn strictly_contains(outer: &Span, inner: &Span) -> bool {
 }
 
 fn spans_cross(left: &Span, right: &Span) -> bool {
-    (left.start < right.start
-        && right.start < left.end
-        && left.end < right.end)
-        || (right.start < left.start
-            && left.start < right.end
-            && right.end < left.end)
+    (left.start < right.start && right.start < left.end && left.end < right.end)
+        || (right.start < left.start && left.start < right.end && right.end < left.end)
 }
 
 fn validate_span_tree(
@@ -102,12 +98,7 @@ fn validate_span_tree(
             if spans_cross(left, right) {
                 return Err(format!(
                     "crossing spans: [{}] {}..{} and [{}] {}..{}",
-                    left.label,
-                    left.start,
-                    left.end,
-                    right.label,
-                    right.start,
-                    right.end
+                    left.label, left.start, left.end, right.label, right.start, right.end
                 ));
             }
         }
@@ -202,10 +193,20 @@ fn parse_bottom_up(
     let mut indexed: Vec<(usize, &Span)> = sentence.spans.iter().enumerate().collect();
     indexed.sort_by_key(|(_, span)| (span.end - span.start, span.start));
 
-    let top_level_keys: Vec<SpanKey> = sentence.spans.iter()
+    let top_level_keys: Vec<SpanKey> = sentence
+        .spans
+        .iter()
         .filter_map(|s| {
-            let key = SpanKey { start: s.start, end: s.end, label: s.label.clone() };
-            if parent_map.get(&key) == Some(&None) { Some(key) } else { None }
+            let key = SpanKey {
+                start: s.start,
+                end: s.end,
+                label: s.label.clone(),
+            };
+            if parent_map.get(&key) == Some(&None) {
+                Some(key)
+            } else {
+                None
+            }
         })
         .collect();
 
@@ -213,13 +214,23 @@ fn parse_bottom_up(
         t.push(&format!("tokens: {:?}", sentence.tokens));
         t.push(&format!("{} spans (sorted bottom-up):", indexed.len()));
         for (_i, span) in &indexed {
-            let parent_str = match parent_map.get(&SpanKey { start: span.start, end: span.end, label: span.label.clone() }) {
+            let parent_str = match parent_map.get(&SpanKey {
+                start: span.start,
+                end: span.end,
+                label: span.label.clone(),
+            }) {
                 None => "NONE".to_string(),
                 Some(None) => "TOP".to_string(),
                 Some(Some(p)) => format!("[{}] {}..{}", p.label, p.start, p.end),
             };
-            t.push(&format!("  [{}] {}..{} size={} parent={}",
-                span.label, span.start, span.end, span.end - span.start, parent_str));
+            t.push(&format!(
+                "  [{}] {}..{} size={} parent={}",
+                span.label,
+                span.start,
+                span.end,
+                span.end - span.start,
+                parent_str
+            ));
         }
         t.push("");
     }
@@ -227,14 +238,28 @@ fn parse_bottom_up(
     let mut cache: HashMap<SpanKey, SpanResult> = HashMap::new();
 
     for (_orig_idx, span) in &indexed {
-        let key = SpanKey { start: span.start, end: span.end, label: span.label.clone() };
+        let key = SpanKey {
+            start: span.start,
+            end: span.end,
+            label: span.label.clone(),
+        };
         let span_tokens = &sentence.tokens[span.start..span.end];
 
-        let direct_children: Vec<SpanKey> = sentence.spans.iter()
+        let direct_children: Vec<SpanKey> = sentence
+            .spans
+            .iter()
             .filter_map(|s| {
-                let child_key = SpanKey { start: s.start, end: s.end, label: s.label.clone() };
-                if child_key == key { return None; }
-                if s.start < span.start || s.end > span.end { return None; }
+                let child_key = SpanKey {
+                    start: s.start,
+                    end: s.end,
+                    label: s.label.clone(),
+                };
+                if child_key == key {
+                    return None;
+                }
+                if s.start < span.start || s.end > span.end {
+                    return None;
+                }
                 match parent_map.get(&child_key) {
                     Some(Some(parent)) if *parent == key => Some(child_key),
                     _ => None,
@@ -243,8 +268,14 @@ fn parse_bottom_up(
             .collect();
 
         if let Some(t) = &mut trace {
-            t.enter(&format!("parse [{}] {}..{} (size={}, children={})",
-                span.label, span.start, span.end, span.end - span.start, direct_children.len()));
+            t.enter(&format!(
+                "parse [{}] {}..{} (size={}, children={})",
+                span.label,
+                span.start,
+                span.end,
+                span.end - span.start,
+                direct_children.len()
+            ));
             t.push(&format!("tokens: {:?}", span_tokens));
         }
 
@@ -260,7 +291,10 @@ fn parse_bottom_up(
         )?;
 
         if let Some(t) = &mut trace {
-            t.push(&format!("→ {} [{}: {}]", result.output, result.rule_name, result.pattern));
+            t.push(&format!(
+                "→ {} [{}: {}]",
+                result.output, result.rule_name, result.pattern
+            ));
             t.leave();
         }
 
@@ -270,16 +304,28 @@ fn parse_bottom_up(
     if top_level_keys.len() == 1 {
         let key = &top_level_keys[0];
         let result = cache.get(key).unwrap();
-        let span = sentence.spans.iter().find(|s| {
-            SpanKey { start: s.start, end: s.end, label: s.label.clone() } == *key
-        }).unwrap();
+        let span = sentence
+            .spans
+            .iter()
+            .find(|s| {
+                SpanKey {
+                    start: s.start,
+                    end: s.end,
+                    label: s.label.clone(),
+                } == *key
+            })
+            .unwrap();
         let m = span_result_to_match(result, span, &sentence.tokens);
         Ok(vec![m])
     } else {
         return Err(format!(
             "expected exactly one top-level span, found {}: {}",
             top_level_keys.len(),
-            top_level_keys.iter().map(|k| format!("[{}] {}..{}", k.label, k.start, k.end)).collect::<Vec<_>>().join(", ")
+            top_level_keys
+                .iter()
+                .map(|k| format!("[{}] {}..{}", k.label, k.start, k.end))
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
 }
@@ -294,21 +340,29 @@ fn match_span(
     cache: &HashMap<SpanKey, SpanResult>,
     trace: Option<&mut DebugTrace>,
 ) -> Result<SpanResult, String> {
-    try_pattern_match(span_tokens, global_start, span, lexicon, rules, var_gen, cache, trace)
-        .ok_or_else(|| format!(
+    try_pattern_match(
+        span_tokens,
+        global_start,
+        span,
+        lexicon,
+        rules,
+        var_gen,
+        cache,
+        trace,
+    )
+    .ok_or_else(|| {
+        format!(
             "span [{}] tokens[{}..{}] ({:?}): no matching rule",
             span.label, span.start, span.end, span_tokens
-        ))
+        )
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn sentence(
-        token_count: usize,
-        spans: Vec<(&str, usize, usize)>,
-    ) -> InputSentence {
+    fn sentence(token_count: usize, spans: Vec<(&str, usize, usize)>) -> InputSentence {
         InputSentence {
             tokens: (0..token_count)
                 .map(|index| format!("t{}", index))
@@ -328,12 +382,7 @@ mod tests {
     fn valid_tree_assigns_nearest_strict_parents() {
         let input = sentence(
             5,
-            vec![
-                ("n", 1, 2),
-                ("dp", 0, 2),
-                ("dp", 3, 5),
-                ("s", 0, 5),
-            ],
+            vec![("n", 1, 2), ("dp", 0, 2), ("dp", 3, 5), ("s", 0, 5)],
         );
 
         let parents = validate_span_tree(&input).unwrap();
@@ -384,14 +433,7 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_intervals_even_with_different_labels() {
-        let input = sentence(
-            3,
-            vec![
-                ("dp", 0, 1),
-                ("n", 0, 1),
-                ("s", 0, 3),
-            ],
-        );
+        let input = sentence(3, vec![("dp", 0, 1), ("n", 0, 1), ("s", 0, 3)]);
 
         assert!(validate_span_tree(&input)
             .unwrap_err()
@@ -400,14 +442,7 @@ mod tests {
 
     #[test]
     fn rejects_crossing_spans() {
-        let input = sentence(
-            5,
-            vec![
-                ("left", 0, 3),
-                ("right", 2, 5),
-                ("s", 0, 5),
-            ],
-        );
+        let input = sentence(5, vec![("left", 0, 3), ("right", 2, 5), ("s", 0, 5)]);
 
         assert!(validate_span_tree(&input)
             .unwrap_err()
@@ -416,13 +451,7 @@ mod tests {
 
     #[test]
     fn requires_one_full_sentence_root() {
-        let input = sentence(
-            4,
-            vec![
-                ("dp", 0, 1),
-                ("s", 0, 3),
-            ],
-        );
+        let input = sentence(4, vec![("dp", 0, 1), ("s", 0, 3)]);
 
         assert!(validate_span_tree(&input)
             .unwrap_err()

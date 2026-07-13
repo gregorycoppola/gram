@@ -4,13 +4,18 @@ mod error;
 mod routes;
 
 use anyhow::Result;
-use axum::{routing::{get, post}, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
-pub use types::{ParseResult, ParseStatus, FixtureSummary, ParseRequest, CheckProofRequest, CheckProofResponse};
+pub use types::{
+    CheckProofRequest, CheckProofResponse, FixtureSummary, ParseRequest, ParseResult, ParseStatus,
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -23,7 +28,10 @@ pub async fn run_server(port: u16, fixtures_dir: PathBuf, proofs_dir: PathBuf) -
         fixtures_dir: Arc::new(fixtures_dir),
         proofs_dir: Arc::new(proofs_dir),
     };
-    let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any);
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
 
     let app = Router::new()
         .route("/health", get(routes::health))

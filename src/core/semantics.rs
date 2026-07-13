@@ -20,7 +20,6 @@
 ///   counted_binding = '[' ident ':' ident ',' count ']' ':'
 ///   count      = num | ident           -- "3", "many", "few", ...
 ///   count (legacy, on exists) = ',' '|' ident '|' '=' ident
-
 use crate::core::lexicon::Lexicon;
 use crate::core::logic::Expr;
 
@@ -107,10 +106,7 @@ fn tokenize(input: &str) -> Result<Vec<Tok>, String> {
                 while i < n {
                     if chars[i].is_alphanumeric() || chars[i] == '_' {
                         i += 1;
-                    } else if chars[i] == '-'
-                        && i + 1 < n
-                        && chars[i + 1] != '>'
-                    {
+                    } else if chars[i] == '-' && i + 1 < n && chars[i + 1] != '>' {
                         i += 1;
                     } else {
                         break;
@@ -174,21 +170,14 @@ impl Parser {
             self.advance();
             Ok(())
         } else {
-            Err(format!(
-                "expected {:?}, got {:?}",
-                token,
-                self.peek()
-            ))
+            Err(format!("expected {:?}, got {:?}", token, self.peek()))
         }
     }
 
     fn expect_ident(&mut self) -> Result<String, String> {
         match self.advance() {
             Some(Tok::Ident(identifier)) => Ok(identifier),
-            other => Err(format!(
-                "expected identifier, got {:?}",
-                other
-            )),
+            other => Err(format!("expected identifier, got {:?}", other)),
         }
     }
 
@@ -218,8 +207,7 @@ impl Parser {
 
         // Optional bracket binding (implicit existential): [var:type]:
         let body = if self.at(&Tok::LBracket) {
-            let (var, var_type, inner) =
-                self.parse_binding_and()?;
+            let (var, var_type, inner) = self.parse_binding_and()?;
 
             Expr::Exists {
                 var,
@@ -238,9 +226,7 @@ impl Parser {
     }
 
     /// Parse [var:type]: and_expr
-    fn parse_binding_and(
-        &mut self,
-    ) -> Result<(String, String, Expr), String> {
+    fn parse_binding_and(&mut self) -> Result<(String, String, Expr), String> {
         self.expect(&Tok::LBracket)?;
         let var = self.expect_ident()?;
         self.expect(&Tok::Colon)?;
@@ -253,9 +239,7 @@ impl Parser {
     }
 
     /// Parse [var:type]: impl_expr
-    fn parse_binding_impl(
-        &mut self,
-    ) -> Result<(String, String, Expr), String> {
+    fn parse_binding_impl(&mut self) -> Result<(String, String, Expr), String> {
         self.expect(&Tok::LBracket)?;
         let var = self.expect_ident()?;
         self.expect(&Tok::Colon)?;
@@ -290,10 +274,7 @@ impl Parser {
             self.advance();
             let right = self.parse_primary()?;
 
-            left = Expr::And(
-                Box::new(left),
-                Box::new(right),
-            );
+            left = Expr::And(Box::new(left), Box::new(right));
         }
 
         Ok(left)
@@ -312,13 +293,10 @@ impl Parser {
                 let inner = self.parse_primary()?;
                 Ok(Expr::Not(Box::new(inner)))
             }
-            Some(Tok::Ident(ref value))
-                if value == "always" =>
-            {
+            Some(Tok::Ident(ref value)) if value == "always" => {
                 self.advance();
 
-                let (var, var_type, body) =
-                    self.parse_binding_impl()?;
+                let (var, var_type, body) = self.parse_binding_impl()?;
 
                 Ok(Expr::ForAll {
                     var,
@@ -326,13 +304,10 @@ impl Parser {
                     body: Box::new(body),
                 })
             }
-            Some(Tok::Ident(ref value))
-                if value == "the" =>
-            {
+            Some(Tok::Ident(ref value)) if value == "the" => {
                 self.advance();
 
-                let (var, var_type, body) =
-                    self.parse_binding_impl()?;
+                let (var, var_type, body) = self.parse_binding_impl()?;
 
                 Ok(Expr::The {
                     var,
@@ -340,13 +315,10 @@ impl Parser {
                     body: Box::new(body),
                 })
             }
-            Some(Tok::Ident(ref value))
-                if value == "this" =>
-            {
+            Some(Tok::Ident(ref value)) if value == "this" => {
                 self.advance();
 
-                let (var, var_type, body) =
-                    self.parse_binding_impl()?;
+                let (var, var_type, body) = self.parse_binding_impl()?;
 
                 Ok(Expr::This {
                     var,
@@ -354,13 +326,10 @@ impl Parser {
                     body: Box::new(body),
                 })
             }
-            Some(Tok::Ident(ref value))
-                if value == "that" =>
-            {
+            Some(Tok::Ident(ref value)) if value == "that" => {
                 self.advance();
 
-                let (var, var_type, body) =
-                    self.parse_binding_impl()?;
+                let (var, var_type, body) = self.parse_binding_impl()?;
 
                 Ok(Expr::That {
                     var,
@@ -368,13 +337,10 @@ impl Parser {
                     body: Box::new(body),
                 })
             }
-            Some(Tok::Ident(ref value))
-                if value == "exists" =>
-            {
+            Some(Tok::Ident(ref value)) if value == "exists" => {
                 self.advance();
 
-                let (var, var_type, body) =
-                    self.parse_binding_and()?;
+                let (var, var_type, body) = self.parse_binding_and()?;
 
                 // Check for count: , |var| = count_value
                 let count = if self.at(&Tok::Comma) {
@@ -401,9 +367,7 @@ impl Parser {
                     count,
                 })
             }
-            Some(Tok::Ident(ref value))
-                if value == "exists_many" =>
-            {
+            Some(Tok::Ident(ref value)) if value == "exists_many" => {
                 self.advance();
 
                 // [var:type, count]:
@@ -417,10 +381,7 @@ impl Parser {
                     Some(Tok::Num(number)) => number,
                     Some(Tok::Ident(identifier)) => identifier,
                     other => {
-                        return Err(format!(
-                            "expected count, got {:?}",
-                            other
-                        ));
+                        return Err(format!("expected count, got {:?}", other));
                     }
                 };
 
@@ -475,10 +436,7 @@ impl Parser {
                     Ok(Expr::Entity(identifier))
                 }
             }
-            other => Err(format!(
-                "unexpected token: {:?}",
-                other
-            )),
+            other => Err(format!("unexpected token: {:?}", other)),
         }
     }
 }
@@ -526,29 +484,23 @@ fn is_proposition_value(argument: &Expr) -> bool {
     )
 }
 
-fn check_expr_types(
-    expr: &Expr,
-    lexicon: &Lexicon,
-) -> Result<(), String> {
+fn check_expr_types(expr: &Expr, lexicon: &Lexicon) -> Result<(), String> {
     match expr {
         Expr::Pred { name, roles } => {
             // If the predicate is declared, enforce role types.
             // Otherwise skip.
             if let Some(predicate) = lexicon.predicates.get(name) {
                 for (role_name, role_value) in roles {
-                    let declared =
-                        predicate.roles.get(role_name);
+                    let declared = predicate.roles.get(role_name);
 
-                    let value_is_proposition =
-                        is_proposition_value(role_value);
+                    let value_is_proposition = is_proposition_value(role_value);
 
                     match declared {
                         Some(typ) if typ == "s" => {
                             if !value_is_proposition {
                                 return Err(format!(
                                     "role '{}' of '{}' expects s, got a non-proposition value",
-                                    role_name,
-                                    name
+                                    role_name, name
                                 ));
                             }
                         }
@@ -556,9 +508,7 @@ fn check_expr_types(
                             if value_is_proposition {
                                 return Err(format!(
                                     "role '{}' of '{}' expects {}, got a proposition",
-                                    role_name,
-                                    name,
-                                    typ
+                                    role_name, name, typ
                                 ));
                             }
                         }
@@ -584,9 +534,7 @@ fn check_expr_types(
 
             Ok(())
         }
-        Expr::Not(inner) => {
-            check_expr_types(inner, lexicon)
-        }
+        Expr::Not(inner) => check_expr_types(inner, lexicon),
         Expr::And(left, right) => {
             check_expr_types(left, lexicon)?;
             check_expr_types(right, lexicon)
@@ -600,12 +548,8 @@ fn check_expr_types(
         | Expr::This { body, .. }
         | Expr::That { body, .. }
         | Expr::Exists { body, .. }
-        | Expr::ExistsMany { body, .. } => {
-            check_expr_types(body, lexicon)
-        }
-        Expr::Question { body, .. } => {
-            check_expr_types(body, lexicon)
-        }
+        | Expr::ExistsMany { body, .. } => check_expr_types(body, lexicon),
+        Expr::Question { body, .. } => check_expr_types(body, lexicon),
         Expr::Var { .. } | Expr::Entity(_) => Ok(()),
     }
 }
@@ -617,10 +561,7 @@ fn check_expr_types(
 /// types: roles declared `s` receive propositions, roles declared with
 /// any other type do not. Predicates absent from the lexicon are passed
 /// through without checking.
-pub fn check_types(
-    expr: &Expr,
-    lexicon: &Lexicon,
-) -> Result<(), String> {
+pub fn check_types(expr: &Expr, lexicon: &Lexicon) -> Result<(), String> {
     check_expr_types(expr, lexicon)
 }
 
@@ -629,10 +570,7 @@ pub fn check_types(
 ///
 /// Returns the parsed `Expr` on success, or the first parse/type error
 /// encountered.
-pub fn parse_with_types(
-    input: &str,
-    lexicon: &Lexicon,
-) -> Result<Expr, String> {
+pub fn parse_with_types(input: &str, lexicon: &Lexicon) -> Result<Expr, String> {
     let expr = parse(input)?;
     check_types(&expr, lexicon)?;
     Ok(expr)
@@ -644,8 +582,7 @@ mod tests {
 
     #[test]
     fn parse_counted_existential_bare_number() {
-        let source =
-            "exists_many [x:e, 3]: man(theme: x) ∧ tall(theme: x)";
+        let source = "exists_many [x:e, 3]: man(theme: x) ∧ tall(theme: x)";
 
         let expr = parse(source).expect("parse");
 
@@ -662,18 +599,14 @@ mod tests {
                 assert!(matches!(*body, Expr::And(_, _)));
             }
             other => {
-                panic!(
-                    "expected ExistsMany, got {:?}",
-                    other
-                );
+                panic!("expected ExistsMany, got {:?}", other);
             }
         }
     }
 
     #[test]
     fn parse_counted_existential_vague() {
-        let source =
-            "exists_many [x:e, many]: man(theme: x)";
+        let source = "exists_many [x:e, many]: man(theme: x)";
 
         let expr = parse(source).expect("parse");
 
@@ -682,18 +615,14 @@ mod tests {
                 assert_eq!(count, "many");
             }
             other => {
-                panic!(
-                    "expected ExistsMany, got {:?}",
-                    other
-                );
+                panic!("expected ExistsMany, got {:?}", other);
             }
         }
     }
 
     #[test]
     fn display_counted_existential_round_trips() {
-        let source =
-            "exists_many [x:e, 3]: man(theme: x) ∧ tall(theme: x)";
+        let source = "exists_many [x:e, 3]: man(theme: x) ∧ tall(theme: x)";
 
         let expr = parse(source).expect("parse");
 
@@ -713,22 +642,15 @@ mod tests {
     fn parse_word_and_expression() {
         let source = "active(theme: switch) and not broken(theme: lamp) -> lit(theme: lamp)";
 
-        let expr =
-            parse(source).expect("parse textual and");
+        let expr = parse(source).expect("parse textual and");
 
         match expr {
             Expr::Implies { ante, cons } => {
                 assert!(matches!(*ante, Expr::And(_, _)));
-                assert!(matches!(
-                    *cons,
-                    Expr::Pred { .. }
-                ));
+                assert!(matches!(*cons, Expr::Pred { .. }));
             }
             other => {
-                panic!(
-                    "expected implication, got {:?}",
-                    other
-                );
+                panic!("expected implication, got {:?}", other);
             }
         }
     }
@@ -737,18 +659,14 @@ mod tests {
     fn parse_ampersand_expression() {
         let source = "active(theme: switch) & not broken(theme: lamp) -> lit(theme: lamp)";
 
-        let expr =
-            parse(source).expect("parse ampersand");
+        let expr = parse(source).expect("parse ampersand");
 
         match expr {
             Expr::Implies { ante, .. } => {
                 assert!(matches!(*ante, Expr::And(_, _)));
             }
             other => {
-                panic!(
-                    "expected implication, got {:?}",
-                    other
-                );
+                panic!("expected implication, got {:?}", other);
             }
         }
     }
@@ -806,8 +724,7 @@ mod type_tests {
             "sentences": []
         }"#;
 
-        let fixture: Fixture =
-            serde_json::from_str(json).unwrap();
+        let fixture: Fixture = serde_json::from_str(json).unwrap();
 
         Lexicon::from_fixture(&fixture)
     }
@@ -816,10 +733,7 @@ mod type_tests {
     fn type_s_accepts_predicate() {
         let lexicon = test_lexicon();
 
-        let expr = parse(
-            "think(agent: socrates, content: mortal(theme: socrates))",
-        )
-        .unwrap();
+        let expr = parse("think(agent: socrates, content: mortal(theme: socrates))").unwrap();
 
         assert!(check_types(&expr, &lexicon).is_ok());
     }
@@ -828,25 +742,14 @@ mod type_tests {
     fn type_e_rejects_predicate() {
         let lexicon = test_lexicon();
 
-        let expr = parse(
-            "mortal(theme: think(agent: socrates, content: mortal(theme: socrates)))",
-        )
-        .unwrap();
+        let expr = parse("mortal(theme: think(agent: socrates, content: mortal(theme: socrates)))")
+            .unwrap();
 
-        let error =
-            check_types(&expr, &lexicon).unwrap_err();
+        let error = check_types(&expr, &lexicon).unwrap_err();
 
-        assert!(
-            error.contains("theme"),
-            "got: {}",
-            error
-        );
+        assert!(error.contains("theme"), "got: {}", error);
 
-        assert!(
-            error.contains("mortal"),
-            "got: {}",
-            error
-        );
+        assert!(error.contains("mortal"), "got: {}", error);
     }
 
     #[test]
@@ -880,8 +783,7 @@ mod type_tests {
     fn undeclared_predicate_passes() {
         let lexicon = test_lexicon();
 
-        let expr =
-            parse("unknown_pred(theme: socrates)").unwrap();
+        let expr = parse("unknown_pred(theme: socrates)").unwrap();
 
         assert!(check_types(&expr, &lexicon).is_ok());
     }
@@ -892,10 +794,7 @@ mod type_tests {
 
         // The predicate is unknown, so nested values are traversed
         // but no undeclared role schema can be enforced.
-        let expr = parse(
-            "unknown_pred(theme: mortal(theme: socrates))",
-        )
-        .unwrap();
+        let expr = parse("unknown_pred(theme: mortal(theme: socrates))").unwrap();
 
         assert!(check_types(&expr, &lexicon).is_ok());
     }
@@ -904,23 +803,17 @@ mod type_tests {
     fn parse_with_types_accepts() {
         let lexicon = test_lexicon();
 
-        let source =
-            "think(agent: socrates, content: mortal(theme: socrates))";
+        let source = "think(agent: socrates, content: mortal(theme: socrates))";
 
-        assert!(
-            parse_with_types(source, &lexicon).is_ok()
-        );
+        assert!(parse_with_types(source, &lexicon).is_ok());
     }
 
     #[test]
     fn parse_with_types_rejects() {
         let lexicon = test_lexicon();
 
-        let source =
-            "mortal(theme: think(agent: socrates, content: mortal(theme: socrates)))";
+        let source = "mortal(theme: think(agent: socrates, content: mortal(theme: socrates)))";
 
-        assert!(
-            parse_with_types(source, &lexicon).is_err()
-        );
+        assert!(parse_with_types(source, &lexicon).is_err());
     }
 }

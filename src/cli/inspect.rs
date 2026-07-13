@@ -1,4 +1,3 @@
-
 use anyhow::Result;
 use clap::Args;
 use std::path::PathBuf;
@@ -28,8 +27,11 @@ pub fn run_inspect(args: InspectArgs) -> Result<()> {
     for name in lexicon.entities.keys() {
         println!("    {}", name);
     }
-    println!("  form index ({} entries, max_form_len={}):",
-        lexicon.form_index_len(), lexicon.max_form_len());
+    println!(
+        "  form index ({} entries, max_form_len={}):",
+        lexicon.form_index_len(),
+        lexicon.max_form_len()
+    );
     for (form, (canonical, cat)) in lexicon.form_index_entries() {
         println!("    {:?} -> ({}, {:?})", form, canonical, cat);
     }
@@ -54,7 +56,10 @@ pub fn run_inspect(args: InspectArgs) -> Result<()> {
                     for (i, tok) in tokens.iter().enumerate() {
                         let cleaned = crate::core::lexicon::clean_token(tok);
                         let lookup = lexicon.lookup_at(&tokens, i);
-                        println!("    [{:>2}] {:?} clean={:?} lookup={:?}", i, tok, cleaned, lookup);
+                        println!(
+                            "    [{:>2}] {:?} clean={:?} lookup={:?}",
+                            i, tok, cleaned, lookup
+                        );
                     }
                 }
             }

@@ -1,8 +1,12 @@
+use super::types::*;
 use crate::core::grammar::is_punctuation;
 use crate::core::lexicon::clean_token;
-use super::types::*;
 
-pub fn build_syntax(tokens: &[String], constituents: &[(usize, usize, String)], top_label: &str) -> String {
+pub fn build_syntax(
+    tokens: &[String],
+    constituents: &[(usize, usize, String)],
+    top_label: &str,
+) -> String {
     let mut parts: Vec<String> = Vec::new();
     let mut ci = 0;
     let mut skip_until = 0;
@@ -56,38 +60,70 @@ pub fn build_syntax_tree(
         let node = match ann.kind {
             TokenKind::Keyword => {
                 let label = ann.keyword_class.as_deref().unwrap_or("KW");
-                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
+                SyntaxNode {
+                    label: label.to_string(),
+                    children: vec![],
+                    terminal: Some(cleaned),
+                    semantics: None,
+                }
             }
             TokenKind::Entity => {
                 let label = ann.canonical.as_deref().unwrap_or(&cleaned);
-                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
+                SyntaxNode {
+                    label: label.to_string(),
+                    children: vec![],
+                    terminal: Some(cleaned),
+                    semantics: None,
+                }
             }
             TokenKind::Predicate => {
                 let label = ann.canonical.as_deref().unwrap_or(&cleaned);
-                SyntaxNode { label: label.to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
+                SyntaxNode {
+                    label: label.to_string(),
+                    children: vec![],
+                    terminal: Some(cleaned),
+                    semantics: None,
+                }
             }
-            TokenKind::Literal => {
-                SyntaxNode { label: "LIT".to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
-            }
-            TokenKind::SubClause => {
-                SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned), semantics: None }
-            }
-            _ => {
-                SyntaxNode { label: "UNK".to_string(), children: vec![], terminal: Some(cleaned), semantics: None }
-            }
+            TokenKind::Literal => SyntaxNode {
+                label: "LIT".to_string(),
+                children: vec![],
+                terminal: Some(cleaned),
+                semantics: None,
+            },
+            TokenKind::SubClause => SyntaxNode {
+                label: cleaned.clone(),
+                children: vec![],
+                terminal: Some(cleaned),
+                semantics: None,
+            },
+            _ => SyntaxNode {
+                label: "UNK".to_string(),
+                children: vec![],
+                terminal: Some(cleaned),
+                semantics: None,
+            },
         };
         children.push(node);
     }
-    SyntaxNode { label: top_label.to_string(), children, terminal: None, semantics: None }
+    SyntaxNode {
+        label: top_label.to_string(),
+        children,
+        terminal: None,
+        semantics: None,
+    }
 }
 
 pub fn offset_constituents(constituents: &[Constituent], offset: usize) -> Vec<Constituent> {
-    constituents.iter().map(|c| {
-        let mut c = c.clone();
-        c.span = c.span.map(|(s, e)| (s + offset, e + offset));
-        c.children = offset_constituents(&c.children, offset);
-        c
-    }).collect()
+    constituents
+        .iter()
+        .map(|c| {
+            let mut c = c.clone();
+            c.span = c.span.map(|(s, e)| (s + offset, e + offset));
+            c.children = offset_constituents(&c.children, offset);
+            c
+        })
+        .collect()
 }
 
 pub fn build_syntax_tree_from_constituent(
@@ -133,7 +169,11 @@ pub fn build_syntax_tree_from_constituent(
             let child = &c.children[ci];
             if let Some((child_s, _)) = child.span {
                 if child_s == i + global_offset {
-                    children.push(build_syntax_tree_from_constituent(child, all_tokens, global_offset));
+                    children.push(build_syntax_tree_from_constituent(
+                        child,
+                        all_tokens,
+                        global_offset,
+                    ));
                     if let Some((_, child_e)) = child.span {
                         skip_until = child_e.saturating_sub(global_offset);
                     }
@@ -162,9 +202,14 @@ pub fn build_syntax_tree_for_result(
     tokens: &[String],
     offset: usize,
 ) -> SyntaxNode {
-    let mut annotations: Vec<TokenAnnotation> = tokens.iter()
+    let mut annotations: Vec<TokenAnnotation> = tokens
+        .iter()
         .map(|_| TokenAnnotation {
-            kind: TokenKind::Unmatched, canonical: None, typ: None, variable: None, keyword_class: None,
+            kind: TokenKind::Unmatched,
+            canonical: None,
+            typ: None,
+            variable: None,
+            keyword_class: None,
         })
         .collect();
     for (i, ann) in result.token_annotations.iter().enumerate() {
@@ -173,7 +218,9 @@ pub fn build_syntax_tree_for_result(
         }
     }
 
-    let constituent_trees: Vec<(usize, usize, SyntaxNode)> = result.constituents.iter()
+    let constituent_trees: Vec<(usize, usize, SyntaxNode)> = result
+        .constituents
+        .iter()
         .filter_map(|c| {
             let (s, e) = c.span?;
             let local_s = s.saturating_sub(offset);
@@ -187,14 +234,22 @@ pub fn build_syntax_tree_for_result(
                 if c.children.is_empty() {
                     SyntaxNode {
                         label: kind_to_syntax_label(&c.label),
-                        children: tokens[local_s..local_e].iter().filter_map(|t| {
-                            let cleaned = clean_token(t);
-                            if is_punctuation(&cleaned) {
-                                None
-                            } else {
-                                Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned), semantics: None })
-                            }
-                        }).collect(),
+                        children: tokens[local_s..local_e]
+                            .iter()
+                            .filter_map(|t| {
+                                let cleaned = clean_token(t);
+                                if is_punctuation(&cleaned) {
+                                    None
+                                } else {
+                                    Some(SyntaxNode {
+                                        label: cleaned.clone(),
+                                        children: vec![],
+                                        terminal: Some(cleaned),
+                                        semantics: None,
+                                    })
+                                }
+                            })
+                            .collect(),
                         terminal: None,
                         semantics: None,
                     }
@@ -206,15 +261,29 @@ pub fn build_syntax_tree_for_result(
         })
         .collect();
 
-    let mut tree = build_syntax_tree(tokens, &annotations, &constituent_trees, &kind_to_syntax_label(&result.kind));
+    let mut tree = build_syntax_tree(
+        tokens,
+        &annotations,
+        &constituent_trees,
+        &kind_to_syntax_label(&result.kind),
+    );
     tree.semantics = Some(result.output.clone());
     tree
 }
 
-pub fn span_result_to_match(result: &SpanResult, span: &crate::core::fixture::Span, all_tokens: &[String]) -> Match {
-    let mut full_annotations: Vec<TokenAnnotation> = all_tokens.iter()
+pub fn span_result_to_match(
+    result: &SpanResult,
+    span: &crate::core::fixture::Span,
+    all_tokens: &[String],
+) -> Match {
+    let mut full_annotations: Vec<TokenAnnotation> = all_tokens
+        .iter()
         .map(|_| TokenAnnotation {
-            kind: TokenKind::Unmatched, canonical: None, typ: None, variable: None, keyword_class: None,
+            kind: TokenKind::Unmatched,
+            canonical: None,
+            typ: None,
+            variable: None,
+            keyword_class: None,
         })
         .collect();
     for (i, ann) in result.token_annotations.iter().enumerate() {
@@ -224,24 +293,42 @@ pub fn span_result_to_match(result: &SpanResult, span: &crate::core::fixture::Sp
         }
     }
 
-    let constituent_spans: Vec<(usize, usize, String)> = result.constituents.iter()
+    let constituent_spans: Vec<(usize, usize, String)> = result
+        .constituents
+        .iter()
         .filter_map(|c| c.span.map(|(s, e)| (s, e, format!("[{}]", c.label))))
         .collect();
-    let syntax = build_syntax(all_tokens, &constituent_spans, &kind_to_syntax_label(&result.kind));
+    let syntax = build_syntax(
+        all_tokens,
+        &constituent_spans,
+        &kind_to_syntax_label(&result.kind),
+    );
 
-    let constituent_trees: Vec<(usize, usize, SyntaxNode)> = result.constituents.iter()
+    let constituent_trees: Vec<(usize, usize, SyntaxNode)> = result
+        .constituents
+        .iter()
         .filter_map(|c| {
             let (s, e) = c.span?;
             let tree = c.syntax_tree.clone().unwrap_or_else(|| {
                 if c.children.is_empty() {
                     SyntaxNode {
                         label: kind_to_syntax_label(&c.label),
-                        children: all_tokens[s..e].iter().filter_map(|t| {
-                            let cleaned = clean_token(t);
-                            if is_punctuation(&cleaned) { None } else {
-                                Some(SyntaxNode { label: cleaned.clone(), children: vec![], terminal: Some(cleaned), semantics: None })
-                            }
-                        }).collect(),
+                        children: all_tokens[s..e]
+                            .iter()
+                            .filter_map(|t| {
+                                let cleaned = clean_token(t);
+                                if is_punctuation(&cleaned) {
+                                    None
+                                } else {
+                                    Some(SyntaxNode {
+                                        label: cleaned.clone(),
+                                        children: vec![],
+                                        terminal: Some(cleaned),
+                                        semantics: None,
+                                    })
+                                }
+                            })
+                            .collect(),
                         terminal: None,
                         semantics: None,
                     }
@@ -252,7 +339,12 @@ pub fn span_result_to_match(result: &SpanResult, span: &crate::core::fixture::Sp
             Some((s, e, tree))
         })
         .collect();
-    let mut syntax_tree = build_syntax_tree(all_tokens, &full_annotations, &constituent_trees, &kind_to_syntax_label(&result.kind));
+    let mut syntax_tree = build_syntax_tree(
+        all_tokens,
+        &full_annotations,
+        &constituent_trees,
+        &kind_to_syntax_label(&result.kind),
+    );
     syntax_tree.semantics = Some(result.output.clone());
 
     Match {

@@ -36,10 +36,7 @@ pub enum SemValue {
     },
     /// A noun phrase: a predicate restriction with a free variable.
     /// The determiner will bind this variable.
-    N {
-        var: String,
-        restriction: Expr,
-    },
+    N { var: String, restriction: Expr },
     /// A gapped proposition: a predicate with one free variable and a designated hole.
     GapProp(GapProp),
 }
@@ -48,25 +45,27 @@ impl std::fmt::Display for SemValue {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             SemValue::Prop(expr) => write!(f, "{}", expr),
-            SemValue::Dp { var, var_type, quant } => {
-                match quant {
-                    DpQuant::ForAll { restriction } => {
-                        write!(f, "∀[{}:{}] ", var, var_type)?;
-                        write!(f, "{}", restriction)
-                    }
-                    DpQuant::Exists { restriction } => {
-                        write!(f, "∃[{}:{}] ", var, var_type)?;
-                        write!(f, "{}", restriction)
-                    }
-                    DpQuant::The { restriction } => {
-                        write!(f, "ι[{}:{}] ", var, var_type)?;
-                        write!(f, "{}", restriction)
-                    }
-                    DpQuant::Bare => {
-                        write!(f, "{}:{}", var, var_type)
-                    }
+            SemValue::Dp {
+                var,
+                var_type,
+                quant,
+            } => match quant {
+                DpQuant::ForAll { restriction } => {
+                    write!(f, "∀[{}:{}] ", var, var_type)?;
+                    write!(f, "{}", restriction)
                 }
-            }
+                DpQuant::Exists { restriction } => {
+                    write!(f, "∃[{}:{}] ", var, var_type)?;
+                    write!(f, "{}", restriction)
+                }
+                DpQuant::The { restriction } => {
+                    write!(f, "ι[{}:{}] ", var, var_type)?;
+                    write!(f, "{}", restriction)
+                }
+                DpQuant::Bare => {
+                    write!(f, "{}:{}", var, var_type)
+                }
+            },
             SemValue::N { var, restriction } => {
                 write!(f, "N[{}] {}", var, restriction)
             }

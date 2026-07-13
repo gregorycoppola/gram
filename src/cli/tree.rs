@@ -1,4 +1,3 @@
-
 use anyhow::{Context, Result};
 use clap::Args;
 use std::path::PathBuf;

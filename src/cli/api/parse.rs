@@ -1,6 +1,6 @@
-use anyhow::Result;
 use crate::cli::pretty::print_pretty;
 use crate::server::ParseResult;
+use anyhow::Result;
 
 pub async fn run_fixtures(client: &reqwest::Client, base: &str) -> Result<()> {
     let url = format!("{}/fixtures", base);
