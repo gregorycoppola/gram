@@ -1,0 +1,151 @@
+{
+  "lexicon": {
+    "predicates": [
+      {
+        "name": "first",
+        "roles": {
+          "theme": "e"
+        },
+        "forms": [
+          "first"
+        ]
+      },
+      {
+        "name": "nba_championship",
+        "roles": {
+          "theme": "e",
+          "interval": "n",
+          "team": "e"
+        },
+        "forms": [
+          "NBA Championship"
+        ]
+      },
+      {
+        "name": "clinch",
+        "roles": {
+          "agent": "e",
+          "patient": "e",
+          "at_time": "n"
+        },
+        "forms": [
+          "clinched"
+        ]
+      }
+    ],
+    "entities": [
+      {
+        "name": "new_york_knicks",
+        "type": "e",
+        "forms": [
+          "the New York Knicks",
+          "their"
+        ]
+      },
+      {
+        "name": "years_53",
+        "type": "n",
+        "forms": [
+          "53 years"
+        ]
+      },
+      {
+        "name": "last_month",
+        "type": "n",
+        "forms": [
+          "last month"
+        ]
+      }
+    ]
+  },
+  "grammar": [
+    {
+      "name": "bare_dp",
+      "pattern": "$x:e",
+      "sem": "bare_dp($x)",
+      "kind": "dp"
+    },
+    {
+      "name": "bare_time_dp",
+      "pattern": "$x:n",
+      "sem": "bare_dp($x)",
+      "kind": "dp"
+    },
+    {
+      "name": "ordinal_interval_n",
+      "pattern": "$A:{theme:e} $N:{interval:n,team:e,theme:e} LIT:in SUB:dp",
+      "sem": "adj_of_n($A, $N, $SUB, theme, interval)",
+      "kind": "n"
+    },
+    {
+      "name": "possessive_the_n_dp",
+      "pattern": "SUB:dp SUB:n",
+      "sem": "possessive_the_n_dp($SUB, $SUB1, team)",
+      "kind": "dp"
+    },
+    {
+      "name": "s_transitive_at_time",
+      "pattern": "SUB:dp[$x:e] $V:{agent:e,at_time:n,patient:e} SUB:dp SUB:dp",
+      "sem": "s_ditransitive($SUB, $SUB1, $SUB2, $V, agent, patient, at_time)",
+      "kind": "s"
+    }
+  ],
+  "sentences": [
+    {
+      "tokens": [
+        "the",
+        "New",
+        "York",
+        "Knicks",
+        "clinched",
+        "their",
+        "first",
+        "NBA",
+        "Championship",
+        "in",
+        "53",
+        "years",
+        "last",
+        "month"
+      ],
+      "spans": [
+        [
+          "dp",
+          0,
+          4
+        ],
+        [
+          "dp",
+          5,
+          6
+        ],
+        [
+          "dp",
+          10,
+          12
+        ],
+        [
+          "n",
+          6,
+          12
+        ],
+        [
+          "dp",
+          5,
+          12
+        ],
+        [
+          "dp",
+          12,
+          14
+        ],
+        [
+          "s",
+          0,
+          14
+        ]
+      ],
+      "gold": "the [x:e]: first(theme: x) ∧ nba_championship(theme: x, interval: years_53, team: new_york_knicks) -> clinch(agent: new_york_knicks, patient: x, at_time: last_month)"
+    }
+  ]
+}

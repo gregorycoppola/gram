@@ -39,6 +39,7 @@ pub fn constructor_signature(name: &str) -> Option<&'static [ConstructorArgKind]
         "bare_dp" => Some(&[Lexical]),
         "adj_n" => Some(&[Lexical, Literal, Sub]),
         "the_n_dp" | "a_n_dp" => Some(&[Sub]),
+        "possessive_the_n_dp" => Some(&[Sub, Sub, Literal]),
         "the_of_dp" | "a_of_dp" => Some(&[Lexical, Sub, Literal, Literal]),
         "the_pp_dp" => Some(&[Lexical, Literal, Sub, Literal, Literal]),
         "adj_of_n" => Some(&[Lexical, Lexical, Sub, Literal, Literal]),
@@ -70,6 +71,7 @@ pub fn apply_constructor(
         "adj_n" => construct_adj_n(args, var_gen),
         "the_n_dp" => construct_the_n_dp(args),
         "a_n_dp" => construct_a_n_dp(args),
+        "possessive_the_n_dp" => construct_possessive_the_n_dp(args),
         "a_dp" => construct_a_dp(args, var_gen),
         "the_of_dp" => construct_the_of_dp(args, var_gen),
         "a_of_dp" => construct_a_of_dp(args, var_gen),
@@ -257,6 +259,88 @@ fn construct_a_n_dp(args: &[Arg]) -> Result<SemValue, String> {
         quant: DpQuant::Exists {
             restriction: n_restriction,
         },
+    })
+}
+
+fn add_role_to_head_predicate(
+    expression: &Expr,
+    role: &str,
+    value: &Expr,
+) -> Result<Expr, String> {
+    match expression {
+        Expr::Pred { name, roles } => {
+            if roles.iter().any(|(existing, _)| existing == role) {
+                return Err(format!(
+                    "possessive_the_n_dp: head predicate '{}' already has role '{}'",
+                    name, role
+                ));
+            }
+
+            let mut enriched_roles = roles.clone();
+            enriched_roles.push((role.to_string(), value.clone()));
+
+            Ok(Expr::Pred {
+                name: name.clone(),
+                roles: enriched_roles,
+            })
+        }
+        Expr::And(left, right) => Ok(Expr::And(
+            left.clone(),
+            Box::new(add_role_to_head_predicate(right, role, value)?),
+        )),
+        _ => Err(
+            "possessive_the_n_dp: N restriction must end in a predicate head".into(),
+        ),
+    }
+}
+
+fn construct_possessive_the_n_dp(args: &[Arg]) -> Result<SemValue, String> {
+    if args.len() != 3 {
+        return Err(format!(
+            "possessive_the_n_dp expects 3 args, got {}",
+            args.len()
+        ));
+    }
+
+    let possessor = match &args[0] {
+        Arg::Sub(SemValue::Dp {
+            var,
+            quant: DpQuant::Bare,
+            ..
+        }) => var.clone(),
+        _ => {
+            return Err(
+                "possessive_the_n_dp: first arg must be a bare possessor DP".into(),
+            )
+        }
+    };
+
+    let (noun_var, noun_restriction) = match &args[1] {
+        Arg::Sub(SemValue::N { var, restriction }) => {
+            (var.clone(), restriction.clone())
+        }
+        _ => return Err("possessive_the_n_dp: second arg must be an N".into()),
+    };
+
+    let possessor_role = match &args[2] {
+        Arg::Literal(role) => role.clone(),
+        _ => {
+            return Err(
+                "possessive_the_n_dp: third arg must be a literal role name".into(),
+            )
+        }
+    };
+
+    let restriction = add_role_to_head_predicate(
+        &noun_restriction,
+        &possessor_role,
+        &Expr::Entity(possessor),
+    )?;
+
+    Ok(SemValue::Dp {
+        var: noun_var,
+        var_type: "e".to_string(),
+        quant: DpQuant::The { restriction },
     })
 }
 
