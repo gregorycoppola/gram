@@ -17,11 +17,16 @@ use super::error::{AppError, AppResult};
 use super::types::{
     CheckProofRequest, CheckProofResponse, CheckProofStep, CoverageArticleSummary,
     CoverageExampleSummary, FixtureSummary, ParseRequest, ParseResult, ParseStatus,
+    VersionResponse,
 };
 use super::AppState;
 
 pub async fn health() -> Json<Value> {
     Json(serde_json::json!({ "status": "ok" }))
+}
+
+pub async fn version() -> Json<VersionResponse> {
+    Json(VersionResponse::default())
 }
 
 pub async fn list_proofs(State(state): State<AppState>) -> AppResult<Json<Vec<String>>> {

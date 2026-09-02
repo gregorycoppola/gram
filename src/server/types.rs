@@ -3,6 +3,48 @@ use serde::{Deserialize, Serialize};
 use crate::core::matcher::{GoldEvaluation, Match};
 use crate::core::proof::ProofStep;
 
+pub const HTTP_API_VERSION: &str = "0.1";
+pub const SYNTAX_FIXTURE_VERSION: u32 = 1;
+pub const PROOF_FIXTURE_VERSION: u32 = 1;
+pub const INFERENCE_FIXTURE_VERSION: u32 = 1;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VersionResponse {
+    pub gram_version: String,
+    pub http_api_version: String,
+    pub syntax_fixture_version: u32,
+    pub proof_fixture_version: u32,
+    pub inference_fixture_version: u32,
+}
+
+impl Default for VersionResponse {
+    fn default() -> Self {
+        Self {
+            gram_version: env!("CARGO_PKG_VERSION").to_string(),
+            http_api_version: HTTP_API_VERSION.to_string(),
+            syntax_fixture_version: SYNTAX_FIXTURE_VERSION,
+            proof_fixture_version: PROOF_FIXTURE_VERSION,
+            inference_fixture_version: INFERENCE_FIXTURE_VERSION,
+        }
+    }
+}
+
+#[cfg(test)]
+mod version_tests {
+    use super::*;
+
+    #[test]
+    fn reports_current_compatibility_versions() {
+        let version = VersionResponse::default();
+
+        assert_eq!(version.gram_version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(version.http_api_version, "0.1");
+        assert_eq!(version.syntax_fixture_version, 1);
+        assert_eq!(version.proof_fixture_version, 1);
+        assert_eq!(version.inference_fixture_version, 1);
+    }
+}
+
 /// One parsed sentence — the unit gloss renders.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ParseResult {

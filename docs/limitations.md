@@ -12,7 +12,8 @@ language system.
   graphs. Belief propagation can be approximate on loopy graphs.
 - Public Rust APIs, CLI output, HTTP payloads, and persisted JSON have no
   compatibility guarantees yet.
-- Fixture documents have no top-level format version or published JSON Schema.
+- Fixture versions are advertised by the service rather than embedded in each
+  document, and there is not yet a published JSON Schema.
 - The HTTP server is local-only, unauthenticated, and permissive about CORS.
 - Corpus coverage depends on separately obtained data whose redistribution
   status must be reviewed before release.

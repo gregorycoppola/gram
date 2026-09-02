@@ -10,6 +10,8 @@ use std::path::PathBuf;
 pub enum ApiCommand {
     /// GET /health
     Health,
+    /// GET /version — API and fixture compatibility versions
+    Version,
     /// GET /fixtures — list all fixtures
     Fixtures,
     /// GET /fixtures/:name — raw fixture JSON
@@ -86,6 +88,12 @@ async fn run_api_async(args: ApiArgs) -> Result<()> {
                 .json::<serde_json::Value>()
                 .await
                 .context("parsing health response")?;
+            println!("{}", serde_json::to_string_pretty(&body)?);
+            Ok(())
+        }
+        ApiCommand::Version => {
+            let url = format!("{}/version", base);
+            let body: crate::server::VersionResponse = get_json(&client, &url).await?;
             println!("{}", serde_json::to_string_pretty(&body)?);
             Ok(())
         }

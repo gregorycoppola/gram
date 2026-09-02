@@ -15,7 +15,7 @@ use tower_http::trace::TraceLayer;
 
 pub use types::{
     CheckProofRequest, CheckProofResponse, CoverageArticleSummary, CoverageExampleSummary,
-    FixtureSummary, ParseRequest, ParseResult, ParseStatus,
+    FixtureSummary, ParseRequest, ParseResult, ParseStatus, VersionResponse,
 };
 
 #[derive(Clone)]
@@ -44,6 +44,7 @@ pub async fn run_server(
 
     let app = Router::new()
         .route("/health", get(routes::health))
+        .route("/version", get(routes::version))
         .route("/proofs", get(routes::list_proofs))
         .route("/proofs/:name", get(routes::get_proof))
         .route("/proof/check", post(routes::check_proof))

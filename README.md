@@ -110,7 +110,8 @@ cargo test --all-targets --all-features
 ```
 
 See [docs/architecture.md](docs/architecture.md),
-[docs/http-api.md](docs/http-api.md), and
+[docs/http-api.md](docs/http-api.md),
+[docs/fixtures.md](docs/fixtures.md), and
 [docs/limitations.md](docs/limitations.md) for the current design and contract
 boundaries. QBBN semantics and testing are described in
 [docs/qbbn-inference.md](docs/qbbn-inference.md).

@@ -13,6 +13,7 @@ no authentication and is intended only for local development.
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/health` | Return `{ "status": "ok" }` |
+| GET | `/version` | Return API, package, and fixture compatibility versions |
 | GET | `/fixtures` | List syntax fixtures |
 | GET | `/fixtures/:name` | Return a fixture |
 | GET | `/fixtures/:name/parse` | Parse all fixture sentences |
@@ -29,6 +30,6 @@ no authentication and is intended only for local development.
 Nested names are URL encoded by the Gram CLI and Gloss client. Most stable
 operations can be exercised with `cargo run -- api --help`.
 
-The API has no version endpoint, compatibility negotiation, published schema,
-or stability guarantee yet. Error bodies are implementation-defined. Treat
-every route as experimental until these contracts are added.
+The v0.1 HTTP contract reports `http_api_version: "0.1"`. Compatible clients
+must require the same major component and may accept newer minor versions when
+they only add fields or endpoints. Error bodies remain implementation-defined.
