@@ -2,6 +2,10 @@
 name = "gram"
 version = "0.1.0"
 edition = "2021"
+description = "Experimental natural-language-to-probabilistic-logic compiler and reasoning runtime"
+license = "MIT"
+repository = "https://github.com/gregorycoppola/gram"
+readme = "README.md"
 
 [lib]
 path = "src/lib.rs"

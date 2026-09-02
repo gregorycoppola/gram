@@ -122,8 +122,6 @@ boundaries. QBBN semantics and testing are described in
 - [Gram Data](https://github.com/gregorycoppola/gram-data) contains experimental
   real-language fixtures and is required only for the coverage endpoints.
 
-## Contributing and license
+## License
 
-Contributor guidance and governance documents are being prepared for the first
-public release. A license has not yet been selected; do not assume permission
-to redistribute this repository until an explicit license file is added.
+Gram is available under the [MIT License](LICENSE).
