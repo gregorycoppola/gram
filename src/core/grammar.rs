@@ -31,7 +31,7 @@ pub struct Rule {
 }
 
 pub fn compile_rules(rules: &[FixtureRule]) -> Result<Vec<Rule>> {
-    rules.iter().map(|r| compile_rule(r)).collect()
+    rules.iter().map(compile_rule).collect()
 }
 
 fn compile_rule(r: &FixtureRule) -> Result<Rule> {

@@ -115,7 +115,7 @@ fn print_token_chips(tokens: &[String], annotations: &[TokenAnnotation]) {
 }
 
 fn print_constituent_table(constituents: &[Constituent], output: &str) {
-    println!("    {:<16} {:<12} {}", "span", "category", "semantics");
+    println!("    {:<16} {:<12} semantics", "span", "category");
     println!("    {}", "─".repeat(60));
 
     fn print_rows(constituents: &[Constituent], depth: usize) {

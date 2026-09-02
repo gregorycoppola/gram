@@ -104,9 +104,10 @@ fn tokenize(input: &str) -> Result<Vec<Tok>, String> {
                 let start = i;
 
                 while i < n {
-                    if chars[i].is_alphanumeric() || chars[i] == '_' {
-                        i += 1;
-                    } else if chars[i] == '-' && i + 1 < n && chars[i + 1] != '>' {
+                    if chars[i].is_alphanumeric()
+                        || chars[i] == '_'
+                        || (chars[i] == '-' && i + 1 < n && chars[i + 1] != '>')
+                    {
                         i += 1;
                     } else {
                         break;

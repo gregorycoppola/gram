@@ -40,6 +40,12 @@ impl DebugTrace {
     }
 }
 
+impl Default for DebugTrace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn filter_label(f: &KindFilter) -> String {
     match f {
         KindFilter::Any => "any".to_string(),

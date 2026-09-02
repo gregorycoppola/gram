@@ -204,9 +204,7 @@ impl KnowledgeBase {
     pub fn ground_all(&self) -> Vec<HornClause> {
         let mut grounded = Vec::new();
         for clause in &self.clauses {
-            if clause.is_fact() {
-                grounded.push(clause.clone());
-            } else if clause.variables.is_empty() {
+            if clause.is_fact() || clause.variables.is_empty() {
                 grounded.push(clause.clone());
             } else {
                 for binding in self.all_bindings(&clause.variables) {
@@ -230,6 +228,12 @@ impl KnowledgeBase {
             domains.push(ents);
         }
         cartesian_product(&domains, variables)
+    }
+}
+
+impl Default for KnowledgeBase {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

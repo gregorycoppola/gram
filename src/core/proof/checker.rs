@@ -140,7 +140,7 @@ fn check_universal_elim(
 ) -> Result<Expr, String> {
     let source_idx = step
         .from
-        .get(0)
+        .first()
         .copied()
         .ok_or("universal_elim requires a source step")?;
     let source = prior
@@ -236,7 +236,7 @@ fn check_existential_intro(
 ) -> Result<Expr, String> {
     let source_idx = step
         .from
-        .get(0)
+        .first()
         .copied()
         .ok_or("existential_intro requires a source step")?;
     let source = prior
@@ -297,7 +297,7 @@ fn check_and_intro(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Resu
 fn check_and_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step
         .from
-        .get(0)
+        .first()
         .copied()
         .ok_or("and_elim requires a source step")?;
     let source = prior
@@ -306,9 +306,7 @@ fn check_and_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Resul
 
     match source {
         Expr::And(left, right) => {
-            if expr_eq(formula, left) {
-                Ok(formula.clone())
-            } else if expr_eq(formula, right) {
+            if expr_eq(formula, left) || expr_eq(formula, right) {
                 Ok(formula.clone())
             } else {
                 Err(format!(
@@ -324,7 +322,7 @@ fn check_and_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Resul
 fn check_and_elim_l(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step
         .from
-        .get(0)
+        .first()
         .copied()
         .ok_or("and_elim_l requires a source step")?;
     let source = prior
@@ -349,7 +347,7 @@ fn check_and_elim_l(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Res
 fn check_and_elim_r(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step
         .from
-        .get(0)
+        .first()
         .copied()
         .ok_or("and_elim_r requires a source step")?;
     let source = prior
@@ -441,7 +439,7 @@ fn check_belief_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Re
 fn check_of_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step
         .from
-        .get(0)
+        .first()
         .copied()
         .ok_or("of_elim requires a source step")?;
     let source = prior
@@ -506,7 +504,7 @@ fn check_of_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result
 fn check_apply_elim(formula: &Expr, step: &ProofStep, prior: &PriorSteps) -> Result<Expr, String> {
     let source_idx = step
         .from
-        .get(0)
+        .first()
         .copied()
         .ok_or("apply_elim requires a source step")?;
     let source = prior
@@ -568,7 +566,7 @@ fn check_exists_many_weaken(
 ) -> Result<Expr, String> {
     let source_idx = step
         .from
-        .get(0)
+        .first()
         .copied()
         .ok_or("exists_many_weaken requires a source step")?;
     let source = prior
@@ -618,7 +616,7 @@ fn check_exists_many_weaken(
         ));
     }
     if !expr_eq(body1, body2) {
-        return Err(format!("exists_many_weaken: body mismatch"));
+        return Err("exists_many_weaken: body mismatch".to_string());
     }
 
     let n1: i32 = count1.parse().map_err(|_| {
@@ -653,7 +651,7 @@ fn check_quantifier_weaken(
 
     let source_idx = step
         .from
-        .get(0)
+        .first()
         .copied()
         .ok_or("quantifier_weaken requires a source step")?;
     let source = prior

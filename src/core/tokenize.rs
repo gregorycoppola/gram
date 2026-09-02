@@ -14,7 +14,7 @@ pub fn split_sentences(text: &str) -> Vec<String> {
         if matches!(c, '.' | '!' | '?') {
             // Look ahead: is the next char whitespace or end-of-text?
             let next = chars.get(i + 1).copied();
-            if next.is_none() || next.map_or(false, |c| c.is_whitespace()) {
+            if next.is_none() || next.is_some_and(char::is_whitespace) {
                 let trimmed = current.trim().to_string();
                 if !trimmed.is_empty() {
                     out.push(trimmed);

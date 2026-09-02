@@ -14,8 +14,8 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 pub use types::{
-    CheckProofRequest, CheckProofResponse, CoverageArticleSummary,
-    CoverageExampleSummary, FixtureSummary, ParseRequest, ParseResult, ParseStatus,
+    CheckProofRequest, CheckProofResponse, CoverageArticleSummary, CoverageExampleSummary,
+    FixtureSummary, ParseRequest, ParseResult, ParseStatus,
 };
 
 #[derive(Clone)]

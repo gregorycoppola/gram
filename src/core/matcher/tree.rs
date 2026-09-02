@@ -10,11 +10,11 @@ pub fn build_syntax(
     let mut parts: Vec<String> = Vec::new();
     let mut ci = 0;
     let mut skip_until = 0;
-    for i in 0..tokens.len() {
+    for (i, token) in tokens.iter().enumerate() {
         if i < skip_until {
             continue;
         }
-        let cleaned = clean_token(&tokens[i]);
+        let cleaned = clean_token(token);
         if is_punctuation(&cleaned) {
             continue;
         }

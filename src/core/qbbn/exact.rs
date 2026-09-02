@@ -9,11 +9,11 @@
 //! - Every proposition with no producing OR factor has a Bernoulli root prior.
 //!   The default prior is 0.5.
 //! - An AND factor is deterministic:
-//!     g = literal_1 AND ... AND literal_n
+//!   g = literal_1 AND ... AND literal_n
 //! - An OR factor uses the same log-linear CPT as `bp::cpt_prob_true`.
 //! - `evidence_prob = q` is represented as a unary likelihood:
-//!     likelihood(X = true)  = q
-//!     likelihood(X = false) = 1 - q
+//!   likelihood(X = true)  = q
+//!   likelihood(X = false) = 1 - q
 //! - The product of all factors is globally normalized.
 //!
 //! For a source proposition with a 0.5 root prior, evidence probability `q`

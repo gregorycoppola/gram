@@ -64,7 +64,9 @@ fn default_tolerance() -> f64 {
     0.01
 }
 
-fn extract_horn_clause(expr: &Expr) -> Result<(Vec<Expr>, Expr, Vec<(String, String)>), String> {
+type HornClauseParts = (Vec<Expr>, Expr, Vec<(String, String)>);
+
+fn extract_horn_clause(expr: &Expr) -> Result<HornClauseParts, String> {
     match expr {
         Expr::ForAll {
             var,
@@ -83,7 +85,7 @@ fn extract_horn_clause(expr: &Expr) -> Result<(Vec<Expr>, Expr, Vec<(String, Str
     }
 }
 
-fn extract_impl(expr: &Expr) -> Result<(Vec<Expr>, Expr, Vec<(String, String)>), String> {
+fn extract_impl(expr: &Expr) -> Result<HornClauseParts, String> {
     match expr {
         Expr::Implies { ante, cons } => {
             let premises = flatten_and(ante);

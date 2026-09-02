@@ -559,13 +559,19 @@ impl QBBNGraph {
     }
 }
 
+impl Default for QBBNGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn is_negated_formula(formula: &str) -> bool {
     formula.starts_with("not ")
 }
 
 fn get_positive_formula(formula: &str) -> String {
-    if formula.starts_with("not ") {
-        formula[4..].to_string()
+    if let Some(positive) = formula.strip_prefix("not ") {
+        positive.to_string()
     } else {
         formula.to_string()
     }

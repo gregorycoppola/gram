@@ -5,7 +5,7 @@ use super::factor_graph::{Factor, FactorType, NodeType, QBBNGraph};
 type Message = [f64; 2];
 type MessageKey = (String, String);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BPTrace {
     pub iterations: Vec<HashMap<String, f64>>,
 }
@@ -114,8 +114,7 @@ fn factor_potential(
         FactorType::And => {
             let mut conjunction = true;
 
-            for index in 0..factor.input_ids.len() {
-                let raw_value = assignment[index];
+            for (index, &raw_value) in assignment.iter().take(factor.input_ids.len()).enumerate() {
                 let literal_value = if factor.input_negated[index] {
                     !raw_value
                 } else {
@@ -193,19 +192,19 @@ fn compute_factor_message(
 
     let mut result = [0.0, 0.0];
 
-    for target_state in 0..=1 {
+    for (target_state, target_result) in result.iter_mut().enumerate() {
         for mask in 0..assignment_count {
             let mut assignment = vec![false; variable_ids.len()];
             assignment[target_index] = target_state == 1;
 
             let mut other_index = 0;
 
-            for variable_index in 0..variable_ids.len() {
+            for (variable_index, value) in assignment.iter_mut().enumerate() {
                 if variable_index == target_index {
                     continue;
                 }
 
-                assignment[variable_index] = ((mask >> other_index) & 1) == 1;
+                *value = ((mask >> other_index) & 1) == 1;
                 other_index += 1;
             }
 
@@ -230,7 +229,7 @@ fn compute_factor_message(
                 incoming_product *= incoming[state];
             }
 
-            result[target_state] += potential * incoming_product;
+            *target_result += potential * incoming_product;
         }
     }
 

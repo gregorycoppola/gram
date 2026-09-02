@@ -983,7 +983,6 @@ fn test_the_pp_dp_rejects_quantified_complement() {
     assert!(error.contains("bare DP"), "got: {error}");
 }
 
-
 #[test]
 fn test_possessive_the_n_dp_enriches_composed_head() {
     let noun = SemValue::N {
@@ -1025,8 +1024,7 @@ fn test_possessive_the_n_dp_enriches_composed_head() {
         Arg::Literal("team".into()),
     ];
 
-    let result =
-        apply_constructor("possessive_the_n_dp", &args, &mut VarGen::new()).unwrap();
+    let result = apply_constructor("possessive_the_n_dp", &args, &mut VarGen::new()).unwrap();
 
     let SemValue::Dp {
         var,
@@ -1079,12 +1077,10 @@ fn test_possessive_the_n_dp_rejects_quantified_possessor() {
         Arg::Literal("team".into()),
     ];
 
-    let error =
-        apply_constructor("possessive_the_n_dp", &args, &mut VarGen::new()).unwrap_err();
+    let error = apply_constructor("possessive_the_n_dp", &args, &mut VarGen::new()).unwrap_err();
 
     assert!(error.contains("bare possessor DP"), "got: {error}");
 }
-
 
 #[test]
 fn test_adj_arg_n_attaches_argument_to_modifier() {
@@ -1123,7 +1119,6 @@ fn test_adj_arg_n_attaches_argument_to_modifier() {
         "first(theme: x, interval: years_53) ∧ nba_championship(theme: x)"
     );
 }
-
 
 #[test]
 fn test_n_arg_enriches_noun_head() {
@@ -1249,8 +1244,7 @@ fn test_s_control_purpose_at_time_shares_subject() {
         Arg::Literal("patient".into()),
     ];
 
-    let result =
-        apply_constructor("s_control_purpose_at_time", &args, &mut VarGen::new()).unwrap();
+    let result = apply_constructor("s_control_purpose_at_time", &args, &mut VarGen::new()).unwrap();
 
     let SemValue::Prop(expression) = result else {
         panic!("expected proposition");
@@ -1261,7 +1255,6 @@ fn test_s_control_purpose_at_time_shares_subject() {
         "come_back(agent: jay_z, at_time: now, purpose: the [x:e]: energy(theme: x) -> continue(agent: jay_z, patient: x))"
     );
 }
-
 
 #[test]
 fn test_s_transitive_control_purpose_ditransitive() {
@@ -1306,23 +1299,14 @@ fn test_s_transitive_control_purpose_ditransitive() {
                                 typ: "e".into(),
                             },
                         ),
-                        (
-                            "title".into(),
-                            Expr::Entity("reasonable_doubt".into()),
-                        ),
+                        ("title".into(), Expr::Entity("reasonable_doubt".into())),
                         ("artist".into(), Expr::Entity("jay_z".into())),
                     ],
                 },
             },
         }),
-        Arg::Lexical(
-            "break_up".into(),
-            "{agent:e,patient:e,purpose:s}".into(),
-        ),
-        Arg::Lexical(
-            "celebrate".into(),
-            "{agent:e,duration:n,theme:e}".into(),
-        ),
+        Arg::Lexical("break_up".into(), "{agent:e,patient:e,purpose:s}".into()),
+        Arg::Lexical("celebrate".into(), "{agent:e,duration:n,theme:e}".into()),
         Arg::Literal("agent".into()),
         Arg::Literal("patient".into()),
         Arg::Literal("purpose".into()),

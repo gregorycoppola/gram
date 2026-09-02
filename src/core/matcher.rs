@@ -384,7 +384,7 @@ fn parse_bottom_up(
             .map(|result| span_result_to_match(result, span, &sentence.tokens))
             .collect())
     } else {
-        return Err(format!(
+        Err(format!(
             "expected exactly one top-level span, found {}: {}",
             top_level_keys.len(),
             top_level_keys
@@ -392,10 +392,11 @@ fn parse_bottom_up(
                 .map(|k| format!("[{}] {}..{}", k.label, k.start, k.end))
                 .collect::<Vec<_>>()
                 .join(", ")
-        ));
+        ))
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn match_span(
     span_tokens: &[String],
     global_start: usize,

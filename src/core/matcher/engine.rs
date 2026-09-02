@@ -23,6 +23,7 @@ struct PatternMatch {
     child_derivation_keys: Vec<String>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn try_pattern_matches(
     tokens: &[String],
     global_offset: usize,
