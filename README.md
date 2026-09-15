@@ -1,9 +1,15 @@
 # Gram
 
-Gram is an experimental natural-language-to-probabilistic-logic compiler and
-reasoning runtime written in Rust. It combines a typed slot grammar, logical
-form construction, machine-checkable proofs, and QBBN inference behind a Rust
-library, command-line interface, and local HTTP service.
+Gram is an experimental syntax-to-logic parsing program written in Rust. It
+turns tokenized natural-language examples into typed logical forms using a
+small, explicit grammar and lexicon.
+
+The project is meant for exploring how surface syntax maps onto compositional
+semantics: noun phrases, quantifiers, relative clauses, comparatives,
+prepositional attachments, tense/aspect expansions, and other small linguistic
+patterns. Alongside parsing, Gram includes proof checking and QBBN inference
+experiments so parsed logical forms can be tested inside a lightweight
+reasoning runtime.
 
 > **Research status:** Gram is a pre-release research artifact. Its Rust API,
 > command-line output, HTTP API, and JSON fixture formats are not yet stable or
@@ -11,13 +17,17 @@ library, command-line interface, and local HTTP service.
 
 ## What it does
 
-- tokenizes fixture sentences and compiles typed grammar rules;
-- preserves alternative derivations and compares their semantics with a gold
-  logical form;
-- parses and type-checks logical forms;
+- reads JSON fixtures containing a lexicon, grammar rules, and hinted
+  sentence spans;
+- compiles typed grammar rules into parse operations;
+- maps syntax trees to compositional logical forms;
+- preserves alternative derivations and compares their semantics with expected
+  gold forms;
+- parses and type-checks logic expressions;
 - validates explicit formal-proof steps;
 - builds QBBN factor graphs and runs exact or belief-propagation inference;
-- exposes the same fixtures and operations to the companion Gloss workbench.
+- exposes the same fixtures and operations through a local CLI and HTTP API for
+  the companion Gloss workbench.
 
 ## Quick start
 
